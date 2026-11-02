@@ -393,4 +393,169 @@ public class WorkoutExerciseAddEndpointTests : WorkoutExerciseEndpointTest
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("status").GetString().Should().Be("PUBLISHED");
     }
+
+    [Theory]
+    [InlineData("30", 30)]
+    [InlineData("1.25", 1.25)]
+    [InlineData("999.99", 999.99)]
+    public async Task Post_ShouldStoreAMinutesTargetAndReturnItWithoutIntegerValues(string sent, double expected)
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), Body(SeedData.CurlBicepsId, "MID", MinutesSet(1, decimal.Parse(sent, System.Globalization.CultureInfo.InvariantCulture))));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var returned = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        returned.GetProperty("sets")[0].GetProperty("target").GetProperty("type").GetString().Should().Be("Minutes");
+        MinutesOf(returned).Should().Equal((decimal)expected);
+        returned.GetProperty("sets")[0].GetProperty("target").TryGetProperty("value", out _).Should().BeFalse();
+        returned.GetProperty("sets")[0].GetProperty("target").TryGetProperty("maxValue", out _).Should().BeFalse();
+        MinutesOf((await EntriesOf(SeedData.OwnedWorkoutId))[^1]).Should().Equal((decimal)expected);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("1.255")]
+    [InlineData("1000")]
+    public async Task Post_ShouldRejectAnInvalidMinutesTargetAndChangeNothing(string? sent)
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+        decimal? minutes = sent is null ? null : decimal.Parse(sent, System.Globalization.CultureInfo.InvariantCulture);
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), Body(SeedData.CurlBicepsId, "MID", MinutesSet(1, minutes)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        ExerciseIds(await EntriesOf(SeedData.OwnedWorkoutId)).Should().Equal(SeedData.PressBancaId);
+    }
+
+    [Fact]
+    public async Task Post_ShouldIgnoreTheIntegerTargetsSentWithMinutes()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+        var minutesSet = new { count = 1, targetType = "Minutes", target = 5, maxTarget = 9, targetMinutes = 30m };
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), Body(SeedData.CurlBicepsId, "MID", minutesSet));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var returned = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        MinutesOf(returned).Should().Equal(30m);
+        returned.GetProperty("sets")[0].GetProperty("target").TryGetProperty("value", out _).Should().BeFalse();
+        returned.GetProperty("sets")[0].GetProperty("target").TryGetProperty("maxValue", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Post_ShouldIgnoreTargetMinutesSentWithAnotherType()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+        var durationSet = new { count = 3, targetType = "Duration", target = 40, targetMinutes = 2m };
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), Body(SeedData.CurlBicepsId, "MID", durationSet));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var returned = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        SetsOf(returned).Should().Equal((3, "Duration", (int?)40));
+        MinutesOf(returned).Should().Equal((decimal?)null);
+    }
+
+    [Fact]
+    public async Task Post_ShouldStoreAPerSideEntryWithRepsAndLeaveTheTargetAsSent()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), BodyWith(SeedData.CurlBicepsId, "MID", true, null, Reps(1, 8)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var returned = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        returned.GetProperty("perSide").GetBoolean().Should().BeTrue();
+        SetsOf(returned).Should().Equal((1, "Reps", (int?)8));
+        (await EntriesOf(SeedData.OwnedWorkoutId))[^1].GetProperty("perSide").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Post_ShouldStoreAPerSideEntryWithDuration()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), BodyWith(SeedData.CurlBicepsId, "MID", true, null, Sets(3, "Duration", 30)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var stored = (await EntriesOf(SeedData.OwnedWorkoutId))[^1];
+        stored.GetProperty("perSide").GetBoolean().Should().BeTrue();
+        SetsOf(stored).Should().Equal((3, "Duration", (int?)30));
+    }
+
+    [Fact]
+    public async Task Post_ShouldDefaultPerSideToFalseAndRestToNull()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), ACurl());
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var returned = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        returned.GetProperty("perSide").GetBoolean().Should().BeFalse();
+        returned.TryGetProperty("restMinutes", out var rest).Should().BeTrue();
+        rest.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Theory]
+    [InlineData("1.5")]
+    [InlineData("0.75")]
+    [InlineData("999.99")]
+    public async Task Post_ShouldStoreTheRestWithDecimals(string sent)
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+        var rest = decimal.Parse(sent, System.Globalization.CultureInfo.InvariantCulture);
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), BodyWith(SeedData.CurlBicepsId, "MID", null, rest, Reps(3, 10)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions)).GetProperty("restMinutes").GetDecimal().Should().Be(rest);
+        (await EntriesOf(SeedData.OwnedWorkoutId))[^1].GetProperty("restMinutes").GetDecimal().Should().Be(rest);
+    }
+
+    [Theory]
+    [InlineData("1.333")]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("1000")]
+    public async Task Post_ShouldRejectAnInvalidRestAndChangeNothing(string sent)
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+        var rest = decimal.Parse(sent, System.Globalization.CultureInfo.InvariantCulture);
+
+        // Act
+        var response = await client.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), BodyWith(SeedData.CurlBicepsId, "MID", null, rest, Reps(3, 10)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        ExerciseIds(await EntriesOf(SeedData.OwnedWorkoutId)).Should().Equal(SeedData.PressBancaId);
+    }
 }

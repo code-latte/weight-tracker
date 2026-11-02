@@ -1156,4 +1156,78 @@ public class WorkoutTests
         act.Should().Throw<WorkoutExerciseOrderMismatchException>();
         workout.Exercises.Select(entry => entry.ExerciseId).Should().Equal(exercises);
     }
+
+    [Fact]
+    public void AddExercise_ShouldKeepThePerSideFlagAndTheRest()
+    {
+        // Arrange
+        var workout = Workout.Create(Id.New(), null, Name, null, WorkoutDate);
+        var exerciseId = Id.New();
+        var rest = TimeInMinutes.From(1.25m);
+
+        // Act
+        workout.AddExercise(exerciseId, Effort.MID, [ThreeByTen], perSide: true, rest: rest);
+
+        // Assert
+        var entry = workout.Exercises.Single();
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(rest);
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldReplaceThePerSideFlagAndTheRest()
+    {
+        // Arrange
+        var workout = Workout.Create(Id.New(), null, Name, null, WorkoutDate);
+        var exerciseId = Id.New();
+        workout.AddExercise(exerciseId, Effort.MID, [ThreeByTen]);
+        var rest = TimeInMinutes.From(1.5m);
+
+        // Act
+        workout.UpdateExercise(exerciseId, Effort.MID, [ThreeByTen], perSide: true, rest: rest);
+
+        // Assert
+        var entry = workout.Exercises.Single();
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(rest);
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldClearThePerSideFlagAndTheRestWhenOmitted()
+    {
+        // Arrange
+        var workout = Workout.Create(Id.New(), null, Name, null, WorkoutDate);
+        var exerciseId = Id.New();
+        workout.AddExercise(exerciseId, Effort.MID, [ThreeByTen], perSide: true, rest: TimeInMinutes.From(2m));
+
+        // Act
+        workout.UpdateExercise(exerciseId, Effort.MID, [ThreeByTen]);
+
+        // Assert
+        var entry = workout.Exercises.Single();
+        entry.PerSide.Should().BeFalse();
+        entry.Rest.Should().BeNull();
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldKeepThePerSideFlagAndTheRestWhenTheSuperSeriesRejectsTheUpdate()
+    {
+        // Arrange
+        var workout = Workout.Create(Id.New(), null, Name, null, WorkoutDate);
+        var first = Id.New();
+        var second = Id.New();
+        var rest = TimeInMinutes.From(2m);
+        workout.AddExercise(first, Effort.MID, [FourByTen], perSide: true, rest: rest);
+        workout.AddExercise(second, Effort.MID, [FourByTen]);
+        workout.CreateSuperSeries([EntryOf(workout, first), EntryOf(workout, second)]);
+
+        // Act
+        var act = () => workout.UpdateExercise(first, Effort.HIGH, [ThreeByTen], perSide: false, rest: null);
+
+        // Assert
+        act.Should().Throw<SuperSeriesSetCountMismatchException>();
+        var entry = workout.Exercises.Single(item => item.ExerciseId == first);
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(rest);
+    }
 }

@@ -25,6 +25,8 @@ const exercise = {
   bodyPart: "LEGS",
   type: "STRENGTH",
   effort: "HIGH",
+  perSide: false,
+  restMinutes: null,
   sets: [],
   superSeriesId: null,
 } satisfies Workout["exercises"][number];

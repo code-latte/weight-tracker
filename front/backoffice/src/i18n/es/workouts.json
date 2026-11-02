@@ -53,6 +53,8 @@
       "edit": "Editar ejercicio",
       "title": "Ejercicios",
       "effortLine": "Esfuerzo: {{effort}}",
+      "restLine": "Descanso: {{rest}} min",
+      "perSideSuffix": " · por lado",
       "reorder": "Reordenar ejercicio",
       "dnd": {
         "roleDescription": "ejercicio reordenable",
@@ -68,16 +70,22 @@
         "RepsRange": "{{series}} × {{value}}–{{max}}",
         "Duration": "{{series}} × {{value}} s",
         "MaxReps": "{{series}} × máx",
+        "Minutes": "{{series}} × {{value}} min",
         "other": "{{series}} × {{value}}"
       }
     },
     "configuration": {
       "effort": "Esfuerzo",
+      "rest": "Descanso entre series",
+      "restHint": "Minutos o m:ss, p. ej. 1:30",
+      "perSide": "Por lado",
+      "perSideSuffix": " por lado",
       "sets": "Series",
       "setCount": "Series",
       "targetType": "Tipo",
       "targetValue": "Valor",
       "targetMaxValue": "Máximo",
+      "minutesHint": "m:ss",
       "video": "Vídeo",
       "openVideo": "Ver vídeo",
       "title": "Configuración del ejercicio",
@@ -87,6 +95,7 @@
       "noSets": "Todavía no hay series.",
       "validation": {
         "positiveInteger": "Introduce un número entero mayor que 0.",
+        "minutesFormat": "Usa minutos (2) o minutos:segundos (1:30).",
         "effort": "Elige un esfuerzo.",
         "sets": "Añade al menos una serie."
       },
@@ -95,6 +104,7 @@
         "RepsRange": "{{series}} × {{value}}–{{max}} repeticiones",
         "Duration": "{{series}} × {{value}} s",
         "MaxReps": "{{series}} × máximo",
+        "Minutes": "{{series}} × {{value}} min",
         "other": "{{series}} × {{value}}"
       },
       "cancel": "Cancelar"
@@ -152,7 +162,8 @@
     "Reps": "Repeticiones",
     "Duration": "Segundos",
     "MaxReps": "Máximas repeticiones",
-    "RepsRange": "Rango de repeticiones"
+    "RepsRange": "Rango de repeticiones",
+    "Minutes": "Minutos"
   },
   "exerciseTypes": {
     "STRENGTH": "Fuerza",

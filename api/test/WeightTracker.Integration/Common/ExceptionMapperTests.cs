@@ -99,6 +99,19 @@ public class ExceptionMapperTests
     }
 
     [Fact]
+    public void Map_ShouldReturnBadRequestForAnInvalidTimeInMinutes()
+    {
+        // Arrange
+        var exception = new InvalidTimeInMinutesException("minutes must be greater than 0, got 0");
+
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(StatusCodes.Status400BadRequest);
+    }
+
+    [Fact]
     public void Map_ShouldReturnBadRequestForAnInvalidEffort()
     {
         // Arrange

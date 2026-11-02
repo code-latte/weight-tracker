@@ -61,7 +61,7 @@ public class UpdateWorkoutExerciseUseCaseTests
         GivenSaveAndCommitSucceed(workout);
 
         // Act
-        var entry = await AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, exerciseId, Effort.HIGH, [twoByTwelve], CancellationToken.None);
+        var entry = await AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, exerciseId, Effort.HIGH, [twoByTwelve], false, null, CancellationToken.None);
 
         // Assert
         entry.Effort.Should().Be(Effort.HIGH);
@@ -77,7 +77,7 @@ public class UpdateWorkoutExerciseUseCaseTests
         var workoutId = Id.New();
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workoutId, Id.New(), Id.New(), Effort.MID, [ThreeByTen], CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workoutId, Id.New(), Id.New(), Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<ExerciseIdMismatchException>();
@@ -94,7 +94,7 @@ public class UpdateWorkoutExerciseUseCaseTests
         _workouts.Setup(repository => repository.GetById(workoutId, It.IsAny<CancellationToken>())).ReturnsAsync((Workout?)null);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workoutId, exerciseId, exerciseId, Effort.MID, [ThreeByTen], CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workoutId, exerciseId, exerciseId, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<WorkoutNotFoundException>();
@@ -110,7 +110,7 @@ public class UpdateWorkoutExerciseUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(OwnerId, Role.USER, workout.Id, exerciseId, exerciseId, Effort.HIGH, [ThreeByTen], CancellationToken.None);
+        var act = () => AUseCase().Execute(OwnerId, Role.USER, workout.Id, exerciseId, exerciseId, Effort.HIGH, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
@@ -127,10 +127,28 @@ public class UpdateWorkoutExerciseUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, absent, absent, Effort.MID, [ThreeByTen], CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, absent, absent, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<ExerciseNotInWorkoutException>();
         VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldReplaceThePerSideFlagAndTheRest()
+    {
+        // Arrange
+        var exerciseId = Id.New();
+        var workout = AStoredWorkout(exerciseId);
+        var rest = TimeInMinutes.From(2m);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var entry = await AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, exerciseId, Effort.MID, [ThreeByTen], true, rest, CancellationToken.None);
+
+        // Assert
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(rest);
     }
 }

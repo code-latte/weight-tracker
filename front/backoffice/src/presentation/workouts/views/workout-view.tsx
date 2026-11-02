@@ -98,13 +98,18 @@ type OpenDialog =
   | { kind: "catalog" }
   | { kind: "configure"; item: WorkoutExerciseItem; adding: boolean };
 
-/** A catalog exercise chosen to be added: no effort and no sets yet; they are defined in the configuration dialog. */
+/**
+ * A catalog exercise chosen to be added: no effort, no rest, not per side and no sets yet; they are defined in the
+ * configuration dialog.
+ */
 function newItemOf(exercise: Exercise): WorkoutExerciseItem {
   return {
     workoutExercise: {
       id: `new-${exercise.id}`,
       exerciseId: exercise.id,
       effort: "",
+      perSide: false,
+      restMinutes: null,
       sets: [],
       superSeriesId: null,
     },

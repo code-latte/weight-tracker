@@ -30,6 +30,18 @@ public sealed record AddOrUpdateExerciseRequest
     [Required]
     [MinLength(1)]
     public IReadOnlyList<SetPrescriptionRequest>? Sets { get; init; }
+
+    /// <summary>
+    /// When true the targets of the sets are per side (1x8 reps means 8 on each side). Defaults to false.
+    /// </summary>
+    public bool? PerSide { get; init; }
+
+    /// <summary>
+    /// Rest between sets in minutes, up to 2 decimals (1.5 is 1 minute and 30 seconds). Omit it for no rest.
+    /// </summary>
+    public decimal? RestMinutes { get; init; }
+
+    public TimeInMinutes? ToRest() => RestMinutes is null ? null : TimeInMinutes.From(RestMinutes.Value);
 }
 
 public sealed record SetPrescriptionRequest
@@ -38,9 +50,9 @@ public sealed record SetPrescriptionRequest
     [Required]
     public int? Count { get; init; }
 
-    /// <summary><c>Reps</c>, <c>Duration</c>, <c>MaxReps</c> or <c>RepsRange</c>.</summary>
+    /// <summary><c>Reps</c>, <c>Duration</c>, <c>MaxReps</c>, <c>RepsRange</c> or <c>Minutes</c>.</summary>
     [Required]
-    [AllowedValues(SetTargetTypes.Reps, SetTargetTypes.Duration, SetTargetTypes.MaxReps, SetTargetTypes.RepsRange)]
+    [AllowedValues(SetTargetTypes.Reps, SetTargetTypes.Duration, SetTargetTypes.MaxReps, SetTargetTypes.RepsRange, SetTargetTypes.Minutes)]
     public string? TargetType { get; init; }
 
     /// <summary>
@@ -54,11 +66,17 @@ public sealed record SetPrescriptionRequest
     /// </summary>
     public int? MaxTarget { get; init; }
 
+    /// <summary>
+    /// Minutes per set for <c>Minutes</c>, up to 2 decimals (1.25 is 1 minute and 15 seconds). Ignored for every other target type.
+    /// </summary>
+    public decimal? TargetMinutes { get; init; }
+
     public SetPrescription ToDomain() => new(Count!.Value, TargetType switch
     {
         SetTargetTypes.Reps => new SetTarget.Reps(Target ?? 0),
         SetTargetTypes.Duration => new SetTarget.Duration(Target ?? 0),
         SetTargetTypes.RepsRange => new SetTarget.RepsRange(Target ?? 0, MaxTarget ?? 0),
+        SetTargetTypes.Minutes => new SetTarget.Minutes(TimeInMinutes.From(TargetMinutes ?? 0)),
         _ => new SetTarget.MaxReps(),
     });
 }

@@ -397,4 +397,62 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("status").GetString().Should().Be("PUBLISHED");
     }
+
+    [Fact]
+    public async Task Put_ShouldReplacePerSideAndRestAndReturnThem()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var body = BodyWith(SeedData.SentadillaId, "HIGH", true, 1.5m, Reps(2, 12));
+
+        // Act
+        var response = await trainer.PutAsJsonAsync(ExerciseRoute(SeedData.TrainedWorkoutId, SeedData.SentadillaId), body);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var returned = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        returned.GetProperty("perSide").GetBoolean().Should().BeTrue();
+        returned.GetProperty("restMinutes").GetDecimal().Should().Be(1.5m);
+        var stored = (await EntriesOf(SeedData.TrainedWorkoutId)).Single(entry => entry.GetProperty("exerciseId").GetGuid() == SeedData.SentadillaId);
+        stored.GetProperty("perSide").GetBoolean().Should().BeTrue();
+        stored.GetProperty("restMinutes").GetDecimal().Should().Be(1.5m);
+    }
+
+    [Fact]
+    public async Task Put_ShouldClearPerSideAndRestWhenTheyAreOmitted()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var route = ExerciseRoute(SeedData.TrainedWorkoutId, SeedData.SentadillaId);
+        (await trainer.PutAsJsonAsync(route, BodyWith(SeedData.SentadillaId, "HIGH", true, 2m, Reps(2, 12)))).EnsureSuccessStatusCode();
+
+        // Act
+        var response = await trainer.PutAsJsonAsync(route, ASentadillaUpdate());
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stored = (await EntriesOf(SeedData.TrainedWorkoutId)).Single(entry => entry.GetProperty("exerciseId").GetGuid() == SeedData.SentadillaId);
+        stored.GetProperty("perSide").GetBoolean().Should().BeFalse();
+        stored.GetProperty("restMinutes").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Put_ShouldRejectAnInvalidRestAndKeepThePreviousValues()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var route = ExerciseRoute(SeedData.TrainedWorkoutId, SeedData.SentadillaId);
+        (await trainer.PutAsJsonAsync(route, BodyWith(SeedData.SentadillaId, "HIGH", true, 2m, Reps(2, 12)))).EnsureSuccessStatusCode();
+
+        // Act
+        var response = await trainer.PutAsJsonAsync(route, BodyWith(SeedData.SentadillaId, "LOW", false, -1m, Reps(5, 5)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var stored = (await EntriesOf(SeedData.TrainedWorkoutId)).Single(entry => entry.GetProperty("exerciseId").GetGuid() == SeedData.SentadillaId);
+        stored.GetProperty("effort").GetString().Should().Be("HIGH");
+        stored.GetProperty("perSide").GetBoolean().Should().BeTrue();
+        stored.GetProperty("restMinutes").GetDecimal().Should().Be(2m);
+        SetsOf(stored).Should().Equal((2, "Reps", (int?)12));
+    }
 }

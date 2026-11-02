@@ -123,6 +123,8 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(workoutExercise => workoutExercise.ExerciseId).HasColumnName("ExerciseId");
             entity.Property(workoutExercise => workoutExercise.Position).HasColumnName("Position");
             entity.Property(workoutExercise => workoutExercise.Effort).HasColumnName("Effort");
+            entity.Property(workoutExercise => workoutExercise.PerSide).HasColumnName("PerSide");
+            entity.Property(workoutExercise => workoutExercise.RestMinutes).HasColumnName("RestMinutes").HasPrecision(5, 2);
             entity.Property(workoutExercise => workoutExercise.SuperSeriesId).HasColumnName("SuperSeriesId");
 
             entity.HasIndex(workoutExercise => new { workoutExercise.WorkoutId, workoutExercise.ExerciseId }).IsUnique();
@@ -150,6 +152,7 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(set => set.TargetType).HasColumnName("TargetType").HasMaxLength(20).IsRequired();
             entity.Property(set => set.TargetValue).HasColumnName("TargetValue");
             entity.Property(set => set.TargetMaxValue).HasColumnName("TargetMaxValue");
+            entity.Property(set => set.TargetMinutes).HasColumnName("TargetMinutes").HasPrecision(5, 2);
         });
 
         modelBuilder.Entity<RefreshTokenEntity>(entity =>

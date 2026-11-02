@@ -1,4 +1,5 @@
 import { isCalendarDate } from "./calendar-date";
+import { isMinutesText } from "./time-in-minutes";
 
 export const WORKOUT_NAME_MAX_LENGTH = 256;
 export const WORKOUT_DESCRIPTION_MAX_LENGTH = 1024;
@@ -89,7 +90,7 @@ export function validateCreateWorkoutForm(
 const TARGET_TYPES_WITHOUT_VALUE = new Set(["MaxReps"]);
 const TARGET_TYPES_WITH_MAXIMUM = new Set(["RepsRange"]);
 
-export type SetFieldViolation = "positiveInteger";
+export type SetFieldViolation = "positiveInteger" | "minutesFormat";
 
 /** One set prescription as typed in a form: every field is a string, empty when not filled. */
 export interface SetFormValues {
@@ -112,8 +113,8 @@ export function targetFieldsOf(type: string): { value: boolean; maxValue: boolea
 }
 
 /**
- * Structural rules of one set: the number of sets, and the target fields its type needs, are whole numbers from 1.
- * Whether a range's maximum is above its minimum is left to the API.
+ * Structural rules of one set: the number of sets, and the target fields its type needs, are whole numbers from 1,
+ * except a minutes value, typed as `M` or `M:SS`. Whether a range's maximum is above its minimum is left to the API.
  */
 export function validateSetForm(values: SetFormValues): SetFormViolations {
   const violations: SetFormViolations = {};
@@ -122,7 +123,11 @@ export function validateSetForm(values: SetFormValues): SetFormViolations {
   if (!POSITIVE_INTEGER_PATTERN.test(values.count.trim())) {
     violations.count = "positiveInteger";
   }
-  if (needs.value && !POSITIVE_INTEGER_PATTERN.test(values.value.trim())) {
+  if (needs.value && values.type === "Minutes") {
+    if (!isMinutesText(values.value)) {
+      violations.value = "minutesFormat";
+    }
+  } else if (needs.value && !POSITIVE_INTEGER_PATTERN.test(values.value.trim())) {
     violations.value = "positiveInteger";
   }
   if (needs.maxValue && !POSITIVE_INTEGER_PATTERN.test(values.maxValue.trim())) {
@@ -134,15 +139,18 @@ export function validateSetForm(values: SetFormValues): SetFormViolations {
 export interface ExerciseConfigurationViolations {
   effort?: "required";
   sets?: "minItems";
+  rest?: "minutesFormat";
 }
 
-/** An exercise is saved with an effort and at least one set. */
+/** An exercise is saved with an effort and at least one set; its rest is optional, typed as `M` or `M:SS`. */
 export function validateExerciseConfiguration({
   effort,
   setCount,
+  rest = "",
 }: {
   effort: string;
   setCount: number;
+  rest?: string;
 }): ExerciseConfigurationViolations {
   const violations: ExerciseConfigurationViolations = {};
 
@@ -151,6 +159,9 @@ export function validateExerciseConfiguration({
   }
   if (setCount < 1) {
     violations.sets = "minItems";
+  }
+  if (rest.trim() !== "" && !isMinutesText(rest)) {
+    violations.rest = "minutesFormat";
   }
   return violations;
 }

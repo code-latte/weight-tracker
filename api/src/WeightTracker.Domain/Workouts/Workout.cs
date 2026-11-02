@@ -198,25 +198,27 @@ public sealed class Workout : AggregateRoot
     /// <param name="exerciseId">Exercise to include into the workout</param>
     /// <param name="effort">How hard the exercise must be performed</param>
     /// <param name="sets">Ordered config of number of sets x reps (time, max)</param>
+    /// <param name="perSide">Whether the targets of the sets are per side</param>
+    /// <param name="rest">Rest prescribed between sets, null when none</param>
     /// <exception cref="ExerciseAlreadyInWorkoutException">When the exercise is already in the workout.</exception>
     /// <exception cref="InvalidEffortException">When the effort is not a defined value.</exception>
-    public void AddExercise(Id exerciseId, Effort effort, IEnumerable<SetPrescription> sets)
+    public void AddExercise(Id exerciseId, Effort effort, IEnumerable<SetPrescription> sets, bool perSide = false, TimeInMinutes? rest = null)
     {
         if (_exercises.Any(entry => entry.ExerciseId == exerciseId))
             throw new ExerciseAlreadyInWorkoutException(exerciseId, this.Id);
 
-        _exercises.Add(WorkoutExercise.Create(exerciseId, effort, sets));
+        _exercises.Add(WorkoutExercise.Create(exerciseId, effort, sets, perSide, rest));
     }
 
     /// <summary>
-    /// Replaces the effort and every set prescription of an exercise. The entry keeps its identifier,
+    /// Replaces the effort, the per-side flag, the rest and every set prescription of an exercise. The entry keeps its identifier,
     /// position and superseries.
     /// </summary>
     /// <exception cref="ExerciseNotInWorkoutException">When the exercise is not in the workout.</exception>
     /// <exception cref="SuperSeriesSetCountMismatchException">When the entry is in a superseries and the new total of sets differs from the other members.</exception>
     /// <exception cref="InvalidEffortException">When the effort is not a defined value.</exception>
     /// <exception cref="WorkoutExerciseRequiresSetsException">When no set prescription is given.</exception>
-    public void UpdateExercise(Id exerciseId, Effort effort, IEnumerable<SetPrescription> sets)
+    public void UpdateExercise(Id exerciseId, Effort effort, IEnumerable<SetPrescription> sets, bool perSide = false, TimeInMinutes? rest = null)
     {
         var entry = _exercises.FirstOrDefault(item => item.ExerciseId == exerciseId)
             ?? throw new ExerciseNotInWorkoutException(exerciseId, this.Id);
@@ -232,7 +234,7 @@ public sealed class Workout : AggregateRoot
                 throw new SuperSeriesSetCountMismatchException(this.Id);
         }
 
-        entry.Replace(effort, prescriptions);
+        entry.Replace(effort, prescriptions, perSide, rest);
     }
 
     /// <exception cref="ExerciseNotInWorkoutException">When the exercise is not in the workout.</exception>

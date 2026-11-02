@@ -68,7 +68,7 @@ public class AddWorkoutExerciseUseCaseTests
         GivenSaveAndCommitSucceed(workout);
 
         // Act
-        var entry = await AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, Effort.HIGH, [ThreeByTen], CancellationToken.None);
+        var entry = await AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, Effort.HIGH, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         entry.ExerciseId.Should().Be(exerciseId);
@@ -86,7 +86,7 @@ public class AddWorkoutExerciseUseCaseTests
         _workouts.Setup(repository => repository.GetById(workoutId, It.IsAny<CancellationToken>())).ReturnsAsync((Workout?)null);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workoutId, Id.New(), Effort.MID, [ThreeByTen], CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workoutId, Id.New(), Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<WorkoutNotFoundException>();
@@ -101,7 +101,7 @@ public class AddWorkoutExerciseUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(OwnerId, Role.USER, workout.Id, Id.New(), Effort.MID, [ThreeByTen], CancellationToken.None);
+        var act = () => AUseCase().Execute(OwnerId, Role.USER, workout.Id, Id.New(), Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
@@ -119,7 +119,7 @@ public class AddWorkoutExerciseUseCaseTests
         _exercises.Setup(repository => repository.GetById(exerciseId, It.IsAny<CancellationToken>())).ReturnsAsync((Exercise?)null);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, Effort.MID, [ThreeByTen], CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<ExerciseNotFoundException>();
@@ -136,7 +136,7 @@ public class AddWorkoutExerciseUseCaseTests
         GivenInCatalog(existing);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, existing, Effort.MID, [ThreeByTen], CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, existing, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<ExerciseAlreadyInWorkoutException>();
@@ -153,10 +153,29 @@ public class AddWorkoutExerciseUseCaseTests
         GivenInCatalog(exerciseId);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, Effort.MID, [], CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, Effort.MID, [], false, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<WorkoutExerciseRequiresSetsException>();
         VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldStoreThePerSideFlagAndTheRest()
+    {
+        // Arrange
+        var workout = AStoredWorkout(Id.New());
+        var exerciseId = Id.New();
+        var rest = TimeInMinutes.From(1.5m);
+        GivenStored(workout);
+        GivenInCatalog(exerciseId);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var entry = await AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, exerciseId, Effort.HIGH, [ThreeByTen], true, rest, CancellationToken.None);
+
+        // Assert
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(rest);
     }
 }

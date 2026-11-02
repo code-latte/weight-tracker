@@ -53,6 +53,8 @@
       "edit": "Edit exercise",
       "title": "Exercises",
       "effortLine": "Effort: {{effort}}",
+      "restLine": "Rest: {{rest}} min",
+      "perSideSuffix": " · per side",
       "reorder": "Reorder exercise",
       "dnd": {
         "roleDescription": "reorderable exercise",
@@ -68,16 +70,22 @@
         "RepsRange": "{{series}} × {{value}}–{{max}}",
         "Duration": "{{series}} × {{value}} s",
         "MaxReps": "{{series}} × max",
+        "Minutes": "{{series}} × {{value}} min",
         "other": "{{series}} × {{value}}"
       }
     },
     "configuration": {
       "effort": "Effort",
+      "rest": "Rest between sets",
+      "restHint": "Minutes or m:ss, e.g. 1:30",
+      "perSide": "Per side",
+      "perSideSuffix": " per side",
       "sets": "Sets",
       "setCount": "Sets",
       "targetType": "Type",
       "targetValue": "Value",
       "targetMaxValue": "Maximum",
+      "minutesHint": "m:ss",
       "video": "Video",
       "openVideo": "Watch video",
       "title": "Exercise configuration",
@@ -87,6 +95,7 @@
       "noSets": "No sets yet.",
       "validation": {
         "positiveInteger": "Enter a whole number greater than 0.",
+        "minutesFormat": "Use minutes (2) or minutes:seconds (1:30).",
         "effort": "Choose an effort.",
         "sets": "Add at least one set."
       },
@@ -95,6 +104,7 @@
         "RepsRange": "{{series}} × {{value}}–{{max}} reps",
         "Duration": "{{series}} × {{value}} s",
         "MaxReps": "{{series}} × max",
+        "Minutes": "{{series}} × {{value}} min",
         "other": "{{series}} × {{value}}"
       },
       "cancel": "Cancel"
@@ -152,7 +162,8 @@
     "Reps": "Reps",
     "Duration": "Seconds",
     "MaxReps": "Max reps",
-    "RepsRange": "Rep range"
+    "RepsRange": "Rep range",
+    "Minutes": "Minutes"
   },
   "exerciseTypes": {
     "STRENGTH": "Strength",

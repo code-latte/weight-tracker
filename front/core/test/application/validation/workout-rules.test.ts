@@ -162,6 +162,11 @@ describe("validateSetForm", () => {
       { count: "positiveInteger", value: "positiveInteger" },
     ],
     [{ count: "1", type: "RepsRange", value: "8", maxValue: "" }, { maxValue: "positiveInteger" }],
+    [{ count: "3", type: "Minutes", value: "1:30", maxValue: "" }, {}],
+    [{ count: "1", type: "Minutes", value: "20", maxValue: "" }, {}],
+    [{ count: "1", type: "Minutes", value: "1.5", maxValue: "" }, { value: "minutesFormat" }],
+    [{ count: "1", type: "Minutes", value: "1:60", maxValue: "" }, { value: "minutesFormat" }],
+    [{ count: "1", type: "Minutes", value: "", maxValue: "" }, { value: "minutesFormat" }],
   ])("answers %j with %j", (values, expected) => {
     // Arrange / Act
     const result = validateSetForm(values);
@@ -177,6 +182,7 @@ describe("targetFieldsOf", () => {
     ["Duration", { value: true, maxValue: false }],
     ["RepsRange", { value: true, maxValue: true }],
     ["MaxReps", { value: false, maxValue: false }],
+    ["Minutes", { value: true, maxValue: false }],
   ])("answers the fields %s needs", (type, expected) => {
     // Arrange / Act
     const result = targetFieldsOf(type);
@@ -194,6 +200,11 @@ describe("validateExerciseConfiguration", () => {
       { effort: "required", sets: "minItems" },
     ],
     [{ effort: "LOW", setCount: 0 }, { sets: "minItems" }],
+    [{ effort: "LOW", setCount: 1, rest: "" }, {}],
+    [{ effort: "LOW", setCount: 1, rest: "1:30" }, {}],
+    [{ effort: "LOW", setCount: 1, rest: "2" }, {}],
+    [{ effort: "LOW", setCount: 1, rest: "1:75" }, { rest: "minutesFormat" }],
+    [{ effort: "LOW", setCount: 1, rest: "0" }, { rest: "minutesFormat" }],
   ])("answers %j with %j", (values, expected) => {
     // Arrange / Act
     const result = validateExerciseConfiguration(values);

@@ -20,4 +20,6 @@ public class WorkoutExerciseSetEntity
 
     /// <summary>The max for RepsRange; null for every other target type.</summary>
     public int? TargetMaxValue { get; set; }
+
+    public decimal? TargetMinutes { get; set; }
 }

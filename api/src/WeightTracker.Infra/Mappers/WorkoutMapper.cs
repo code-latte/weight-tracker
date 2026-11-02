@@ -36,6 +36,8 @@ public static class WorkoutMapper
                 ExerciseId = entry.ExerciseId.Value,
                 Position = exercisePosition++,
                 Effort = (int)entry.Effort,
+                PerSide = entry.PerSide,
+                RestMinutes = entry.Rest?.Value,
                 SuperSeriesId = entry.SuperSeriesId?.Value,
             };
 
@@ -43,7 +45,7 @@ public static class WorkoutMapper
 
             foreach (var prescription in entry.Sets)
             {
-                var (targetType, targetValue, targetMaxValue) = MapTargetToColumns(prescription.target);
+                var (targetType, targetValue, targetMaxValue, targetMinutes) = MapTargetToColumns(prescription.target);
 
                 workoutExercise.Sets.Add(new WorkoutExerciseSetEntity
                 {
@@ -54,6 +56,7 @@ public static class WorkoutMapper
                     TargetType = targetType,
                     TargetValue = targetValue,
                     TargetMaxValue = targetMaxValue,
+                    TargetMinutes = targetMinutes,
                 });
             }
 
@@ -79,8 +82,10 @@ public static class WorkoutMapper
                     MapEffort(item.Effort),
                     item.Sets
                         .OrderBy(set => set.Position)
-                        .Select(set => new SetPrescription(set.Count, MapTargetToDomain(set.TargetType, set.TargetValue, set.TargetMaxValue))),
-                    item.SuperSeriesId is null ? null : SuperSeriesId.From(item.SuperSeriesId.Value)))
+                        .Select(set => new SetPrescription(set.Count, MapTargetToDomain(set.TargetType, set.TargetValue, set.TargetMaxValue, set.TargetMinutes))),
+                    item.SuperSeriesId is null ? null : SuperSeriesId.From(item.SuperSeriesId.Value),
+                    item.PerSide,
+                    item.RestMinutes is null ? null : TimeInMinutes.From(item.RestMinutes.Value)))
                 .ToList();
 
             return Workout.Rehydrate(
@@ -100,22 +105,24 @@ public static class WorkoutMapper
         }
     }
 
-    private static (string TargetType, int? TargetValue, int? TargetMaxValue) MapTargetToColumns(SetTarget target) => target switch
+    private static (string TargetType, int? TargetValue, int? TargetMaxValue, decimal? TargetMinutes) MapTargetToColumns(SetTarget target) => target switch
     {
-        SetTarget.Reps reps => (SetTargetTypes.Reps, reps.value, null),
-        SetTarget.Duration duration => (SetTargetTypes.Duration, duration.value, null),
-        SetTarget.MaxReps => (SetTargetTypes.MaxReps, null, null),
-        SetTarget.RepsRange range => (SetTargetTypes.RepsRange, range.min, range.max),
+        SetTarget.Reps reps => (SetTargetTypes.Reps, reps.value, null, null),
+        SetTarget.Duration duration => (SetTargetTypes.Duration, duration.value, null, null),
+        SetTarget.MaxReps => (SetTargetTypes.MaxReps, null, null, null),
+        SetTarget.RepsRange range => (SetTargetTypes.RepsRange, range.min, range.max, null),
+        SetTarget.Minutes minutes => (SetTargetTypes.Minutes, null, null, minutes.value.Value),
         _ => throw new PersistenceMappingException($"'{target.GetType().Name}' is not a known set target"),
     };
 
-    private static SetTarget MapTargetToDomain(string targetType, int? targetValue, int? targetMaxValue) => targetType switch
+    private static SetTarget MapTargetToDomain(string targetType, int? targetValue, int? targetMaxValue, decimal? targetMinutes) => targetType switch
     {
         SetTargetTypes.Reps => new SetTarget.Reps(RequireValue(targetType, targetValue)),
         SetTargetTypes.Duration => new SetTarget.Duration(RequireValue(targetType, targetValue)),
         SetTargetTypes.MaxReps => new SetTarget.MaxReps(),
         SetTargetTypes.RepsRange => new SetTarget.RepsRange(
             RequireValue(targetType, targetValue), RequireValue(targetType, targetMaxValue)),
+        SetTargetTypes.Minutes => new SetTarget.Minutes(TimeInMinutes.From(RequireMinutes(targetType, targetMinutes))),
         _ => throw new PersistenceMappingException($"'{targetType}' is not a known set target"),
     };
 
@@ -137,4 +144,7 @@ public static class WorkoutMapper
 
     private static int RequireValue(string targetType, int? targetValue)
         => targetValue ?? throw new PersistenceMappingException($"Set target '{targetType}' requires a value");
+
+    private static decimal RequireMinutes(string targetType, decimal? targetMinutes)
+        => targetMinutes ?? throw new PersistenceMappingException($"Set target '{targetType}' requires minutes");
 }

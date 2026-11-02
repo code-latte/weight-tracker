@@ -255,6 +255,8 @@ public class WorkoutsController : AuthorizedController
                 Id.From(request.ExerciseId!.Value),
                 request.Effort!.Value,
                 request.Sets!.Select(set => set.ToDomain()).ToList(),
+                request.PerSide ?? false,
+                request.ToRest(),
                 cancellationToken);
 
             return CreatedAtAction(nameof(GetById), new { id = workoutId }, WorkoutExerciseDetailResponse.From(entry));
@@ -266,8 +268,9 @@ public class WorkoutsController : AuthorizedController
     }
 
     /// <summary>
-    /// Replaces the effort and every set prescription of an exercise of the workout. <c>exerciseId</c> is the
-    /// catalog exercise, not the workout entry id, and the body must name the same one.
+    /// Replaces the effort, the per-side flag, the rest and every set prescription of an exercise of the workout.
+    /// A missing <c>perSide</c> becomes <c>false</c> and a missing <c>restMinutes</c> clears the rest.
+    /// <c>exerciseId</c> is the catalog exercise, not the workout entry id, and the body must name the same one.
     /// </summary>
     [HttpPut("{workoutId:guid}/exercises/{exerciseId:guid}")]
     [ProducesResponseType<WorkoutExerciseDetailResponse>(StatusCodes.Status200OK)]
@@ -289,6 +292,8 @@ public class WorkoutsController : AuthorizedController
                 Id.From(request.ExerciseId!.Value),
                 request.Effort!.Value,
                 request.Sets!.Select(set => set.ToDomain()).ToList(),
+                request.PerSide ?? false,
+                request.ToRest(),
                 cancellationToken);
 
             return Ok(WorkoutExerciseDetailResponse.From(entry));

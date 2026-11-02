@@ -90,4 +90,16 @@ public abstract record SetTarget
             return $"{min.ToString()}-{max.ToString()} reps.";
         }
     }
+
+    /// <summary>
+    /// When we want to do a fixed amount of time expressed in minutes (i.e. Bike 30 minutes)
+    /// </summary>
+    /// <param name="value">Minutes per set, with up to two decimals</param>
+    public sealed record Minutes(TimeInMinutes value) : SetTarget
+    {
+        public override string ToString()
+        {
+            return $"{value} min.";
+        }
+    }
 }

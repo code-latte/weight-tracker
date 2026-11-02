@@ -48,13 +48,15 @@ const TYPE_ICONS: Record<string, SvgIconComponent> = {
 };
 
 /** The set target types that have a summary of their own; any other is summarised generically. */
-const SUMMARY_TYPES = new Set(["Reps", "Duration", "MaxReps", "RepsRange"]);
+const SUMMARY_TYPES = new Set(["Reps", "Duration", "MaxReps", "RepsRange", "Minutes"]);
 
 export interface SetSummaryValues {
   count: string | number;
   type: string;
   value?: string | number | null;
   maxValue?: string | number | null;
+  /** The targets are per side; `setSummary` then reads "… por lado". */
+  perSide?: boolean;
 }
 
 /** One label of an exercise, as its card shows it. */
@@ -72,7 +74,10 @@ interface ExerciseLabels {
   /** An effort level in the scale of the exercise's type (RIR, RPE…); the generic scale for no known type. */
   effortLabel: (code: string, type?: string) => string;
   targetTypeLabel: (type: string) => string;
-  /** One set as a short text, such as "2 × 15 repeticiones"; values are given as typed or as numbers. */
+  /**
+   * One set as a short text, such as "2 × 15 repeticiones" or "2 × 8 repeticiones por lado"; values are given as typed
+   * or as numbers, and minutes already as `M` or `M:SS`.
+   */
   setSummary: (set: SetSummaryValues) => string;
   /** One set as its count and target only, such as "2 × 15"; for lists where space is short. */
   compactSetSummary: (set: SetSummaryValues) => string;
@@ -126,13 +131,13 @@ export default function useExerciseLabels(): ExerciseLabels {
           ? t(`effortsByType.${type}.${code}`, { defaultValue: labelIn("efforts")(code) })
           : labelIn("efforts")(code),
       targetTypeLabel: labelIn("targetTypes"),
-      setSummary: ({ count, type, value, maxValue }: SetSummaryValues) =>
+      setSummary: ({ count, type, value, maxValue, perSide }: SetSummaryValues) =>
         t(`workout.configuration.summary.${SUMMARY_TYPES.has(type) ? type : "other"}`, {
           // `series`, not `count`: i18next reserves `count` for plurals.
           series: count,
           value: value ?? "",
           max: maxValue ?? "",
-        }),
+        }) + (perSide ? t("workout.configuration.perSideSuffix") : ""),
       compactSetSummary: ({ count, type, value, maxValue }: SetSummaryValues) =>
         t(`workout.exercises.compactSummary.${SUMMARY_TYPES.has(type) ? type : "other"}`, {
           series: count,

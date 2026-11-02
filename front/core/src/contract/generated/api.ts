@@ -2380,6 +2380,9 @@ export interface components {
             exerciseId: null | string;
             effort: null | components["schemas"]["Effort"];
             sets: null | components["schemas"]["SetPrescriptionRequest"][];
+            perSide?: null | boolean;
+            /** Format: double */
+            restMinutes?: null | number | string;
         };
         AuthResponse: {
             accessToken: string;
@@ -2510,6 +2513,8 @@ export interface components {
             target?: null | number | string;
             /** Format: int32 */
             maxTarget?: null | number | string;
+            /** Format: double */
+            targetMinutes?: null | number | string;
         };
         SetResponse: {
             /** Format: int32 */
@@ -2522,6 +2527,8 @@ export interface components {
             value?: null | number | string;
             /** Format: int32 */
             maxValue?: null | number | string;
+            /** Format: double */
+            minutes?: null | number | string;
         };
         SignupRequest: {
             email: string;
@@ -2642,6 +2649,9 @@ export interface components {
             /** Format: uuid */
             exerciseId: string;
             effort: string;
+            perSide: boolean;
+            /** Format: double */
+            restMinutes: null | number | string;
             sets: components["schemas"]["SetResponse"][];
             /** Format: int32 */
             superSeriesId: null | number | string;
@@ -2656,6 +2666,9 @@ export interface components {
             bodyPart: string;
             type: string;
             effort: string;
+            perSide: boolean;
+            /** Format: double */
+            restMinutes: null | number | string;
             sets: components["schemas"]["SetResponse"][];
             /** Format: int32 */
             superSeriesId: null | number | string;

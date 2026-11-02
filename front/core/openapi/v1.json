@@ -3828,6 +3828,21 @@
             "items": {
               "$ref": "#/components/schemas/SetPrescriptionRequest"
             }
+          },
+          "perSide": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "restMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -4369,6 +4384,15 @@
               "string"
             ],
             "format": "int32"
+          },
+          "targetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -4418,6 +4442,15 @@
               "string"
             ],
             "format": "int32"
+          },
+          "minutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -4849,6 +4882,8 @@
           "id",
           "exerciseId",
           "effort",
+          "perSide",
+          "restMinutes",
           "sets",
           "superSeriesId"
         ],
@@ -4864,6 +4899,18 @@
           },
           "effort": {
             "type": "string"
+          },
+          "perSide": {
+            "type": "boolean"
+          },
+          "restMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           },
           "sets": {
             "type": "array",
@@ -4891,6 +4938,8 @@
           "bodyPart",
           "type",
           "effort",
+          "perSide",
+          "restMinutes",
           "sets",
           "superSeriesId"
         ],
@@ -4921,6 +4970,18 @@
           },
           "effort": {
             "type": "string"
+          },
+          "perSide": {
+            "type": "boolean"
+          },
+          "restMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           },
           "sets": {
             "type": "array",

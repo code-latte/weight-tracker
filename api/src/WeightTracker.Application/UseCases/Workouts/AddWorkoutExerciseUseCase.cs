@@ -50,6 +50,8 @@ public class AddWorkoutExerciseUseCase
         Id exerciseId,
         Effort effort,
         IReadOnlyList<SetPrescription> sets,
+        bool perSide,
+        TimeInMinutes? rest,
         CancellationToken cancellationToken)
     {
         var workout = await _workouts.GetById(workoutId, cancellationToken)
@@ -60,7 +62,7 @@ public class AddWorkoutExerciseUseCase
         _ = await _exercises.GetById(exerciseId, cancellationToken)
             ?? throw new ExerciseNotFoundException(exerciseId);
 
-        workout.AddExercise(exerciseId, effort, sets);
+        workout.AddExercise(exerciseId, effort, sets, perSide, rest);
 
         await _workouts.Save(workout, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

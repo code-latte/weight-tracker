@@ -258,4 +258,48 @@ public class WorkoutResponseShapeTests : IntegrationTest
         // Assert
         workout.GetProperty("status").GetString().Should().Be(status);
     }
+
+    [Fact]
+    public async Task Entry_ShouldCarryPerSideAndRestInTheListAndTheDetailWithAMinutesTarget()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var body = new
+        {
+            exerciseId = SeedData.CurlBicepsId,
+            effort = "MID",
+            perSide = true,
+            restMinutes = 2m,
+            sets = new object[] { new { count = 1, targetType = "Minutes", targetMinutes = 30m } },
+        };
+        (await user.PostAsJsonAsync($"/workouts/{SeedData.OwnedWorkoutId}/exercises", body)).EnsureSuccessStatusCode();
+
+        // Act
+        var inList = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.OwnedWorkoutId).GetProperty("exercises").EnumerateArray().Last();
+        var inDetail = (await user.GetFromJsonAsync<JsonElement>($"/workouts/{SeedData.OwnedWorkoutId}", JsonOptions)).GetProperty("exercises").EnumerateArray().Last();
+
+        // Assert
+        foreach (var entry in new[] { inList, inDetail })
+        {
+            entry.GetProperty("perSide").GetBoolean().Should().BeTrue();
+            entry.GetProperty("restMinutes").GetDecimal().Should().Be(2m);
+            var target = entry.GetProperty("sets")[0].GetProperty("target");
+            target.GetProperty("type").GetString().Should().Be("Minutes");
+            target.GetProperty("minutes").GetDecimal().Should().Be(30m);
+            target.TryGetProperty("value", out _).Should().BeFalse();
+            target.TryGetProperty("maxValue", out _).Should().BeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task Entry_ShouldCarryPerSideFalseAndANullRestWhenNoneIsPrescribed()
+    {
+        // Arrange & Act
+        var entry = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.OwnedWorkoutId).GetProperty("exercises").EnumerateArray().First();
+
+        // Assert
+        entry.GetProperty("perSide").GetBoolean().Should().BeFalse();
+        entry.TryGetProperty("restMinutes", out var rest).Should().BeTrue();
+        rest.ValueKind.Should().Be(JsonValueKind.Null);
+    }
 }

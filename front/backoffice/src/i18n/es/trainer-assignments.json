@@ -1,0 +1,43 @@
+{
+  "list": {
+    "title": "Asignación de entrenadores",
+    "search": "Buscar por atleta, email o entrenador",
+    "assignmentFilter": "Entrenador",
+    "filter": {
+      "withTrainer": "Con entrenador",
+      "withoutTrainer": "Sin entrenador"
+    },
+    "columns": {
+      "fullName": "Nombre completo",
+      "email": "Email",
+      "trainer": "Entrenador",
+      "actions": "Acciones"
+    },
+    "noTrainer": "Sin entrenador",
+    "actions": {
+      "open": "Acciones de {{name}}",
+      "assign": "Asignar entrenador",
+      "endRelationship": "Finalizar relación"
+    },
+    "empty": "Todavía no hay atletas.",
+    "noMatches": "Ningún atleta coincide con la búsqueda."
+  },
+  "assign": {
+    "title": "Asignar entrenador a {{name}}",
+    "fields": {
+      "trainer": "Entrenador"
+    },
+    "noOptions": "Ningún entrenador coincide.",
+    "submit": "Asignar",
+    "cancel": "Cancelar",
+    "success": "Entrenador asignado.",
+    "validation": {
+      "required": "Selecciona un entrenador."
+    },
+    "errors": {
+      "VALIDATION": "Selecciona un entrenador válido.",
+      "NOT_FOUND": "El entrenador o el atleta ya no existe.",
+      "CONFLICT": "No se puede asignar este entrenador: el atleta ya tiene uno o la relación no es válida."
+    }
+  }
+}

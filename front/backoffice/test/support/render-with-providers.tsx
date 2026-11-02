@@ -49,6 +49,19 @@ const unusedDependencies: Registrations<Dependencies> = {
     reorderExercises: async () => undefined as never,
   }),
   exerciseRepository: () => ({ getAll: async () => undefined as never }),
+  trainerAthleteRepository: () => ({
+    getMine: async () => undefined as never,
+    getByTrainer: async () => undefined as never,
+    link: async () => undefined as never,
+    end: async () => undefined as never,
+  }),
+  athleteInvitationRepository: () => ({
+    getAll: async () => undefined as never,
+    invite: async () => undefined as never,
+    revoke: async () => undefined as never,
+    accept: async () => undefined as never,
+    reject: async () => undefined as never,
+  }),
   signupUseCase: () => ({ execute: async () => undefined as never }),
   loginUseCase: () => ({ execute: async () => undefined as never }),
   getSessionUseCase: () => ({ execute: async () => ok(null) }),
@@ -73,6 +86,15 @@ const unusedDependencies: Registrations<Dependencies> = {
   removeExerciseFromWorkoutUseCase: () => ({ execute: async () => undefined as never }),
   reorderWorkoutExercisesUseCase: () => ({ execute: async () => undefined as never }),
   getExercisesUseCase: () => ({ execute: async () => undefined as never }),
+  getMyAthletesUseCase: () => ({ execute: async () => undefined as never }),
+  getTrainerAthletesUseCase: () => ({ execute: async () => undefined as never }),
+  linkAthleteToTrainerUseCase: () => ({ execute: async () => undefined as never }),
+  endTrainerAthleteUseCase: () => ({ execute: async () => undefined as never }),
+  getAthleteInvitationsUseCase: () => ({ execute: async () => undefined as never }),
+  inviteAthleteUseCase: () => ({ execute: async () => undefined as never }),
+  revokeAthleteInvitationUseCase: () => ({ execute: async () => undefined as never }),
+  acceptAthleteInvitationUseCase: () => ({ execute: async () => undefined as never }),
+  rejectAthleteInvitationUseCase: () => ({ execute: async () => undefined as never }),
 };
 
 /** Renders a view in Spanish, with the real theme and a container of fakes. */

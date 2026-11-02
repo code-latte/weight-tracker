@@ -125,8 +125,8 @@ coincide con la búsqueda.". A failed load SHALL show the error for its code wit
 
 #### Scenario: Trainer opens the URL directly
 
-- **WHEN** a trainer opens `/users` and the listing fails with `UNEXPECTED`
-- **THEN** the generic error is shown with a retry action
+- **WHEN** a trainer opens `/users` and the listing fails with `FORBIDDEN`
+- **THEN** the error for `FORBIDDEN` is shown with a retry action
 
 ### Requirement: Only admins can open the creation modal
 

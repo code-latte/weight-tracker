@@ -50,6 +50,16 @@ public class MigrationsTests : IAsyncLifetime
     /// <summary>Last migration before <c>AddActivationToUsers_202610291200</c>.</summary>
     private const long BeforeActivationVersion = 202610281200;
 
+    /// <summary>Last migration before <c>CreateTrainerAthletesTable_202610301437</c>.</summary>
+    private const long BeforeTrainerAthletesVersion = 202610291200;
+
+    /// <summary>Two users for the trainer–athlete tests. Roles are not enforced by the schema.</summary>
+    private const string TrainerAndAthlete = """
+        INSERT INTO "Users" ("Id", "Email", "Name", "Surname", "DateBirth", "Role", "PasswordHash", "CreatedAt", "IsActive")
+        VALUES ('00000000-0000-0000-0000-0000000000d1', 'trainer-migration@weighttracker.test', 'T', 'T', '1990-01-01', 2, 'hash', now(), true),
+               ('00000000-0000-0000-0000-0000000000d2', 'athlete-migration@weighttracker.test', 'A', 'A', '1990-01-01', 1, 'hash', now(), true);
+        """;
+
     /// <summary>Entries in <c>infra/exercises.json</c>.</summary>
     private const int CatalogSize = 876;
 
@@ -62,6 +72,8 @@ public class MigrationsTests : IAsyncLifetime
         "WorkoutExercises",
         "WorkoutExerciseSets",
         "RefreshTokens",
+        "TrainerAthletes",
+        "TrainerInvitations",
     ];
 
     private readonly string _maintenanceConnectionString;
@@ -659,5 +671,84 @@ public class MigrationsTests : IAsyncLifetime
             WHERE table_name = 'Exercises' AND column_name = 'Type')
             """)).Should().BeFalse();
         (await Scalar<long>("SELECT COUNT(*) FROM \"Exercises\"")).Should().Be(CatalogSize);
+    }
+
+    [Fact]
+    public async Task CreateTrainerAthletes_ShouldRejectASecondActiveRelationshipForTheSameAthlete()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, TrainerAndAthlete);
+        await Execute(_connectionString, """
+            INSERT INTO "TrainerAthletes" ("Id", "TrainerId", "UserId", "Status", "StartedAtUtc")
+            VALUES ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d1',
+                    '00000000-0000-0000-0000-0000000000d2', 1, now());
+            """);
+
+        // Act
+        var act = () => Execute(_connectionString, """
+            INSERT INTO "TrainerAthletes" ("Id", "TrainerId", "UserId", "Status", "StartedAtUtc")
+            VALUES ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000d1',
+                    '00000000-0000-0000-0000-0000000000d2', 1, now());
+            """);
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation);
+    }
+
+    [Fact]
+    public async Task CreateTrainerAthletes_ShouldAllowEndedRelationshipsAlongsideAnActiveOne()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, TrainerAndAthlete);
+
+        // Act
+        await Execute(_connectionString, """
+            INSERT INTO "TrainerAthletes" ("Id", "TrainerId", "UserId", "Status", "StartedAtUtc", "FinishedAtUtc")
+            VALUES ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d1',
+                    '00000000-0000-0000-0000-0000000000d2', 2, now(), now()),
+                   ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000d1',
+                    '00000000-0000-0000-0000-0000000000d2', 2, now(), now()),
+                   ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000d1',
+                    '00000000-0000-0000-0000-0000000000d2', 1, now(), NULL);
+            """);
+
+        // Assert
+        (await Scalar<long>("SELECT COUNT(*) FROM \"TrainerAthletes\"")).Should().Be(3);
+    }
+
+    [Fact]
+    public async Task CreateTrainerInvitations_ShouldRejectADuplicatedTokenHash()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, TrainerAndAthlete);
+        const string insert = """
+            INSERT INTO "TrainerInvitations" ("Id", "TrainerId", "InviteEmail", "TokenHash", "Status", "CreatedAtUtc", "ExpiresAtUtc")
+            VALUES ('{0}', '00000000-0000-0000-0000-0000000000d1', 'someone@weighttracker.test', 'same-hash', 1, now(), now() + interval '7 days');
+            """;
+        await Execute(_connectionString, string.Format(insert, "00000000-0000-0000-0000-0000000000f1"));
+
+        // Act
+        var act = () => Execute(_connectionString, string.Format(insert, "00000000-0000-0000-0000-0000000000f2"));
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation);
+    }
+
+    [Fact]
+    public void CreateTrainerTables_Down_ShouldRemoveBothTables()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+
+        // Act
+        DatabaseMigrator.MigrateDown(_connectionString, BeforeTrainerAthletesVersion);
+
+        // Assert
+        TableExists("TrainerAthletes").Should().BeFalse();
+        TableExists("TrainerInvitations").Should().BeFalse();
+        TableExists("Users").Should().BeTrue();
     }
 }

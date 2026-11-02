@@ -23,6 +23,18 @@ public class UserRepository : IUserRepository
         return entity is null ? null : UserMapper.MapToDomain(entity);
     }
 
+    public async Task<IEnumerable<User>> GetAllByIds(IEnumerable<Id> userIds, CancellationToken cancellationToken)
+    {
+        var ids = userIds.Select(id => id.Value).ToList();
+
+        var entities = await _context.Users
+            .AsNoTracking()
+            .Where(user => ids.Contains(user.Id))
+            .ToListAsync(cancellationToken);
+
+        return entities.Select(UserMapper.MapToDomain).ToList();
+    }
+
     public async Task<User?> GetByEmail(Email email, CancellationToken cancellationToken)
     {
         var entity = await _context.Users.FirstOrDefaultAsync(user => user.Email == email.Value, cancellationToken);

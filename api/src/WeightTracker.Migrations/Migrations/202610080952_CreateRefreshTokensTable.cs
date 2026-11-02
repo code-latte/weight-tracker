@@ -12,7 +12,7 @@ public sealed class CreateRefreshTokensTable_202610080952 : Migration
             .WithColumn("Id").AsGuid().NotNullable().PrimaryKey("PK_RefreshTokens")
             .WithColumn("UserId").AsGuid().NotNullable()
             // Only the digest is stored; the raw token never reaches the database.
-            // Length aligned with RefreshToken.TokenHashMaxLength
+            // Length aligned with HashedTokens.MaxLength
             .WithColumn("TokenHash").AsString(128).NotNullable()
             .WithColumn("ExpiresAt").AsCustom("timestamptz").NotNullable()
             .WithColumn("RevokedAt").AsCustom("timestamptz").Nullable()

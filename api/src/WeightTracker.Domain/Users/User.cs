@@ -130,6 +130,17 @@ public sealed class User : AggregateRoot
     public bool CanBeAssignedWorkouts() => IsActive;
 
     /// <summary>
+    /// True when this user may be the trainer in a trainer–athlete relationship. Unlike <see cref="CanTrain"/>,
+    /// an administrator does not qualify.
+    /// </summary>
+    public bool CanBeTrainer() => Role == Role.TRAINER && IsActive;
+
+    /// <summary>
+    /// True when this user may be the athlete in a trainer–athlete relationship.
+    /// </summary>
+    public bool CanBeAthlete() => Role == Role.USER && IsActive;
+
+    /// <summary>
     /// Switches the account off and records when.
     /// </summary>
     /// <exception cref="UserAlreadyDeactivatedException">When the user is already deactivated.</exception>

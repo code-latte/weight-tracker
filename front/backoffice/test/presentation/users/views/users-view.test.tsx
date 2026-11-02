@@ -30,6 +30,7 @@ const ana: UserSummary = {
   role: "TRAINER",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
 };
 const luis: UserSummary = {
   id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
@@ -39,6 +40,7 @@ const luis: UserSummary = {
   role: "USER",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
 };
 const marta: UserSummary = {
   id: "7b3e4a2f-1f7d-4c75-8e9a-2f8b9e3c4d5e",
@@ -48,6 +50,7 @@ const marta: UserSummary = {
   role: "ADMIN",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
 };
 const nameless: UserSummary = {
   id: "8c4f5b3a-2a8e-4d86-9fab-3a9c0f4d5e6f",
@@ -57,6 +60,7 @@ const nameless: UserSummary = {
   role: "USER",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
 };
 
 const carla: UserSummary = {
@@ -67,6 +71,7 @@ const carla: UserSummary = {
   role: "TRAINER",
   isActive: false,
   deactivatedAtUtc: "2026-10-20T09:30:00Z",
+  trainer: null,
 };
 
 const created: CreatedUserResponse = {
@@ -295,15 +300,17 @@ describe("UsersView", () => {
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
-  it("shows the generic error to a trainer, whose listing the API does not serve yet", async () => {
+  it("shows the forbidden error to a trainer, whose listing the API only serves to admins", async () => {
     // Arrange & Act
     renderUsers({
       profile: completeProfile,
-      getUsers: async () => fail(new DomainError("UNEXPECTED", "Not implemented")),
+      getUsers: async () => fail(new DomainError("FORBIDDEN", "Admins only")),
     });
 
     // Assert
-    expect(await screen.findByText("Ha ocurrido un error inesperado.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No tienes permiso para realizar esta acción."),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
 

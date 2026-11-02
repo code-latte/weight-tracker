@@ -31,6 +31,10 @@ public class WeightTrackerDbContext : DbContext
 
     public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
 
+    public DbSet<TrainerAthleteEntity> TrainerAthletes => Set<TrainerAthleteEntity>();
+
+    public DbSet<TrainerInvitationEntity> TrainerInvitations => Set<TrainerInvitationEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserEntity>(entity =>
@@ -172,6 +176,56 @@ public class WeightTrackerDbContext : DbContext
             entity.HasOne<RefreshTokenEntity>()
                 .WithMany()
                 .HasForeignKey(token => token.ReplacedByTokenId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TrainerAthleteEntity>(entity =>
+        {
+            entity.ToTable("TrainerAthletes");
+            entity.HasKey(relationship => relationship.Id);
+            entity.Property(relationship => relationship.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(relationship => relationship.TrainerId).HasColumnName("TrainerId");
+            entity.Property(relationship => relationship.UserId).HasColumnName("UserId");
+            entity.Property(relationship => relationship.Status).HasColumnName("Status");
+            entity.Property(relationship => relationship.StartedAtUtc).HasColumnName("StartedAtUtc").HasColumnType("timestamptz");
+            entity.Property(relationship => relationship.FinishedAtUtc).HasColumnName("FinishedAtUtc").HasColumnType("timestamptz");
+            entity.HasIndex(relationship => relationship.TrainerId);
+
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(relationship => relationship.TrainerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(relationship => relationship.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TrainerInvitationEntity>(entity =>
+        {
+            entity.ToTable("TrainerInvitations");
+            entity.HasKey(invitation => invitation.Id);
+            entity.Property(invitation => invitation.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(invitation => invitation.TrainerId).HasColumnName("TrainerId");
+            entity.Property(invitation => invitation.InviteEmail).HasColumnName("InviteEmail").HasMaxLength(254).IsRequired();
+            entity.Property(invitation => invitation.UserId).HasColumnName("UserId");
+            entity.Property(invitation => invitation.TokenHash).HasColumnName("TokenHash").HasMaxLength(128).IsRequired();
+            entity.Property(invitation => invitation.Status).HasColumnName("Status");
+            entity.Property(invitation => invitation.CreatedAtUtc).HasColumnName("CreatedAtUtc").HasColumnType("timestamptz");
+            entity.Property(invitation => invitation.ExpiresAtUtc).HasColumnName("ExpiresAtUtc").HasColumnType("timestamptz");
+            entity.Property(invitation => invitation.AcceptedAtUtc).HasColumnName("AcceptedAtUtc").HasColumnType("timestamptz");
+            entity.HasIndex(invitation => invitation.TokenHash).IsUnique();
+            entity.HasIndex(invitation => new { invitation.TrainerId, invitation.InviteEmail });
+
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(invitation => invitation.TrainerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(invitation => invitation.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

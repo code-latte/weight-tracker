@@ -9,6 +9,11 @@ public interface IUserRepository
     public Task<User?> GetById(Id userId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The users with the given ids. Unknown ids are skipped; order is not guaranteed.
+    /// </summary>
+    public Task<IEnumerable<User>> GetAllByIds(IEnumerable<Id> userIds, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Looks a user up by their unique business identifier.
     /// </summary>
     public Task<User?> GetByEmail(Email email, CancellationToken cancellationToken);

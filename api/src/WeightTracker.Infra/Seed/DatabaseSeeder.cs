@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using WeightTracker.Application.Interfaces;
+using WeightTracker.Domain.AthleteInvitations;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exercises;
+using WeightTracker.Domain.TrainerAthletes;
 using WeightTracker.Domain.Users;
 using WeightTracker.Domain.Workouts;
 using WeightTracker.Infra.Mappers;
@@ -22,11 +24,16 @@ public class DatabaseSeeder
 {
     private readonly WeightTrackerDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IInvitationTokenService _invitationTokens;
 
-    public DatabaseSeeder(WeightTrackerDbContext context, IPasswordHasher passwordHasher)
+    public DatabaseSeeder(
+        WeightTrackerDbContext context,
+        IPasswordHasher passwordHasher,
+        IInvitationTokenService invitationTokens)
     {
         _context = context;
         _passwordHasher = passwordHasher;
+        _invitationTokens = invitationTokens;
     }
 
     public async Task Seed(CancellationToken cancellationToken)
@@ -38,6 +45,8 @@ public class DatabaseSeeder
         await SeedExercises(cancellationToken);
         await SeedUsers(cancellationToken);
         await SeedWorkouts(cancellationToken);
+        await SeedTrainerAthletes(cancellationToken);
+        await SeedTrainerInvitations(cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
     }
@@ -283,4 +292,52 @@ public class DatabaseSeeder
         => User.Rehydrate(
             Id.From(id), Email.From(email), PersonName.From(name), PersonName.From(surname),
             dateBirth, role, passwordHash, SeedData.CreatedAt, true, null);
+
+    private async Task SeedTrainerAthletes(CancellationToken cancellationToken)
+    {
+        var relationships = new[]
+        {
+            TrainerAthlete.Rehydrate(
+                Id.From(SeedData.EndedTrainerAthleteId), Id.From(SeedData.TrainerId), Id.From(SeedData.UserId),
+                TrainerAthleteStatus.ENDED, SeedData.CreatedAt.AddDays(-90), SeedData.CreatedAt.AddDays(-1)),
+            TrainerAthlete.Rehydrate(
+                Id.From(SeedData.ActiveTrainerAthleteId), Id.From(SeedData.TrainerId), Id.From(SeedData.UserId),
+                TrainerAthleteStatus.ACTIVE, SeedData.CreatedAt, null),
+        };
+
+        await _context.TrainerAthletes.AddRangeAsync(
+            relationships.Select(TrainerAthleteMapper.MapToEntity), cancellationToken);
+    }
+
+    private async Task SeedTrainerInvitations(CancellationToken cancellationToken)
+    {
+        // Far enough ahead that the seeded pending invitations never expire during development or tests
+        var farFuture = SeedData.CreatedAt.AddYears(100);
+
+        var invitations = new[]
+        {
+            SeededInvitation(SeedData.PendingInvitationId, SeedData.UserEmail, SeedData.UserId,
+                SeedData.PendingInvitationToken, farFuture),
+            SeededInvitation(SeedData.ExpiredInvitationId, SeedData.UserEmail, SeedData.UserId,
+                SeedData.ExpiredInvitationToken, SeedData.CreatedAt.AddDays(7)),
+            SeededInvitation(SeedData.UnregisteredInvitationId, SeedData.UnregisteredInvitationEmail, null,
+                SeedData.UnregisteredInvitationToken, farFuture),
+        };
+
+        await _context.TrainerInvitations.AddRangeAsync(
+            invitations.Select(TrainerInvitationMapper.MapToEntity), cancellationToken);
+    }
+
+    private TrainerInvitation SeededInvitation(
+        Guid id, string email, Guid? userId, string rawToken, DateTime expiresAtUtc)
+        => TrainerInvitation.Rehydrate(
+            Id.From(id),
+            Id.From(SeedData.TrainerId),
+            Email.From(email),
+            userId is null ? null : Id.From(userId.Value),
+            _invitationTokens.Hash(rawToken),
+            TrainerInvitationStatus.PENDING,
+            SeedData.CreatedAt,
+            expiresAtUtc,
+            null);
 }

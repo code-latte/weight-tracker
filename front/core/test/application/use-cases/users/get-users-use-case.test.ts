@@ -7,6 +7,7 @@ import {
   fail,
   ok,
   type Result,
+  type UserActivationSummary,
   type UserProfile,
   type UserSummary,
 } from "../../../../src/domain";
@@ -19,6 +20,24 @@ const user: UserSummary = {
   role: "TRAINER",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
+};
+
+const athlete: UserSummary = {
+  id: "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+  email: "luis@example.com",
+  name: "Luis",
+  surname: "Pérez",
+  role: "USER",
+  isActive: true,
+  deactivatedAtUtc: null,
+  trainer: {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    surname: user.surname,
+    role: user.role,
+  },
 };
 
 class FakeUserRepository implements UserRepositoryInterface {
@@ -47,12 +66,12 @@ class FakeUserRepository implements UserRepositoryInterface {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
-  async activate(): Promise<Result<UserSummary, DomainError>> {
+  async activate(): Promise<Result<UserActivationSummary, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
-  async deactivate(): Promise<Result<UserSummary, DomainError>> {
+  async deactivate(): Promise<Result<UserActivationSummary, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
@@ -68,6 +87,17 @@ describe("GetUsersUseCase", () => {
 
     // Assert
     expect(result).toEqual(ok([user]));
+  });
+
+  it("keeps each user's current trainer unchanged", async () => {
+    // Arrange
+    const useCase = new GetUsersUseCase(new FakeUserRepository(ok([athlete, user])));
+
+    // Act
+    const result = await useCase.execute();
+
+    // Assert
+    expect(result).toEqual(ok([athlete, user]));
   });
 
   it("lists the users once and calls nothing else", async () => {

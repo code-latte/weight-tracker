@@ -1,0 +1,18 @@
+{
+  "list": {
+    "title": "Todos los atletas",
+    "search": "Buscar por nombre o email",
+    "columns": {
+      "fullName": "Nombre completo",
+      "email": "Email",
+      "since": "Atleta desde",
+      "actions": "Acciones"
+    },
+    "empty": "Todavía no tienes atletas.",
+    "noMatches": "Ningún atleta coincide con la búsqueda.",
+    "actions": {
+      "open": "Acciones de {{name}}",
+      "endRelationship": "Finalizar relación"
+    }
+  }
+}

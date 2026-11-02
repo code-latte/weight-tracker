@@ -17,6 +17,7 @@ const active: UserSummary = {
   role: "TRAINER",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
 };
 
 const inactive: UserSummary = {
@@ -26,6 +27,7 @@ const inactive: UserSummary = {
   surname: "",
   isActive: false,
   deactivatedAtUtc: "2026-10-20T09:30:00Z",
+  trainer: null,
 };
 
 type Answer = () => Promise<Result<UserSummary, DomainError>>;

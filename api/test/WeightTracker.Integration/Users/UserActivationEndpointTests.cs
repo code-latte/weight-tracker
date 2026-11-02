@@ -210,6 +210,8 @@ public class UserActivationEndpointTests : IntegrationTest
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(
+            "id", "email", "name", "surname", "role", "isActive", "deactivatedAtUtc");
         body.GetProperty("isActive").GetBoolean().Should().BeTrue();
         body.GetProperty("deactivatedAtUtc").ValueKind.Should().Be(JsonValueKind.Null);
 

@@ -7,13 +7,14 @@ import {
   fail,
   ok,
   type Result,
+  type UserActivationSummary,
   type UserProfile,
   type UserSummary,
 } from "../../../../src/domain";
 
 const id = "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e";
 
-const user: UserSummary = {
+const user: UserActivationSummary = {
   id,
   email: "luis@example.com",
   name: "Luis",
@@ -27,9 +28,9 @@ class FakeUserRepository implements UserRepositoryInterface {
   readonly ids: string[] = [];
   otherCalls = 0;
 
-  constructor(private readonly result: Result<UserSummary, DomainError>) {}
+  constructor(private readonly result: Result<UserActivationSummary, DomainError>) {}
 
-  async deactivate(userId: string): Promise<Result<UserSummary, DomainError>> {
+  async deactivate(userId: string): Promise<Result<UserActivationSummary, DomainError>> {
     this.ids.push(userId);
     return this.result;
   }
@@ -54,7 +55,7 @@ class FakeUserRepository implements UserRepositoryInterface {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
-  async activate(): Promise<Result<UserSummary, DomainError>> {
+  async activate(): Promise<Result<UserActivationSummary, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }

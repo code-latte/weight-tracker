@@ -30,6 +30,26 @@ public class ListUsersEndpointTests : IntegrationTest
         return body.EnumerateArray().ToList();
     }
 
+    private static async Task<Guid> CreateAthlete(HttpClient admin, string email)
+    {
+        var created = await admin.PostAsJsonAsync(
+            Route, new { email, password = "Passw0rd!", role = (int)Role.USER });
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private static async Task Link(HttpClient admin, Guid trainerId, Guid athleteId)
+    {
+        var linked = await admin.PostAsJsonAsync($"/trainer-athletes/{trainerId}", new { athleteId });
+        linked.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    private static JsonElement ItemFor(IEnumerable<JsonElement> items, Guid userId)
+        => items.Single(item => item.GetProperty("id").GetGuid() == userId);
+
     private static async Task AssertNoUserDataIn(HttpResponseMessage response)
     {
         var content = await response.Content.ReadAsStringAsync();
@@ -77,7 +97,7 @@ public class ListUsersEndpointTests : IntegrationTest
     }
 
     [Fact]
-    public async Task Get_ShouldAnswerNotImplementedToATrainerAndReturnNoUsers()
+    public async Task Get_ShouldForbidATrainerAndReturnNoUsers()
     {
         // Arrange
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
@@ -86,7 +106,7 @@ public class ListUsersEndpointTests : IntegrationTest
         var response = await client.GetAsync(Route);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         await AssertNoUserDataIn(response);
     }
 
@@ -163,7 +183,7 @@ public class ListUsersEndpointTests : IntegrationTest
         var items = await Items(response);
         items.Should().NotBeEmpty();
         items.Should().OnlyContain(item => item.EnumerateObject().Select(property => property.Name)
-            .SequenceEqual(new[] { "id", "email", "name", "surname", "role", "isActive", "deactivatedAtUtc" }));
+            .SequenceEqual(new[] { "id", "email", "name", "surname", "role", "isActive", "deactivatedAtUtc", "trainer" }));
     }
 
     [Fact]
@@ -201,5 +221,62 @@ public class ListUsersEndpointTests : IntegrationTest
         var user = (await Items(response)).Single(item => item.GetProperty("id").GetGuid() == SeedData.UserId);
         user.GetProperty("isActive").GetBoolean().Should().BeFalse();
         user.GetProperty("deactivatedAtUtc").ValueKind.Should().Be(JsonValueKind.String);
+    }
+
+    [Fact]
+    public async Task Get_ShouldExposeTheCurrentTrainerOfEachAthleteOnly()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+        var linkedId = await CreateAthlete(admin, "linked.athlete@weighttracker.test");
+        var endedId = await CreateAthlete(admin, "ended.athlete@weighttracker.test");
+        var unlinkedId = await CreateAthlete(admin, "unlinked.athlete@weighttracker.test");
+        await Link(admin, SeedData.TrainerId, linkedId);
+        await Link(admin, SeedData.TrainerId, endedId);
+        var ended = await admin.PutAsJsonAsync($"/trainer-athletes/{SeedData.TrainerId}/end", new { athleteId = endedId });
+        ended.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Act
+        var response = await admin.GetAsync(Route);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var items = await Items(response);
+        items.Select(item => item.GetProperty("email").GetString()).Should().BeInAscendingOrder(StringComparer.Ordinal);
+
+        var trainer = ItemFor(items, linkedId).GetProperty("trainer");
+        trainer.EnumerateObject().Select(property => property.Name)
+            .Should().Equal("id", "email", "name", "surname", "role");
+        trainer.GetProperty("id").GetGuid().Should().Be(SeedData.TrainerId);
+        trainer.GetProperty("email").GetString().Should().Be(SeedCredentials.Trainer);
+        trainer.GetProperty("role").GetString().Should().Be("TRAINER");
+
+        ItemFor(items, SeedData.UserId).GetProperty("trainer").GetProperty("id").GetGuid()
+            .Should().Be(SeedData.TrainerId);
+        ItemFor(items, endedId).GetProperty("trainer").ValueKind.Should().Be(JsonValueKind.Null);
+        ItemFor(items, unlinkedId).GetProperty("trainer").ValueKind.Should().Be(JsonValueKind.Null);
+        items.Where(item => item.GetProperty("role").GetString() is "TRAINER" or "ADMIN")
+            .Should().NotBeEmpty()
+            .And.OnlyContain(item => item.GetProperty("trainer").ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Get_ShouldStillExposeATrainerWhoHasBeenDeactivated()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+        var deactivated = await admin.PutAsync($"/users/{SeedData.TrainerId}/deactivate", null);
+        deactivated.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Act
+        var response = await admin.GetAsync(Route);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var trainer = ItemFor(await Items(response), SeedData.UserId).GetProperty("trainer");
+        trainer.GetProperty("id").GetGuid().Should().Be(SeedData.TrainerId);
+        trainer.TryGetProperty("isActive", out _).Should().BeFalse();
     }
 }

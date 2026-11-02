@@ -12,11 +12,12 @@
     "athletes": {
       "title": "Athletes",
       "all": "All athletes",
-      "pendingInvitations": "Pending invitations"
+      "invitations": "Invitations"
     },
     "users": {
       "title": "Users",
-      "all": "All users"
+      "all": "All users",
+      "trainerAssignments": "Trainer assignment"
     },
     "programming": {
       "title": "Programming",
@@ -71,5 +72,17 @@
   "loading": "Loading",
   "loadError": {
     "retry": "Retry"
+  },
+  "endRelationship": {
+    "title": "End the relationship with {{name}}?",
+    "body": "The athlete will no longer be assigned to this trainer.",
+    "ownBody": "You will stop training this athlete and they will no longer appear in your list.",
+    "confirm": "End",
+    "cancel": "Cancel",
+    "success": "Relationship ended.",
+    "errors": {
+      "NOT_FOUND": "This relationship is no longer active. Reload the list.",
+      "CONFLICT": "This relationship is no longer active. Reload the list."
+    }
   }
 }

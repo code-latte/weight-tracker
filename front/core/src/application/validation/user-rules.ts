@@ -1,4 +1,5 @@
 import { isCalendarDate } from "./calendar-date";
+import { isEmail } from "./email";
 import { PROFILE_NAME_MAX_LENGTH } from "./profile-name-rules";
 
 export type UserFieldViolation = "required" | "email" | "maxLength" | "date";
@@ -17,8 +18,6 @@ export type CreateUserFormViolations = Partial<
   Record<keyof CreateUserFormValues, UserFieldViolation>
 >;
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 function validateOptionalName(value: string): UserFieldViolation | null {
   return value.trim().length > PROFILE_NAME_MAX_LENGTH ? "maxLength" : null;
 }
@@ -33,7 +32,7 @@ export function validateCreateUserForm(values: CreateUserFormValues): CreateUser
 
   if (email === "") {
     violations.email = "required";
-  } else if (!EMAIL_PATTERN.test(email)) {
+  } else if (!isEmail(email)) {
     violations.email = "email";
   }
   if (values.password === "") {

@@ -1,35 +1,46 @@
 import {
+  AcceptAthleteInvitationUseCase,
   ActivateUserUseCase,
   AddExerciseToWorkoutUseCase,
   CreateUserUseCase,
   CreateWorkoutUseCase,
   DeactivateUserUseCase,
   type Dependencies,
+  EndTrainerAthleteUseCase,
+  GetAthleteInvitationsUseCase,
   GetExercisesUseCase,
+  GetMyAthletesUseCase,
   GetMyProfileUseCase,
   GetPreferredLanguageUseCase,
   GetPreferredThemeModeUseCase,
   GetSessionUseCase,
+  GetTrainerAthletesUseCase,
   GetUsersUseCase,
   GetWorkoutByIdUseCase,
   GetWorkoutsUseCase,
+  InviteAthleteUseCase,
+  LinkAthleteToTrainerUseCase,
   LoginUseCase,
   LogoutUseCase,
   RefreshSessionUseCase,
+  RejectAthleteInvitationUseCase,
   RemoveExerciseFromWorkoutUseCase,
   ReorderWorkoutExercisesUseCase,
+  RevokeAthleteInvitationUseCase,
   SetPreferredLanguageUseCase,
   SetPreferredThemeModeUseCase,
+  SignupUseCase,
   UpdateMyProfileUseCase,
   UpdateWorkoutExerciseUseCase,
   UpdateWorkoutUseCase,
-  SignupUseCase,
 } from "@weight-tracker/core/application";
 import {
+  AthleteInvitationRepository,
   AuthRepository,
   Container,
   ExerciseRepository,
   FetchHttpClient,
+  TrainerAthleteRepository,
   UserRepository,
   WorkoutRepository,
 } from "@weight-tracker/core/infrastructure";
@@ -52,6 +63,8 @@ const container = new Container<Dependencies>({
   userRepository: (c) => new UserRepository(c.resolve("httpClient")),
   workoutRepository: (c) => new WorkoutRepository(c.resolve("httpClient")),
   exerciseRepository: (c) => new ExerciseRepository(c.resolve("httpClient")),
+  trainerAthleteRepository: (c) => new TrainerAthleteRepository(c.resolve("httpClient")),
+  athleteInvitationRepository: (c) => new AthleteInvitationRepository(c.resolve("httpClient")),
   signupUseCase: (c) =>
     new SignupUseCase(c.resolve("authRepository"), c.resolve("keyValueStore"), 2), // TRAINER
   loginUseCase: (c) => new LoginUseCase(c.resolve("authRepository"), c.resolve("keyValueStore")),
@@ -82,6 +95,22 @@ const container = new Container<Dependencies>({
   reorderWorkoutExercisesUseCase: (c) =>
     new ReorderWorkoutExercisesUseCase(c.resolve("workoutRepository")),
   getExercisesUseCase: (c) => new GetExercisesUseCase(c.resolve("exerciseRepository")),
+  getMyAthletesUseCase: (c) => new GetMyAthletesUseCase(c.resolve("trainerAthleteRepository")),
+  getTrainerAthletesUseCase: (c) =>
+    new GetTrainerAthletesUseCase(c.resolve("trainerAthleteRepository")),
+  linkAthleteToTrainerUseCase: (c) =>
+    new LinkAthleteToTrainerUseCase(c.resolve("trainerAthleteRepository")),
+  endTrainerAthleteUseCase: (c) =>
+    new EndTrainerAthleteUseCase(c.resolve("trainerAthleteRepository")),
+  getAthleteInvitationsUseCase: (c) =>
+    new GetAthleteInvitationsUseCase(c.resolve("athleteInvitationRepository")),
+  inviteAthleteUseCase: (c) => new InviteAthleteUseCase(c.resolve("athleteInvitationRepository")),
+  revokeAthleteInvitationUseCase: (c) =>
+    new RevokeAthleteInvitationUseCase(c.resolve("athleteInvitationRepository")),
+  acceptAthleteInvitationUseCase: (c) =>
+    new AcceptAthleteInvitationUseCase(c.resolve("athleteInvitationRepository")),
+  rejectAthleteInvitationUseCase: (c) =>
+    new RejectAthleteInvitationUseCase(c.resolve("athleteInvitationRepository")),
 });
 
 export default container;

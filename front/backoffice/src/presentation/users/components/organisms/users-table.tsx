@@ -9,9 +9,9 @@ import TableContainer from "@/presentation/common/components/atoms/table-contain
 import TableHead from "@/presentation/common/components/atoms/table-head";
 import TableRow from "@/presentation/common/components/atoms/table-row";
 import Typography from "@/presentation/common/components/atoms/typography";
-import UserRowActions from "@/presentation/users/components/molecules/user-row-actions";
+import RowActions from "@/presentation/common/components/molecules/row-actions";
 import UserStatusChip from "@/presentation/users/components/molecules/user-status-chip";
-import { fullNameOf } from "@/presentation/users/filter-users";
+import { fullNameOf } from "@/presentation/common/full-name";
 import { useTranslation } from "react-i18next";
 
 /** Kept for screen readers only: the actions column needs a name, but not a visible one. */
@@ -108,7 +108,7 @@ export default function UsersTable({
                 {onToggleActivation && (
                   <TableCell align="right" padding="checkbox">
                     {user.id !== currentUserId && (
-                      <UserRowActions
+                      <RowActions
                         label={t("list.actions.open", { name: name ?? user.email })}
                         actionLabel={t(
                           user.isActive ? "list.actions.deactivate" : "list.actions.activate",

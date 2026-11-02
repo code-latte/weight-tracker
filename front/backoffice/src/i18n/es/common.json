@@ -12,11 +12,12 @@
     "athletes": {
       "title": "Atletas",
       "all": "Todos los atletas",
-      "pendingInvitations": "Invitaciones pendientes"
+      "invitations": "Invitaciones"
     },
     "users": {
       "title": "Usuarios",
-      "all": "Todos los usuarios"
+      "all": "Todos los usuarios",
+      "trainerAssignments": "Asignación de entrenadores"
     },
     "programming": {
       "title": "Programación",
@@ -71,5 +72,17 @@
   "loading": "Cargando",
   "loadError": {
     "retry": "Reintentar"
+  },
+  "endRelationship": {
+    "title": "¿Finalizar la relación con {{name}}?",
+    "body": "El atleta dejará de estar asignado a este entrenador.",
+    "ownBody": "Dejarás de entrenar a este atleta y ya no lo verás en tu lista.",
+    "confirm": "Finalizar",
+    "cancel": "Cancelar",
+    "success": "Relación finalizada.",
+    "errors": {
+      "NOT_FOUND": "Esta relación ya no está activa. Recarga la lista.",
+      "CONFLICT": "Esta relación ya no está activa. Recarga la lista."
+    }
   }
 }

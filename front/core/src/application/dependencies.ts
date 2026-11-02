@@ -1,19 +1,27 @@
 import type {
   AddExerciseToWorkoutInput,
+  AthleteInvitation,
   AuthResponse,
+  CreatedAthleteInvitation,
   CreatedUserResponse,
   CreateUserRequest,
   CreateWorkoutRequest,
   Exercise,
   GetWorkoutByIdInput,
+  InvitationResponseInput,
+  InviteAthleteRequest,
   RemoveExerciseFromWorkoutInput,
   ReorderWorkoutExercisesInput,
   LoginRequest,
   Session,
   SignupCredentials,
+  TrainerAthlete,
+  TrainerAthleteInput,
+  TrainerAthleteRelationship,
   UpdateProfileRequest,
   UpdateWorkoutExerciseInput,
   UpdateWorkoutInput,
+  UserActivationSummary,
   UserProfile,
   UserSummary,
   Workout,
@@ -21,11 +29,13 @@ import type {
   WorkoutExerciseDetail,
 } from "../domain";
 import type {
+  AthleteInvitationRepositoryInterface,
   AuthRepositoryInterface,
   ExerciseRepositoryInterface,
   HttpClientInterface,
   KeyValueStoreInterface,
   NotificationServiceInterface,
+  TrainerAthleteRepositoryInterface,
   UseCaseInterface,
   UserRepositoryInterface,
   WorkoutRepositoryInterface,
@@ -40,6 +50,8 @@ export default interface Dependencies {
   userRepository: UserRepositoryInterface;
   workoutRepository: WorkoutRepositoryInterface;
   exerciseRepository: ExerciseRepositoryInterface;
+  trainerAthleteRepository: TrainerAthleteRepositoryInterface;
+  athleteInvitationRepository: AthleteInvitationRepositoryInterface;
   signupUseCase: UseCaseInterface<SignupCredentials, AuthResponse>;
   loginUseCase: UseCaseInterface<LoginRequest, AuthResponse>;
   getSessionUseCase: UseCaseInterface<void, Session | null>;
@@ -53,8 +65,8 @@ export default interface Dependencies {
   updateMyProfileUseCase: UseCaseInterface<UpdateProfileRequest, UserProfile>;
   getUsersUseCase: UseCaseInterface<void, UserSummary[]>;
   createUserUseCase: UseCaseInterface<CreateUserRequest, CreatedUserResponse>;
-  activateUserUseCase: UseCaseInterface<string, UserSummary>;
-  deactivateUserUseCase: UseCaseInterface<string, UserSummary>;
+  activateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
+  deactivateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
   getWorkoutsUseCase: UseCaseInterface<void, Workout[]>;
   getWorkoutByIdUseCase: UseCaseInterface<GetWorkoutByIdInput, WorkoutDetail>;
   createWorkoutUseCase: UseCaseInterface<CreateWorkoutRequest, Workout>;
@@ -64,4 +76,13 @@ export default interface Dependencies {
   removeExerciseFromWorkoutUseCase: UseCaseInterface<RemoveExerciseFromWorkoutInput, void>;
   reorderWorkoutExercisesUseCase: UseCaseInterface<ReorderWorkoutExercisesInput, WorkoutDetail>;
   getExercisesUseCase: UseCaseInterface<void, Exercise[]>;
+  getMyAthletesUseCase: UseCaseInterface<void, TrainerAthlete[]>;
+  getTrainerAthletesUseCase: UseCaseInterface<string, TrainerAthlete[]>;
+  linkAthleteToTrainerUseCase: UseCaseInterface<TrainerAthleteInput, TrainerAthleteRelationship>;
+  endTrainerAthleteUseCase: UseCaseInterface<TrainerAthleteInput, TrainerAthleteRelationship>;
+  getAthleteInvitationsUseCase: UseCaseInterface<void, AthleteInvitation[]>;
+  inviteAthleteUseCase: UseCaseInterface<InviteAthleteRequest, CreatedAthleteInvitation>;
+  revokeAthleteInvitationUseCase: UseCaseInterface<string, AthleteInvitation>;
+  acceptAthleteInvitationUseCase: UseCaseInterface<InvitationResponseInput, AthleteInvitation>;
+  rejectAthleteInvitationUseCase: UseCaseInterface<InvitationResponseInput, AthleteInvitation>;
 }

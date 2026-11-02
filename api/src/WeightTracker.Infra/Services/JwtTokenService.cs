@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -14,9 +13,6 @@ namespace WeightTracker.Infra.Services;
 /// </summary>
 public class JwtTokenService : ITokenService
 {
-    /// <summary>Entropy of a refresh token, in bytes.</summary>
-    private const int RefreshTokenBytes = 32;
-
     private readonly JwtOptions _options;
     private readonly IClock _clock;
 
@@ -55,7 +51,7 @@ public class JwtTokenService : ITokenService
 
     public GeneratedRefreshToken GenerateRefreshToken()
     {
-        var rawValue = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(RefreshTokenBytes));
+        var rawValue = OpaqueToken.NewRawValue();
 
         return new GeneratedRefreshToken(
             rawValue,
@@ -63,8 +59,7 @@ public class JwtTokenService : ITokenService
             _clock.UtcNow.AddDays(_options.RefreshTokenDays));
     }
 
-    public string HashRefreshToken(string rawRefreshToken)
-        => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(rawRefreshToken)));
+    public string HashRefreshToken(string rawRefreshToken) => OpaqueToken.Hash(rawRefreshToken);
 
     private SymmetricSecurityKey SigningKey()
         => new(Encoding.UTF8.GetBytes(_options.SigningKey));

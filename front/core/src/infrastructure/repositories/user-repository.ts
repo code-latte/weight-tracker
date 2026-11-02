@@ -7,6 +7,7 @@ import {
   ok,
   type Result,
   type UpdateProfileRequest,
+  type UserActivationSummary,
   type UserProfile,
   type UserSummary,
 } from "../../domain";
@@ -69,9 +70,9 @@ export default class UserRepository implements UserRepositoryInterface {
     }
   }
 
-  async activate(id: string): Promise<Result<UserSummary, DomainError>> {
+  async activate(id: string): Promise<Result<UserActivationSummary, DomainError>> {
     try {
-      const response = await this.httpClient.request<UserSummary>({
+      const response = await this.httpClient.request<UserActivationSummary>({
         method: "PUT",
         path: `/users/${id}/activate`,
       });
@@ -82,9 +83,9 @@ export default class UserRepository implements UserRepositoryInterface {
     }
   }
 
-  async deactivate(id: string): Promise<Result<UserSummary, DomainError>> {
+  async deactivate(id: string): Promise<Result<UserActivationSummary, DomainError>> {
     try {
-      const response = await this.httpClient.request<UserSummary>({
+      const response = await this.httpClient.request<UserActivationSummary>({
         method: "PUT",
         path: `/users/${id}/deactivate`,
       });

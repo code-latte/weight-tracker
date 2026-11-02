@@ -5,6 +5,7 @@ import {
   type CreateUserRequest,
   ok,
   type UpdateProfileRequest,
+  type UserActivationSummary,
   type UserProfile,
   type UserSummary,
 } from "../../../src/domain";
@@ -18,7 +19,9 @@ const profile: UserProfile = {
   role: "TRAINER",
 };
 
-const summary: UserSummary = { ...profile, isActive: true, deactivatedAtUtc: null };
+const summary: UserActivationSummary = { ...profile, isActive: true, deactivatedAtUtc: null };
+
+const listed: UserSummary = { ...summary, trainer: null };
 
 const updateRequest: UpdateProfileRequest = { name: "Ana", surname: "García" };
 
@@ -187,7 +190,7 @@ describe("UserRepository", () => {
   describe("getAll", () => {
     it("gets /users without a body", async () => {
       // Arrange
-      const httpClient = new FakeHttpClient(async () => [summary]);
+      const httpClient = new FakeHttpClient(async () => [listed]);
       const repository = new UserRepository(httpClient);
 
       // Act
@@ -200,34 +203,51 @@ describe("UserRepository", () => {
     it("returns the users in the API's order on success", async () => {
       // Arrange
       const other: UserSummary = {
-        ...summary,
+        ...listed,
         id: "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
         role: "USER",
       };
-      const repository = new UserRepository(new FakeHttpClient(async () => [other, summary]));
+      const repository = new UserRepository(new FakeHttpClient(async () => [other, listed]));
 
       // Act
       const result = await repository.getAll();
 
       // Assert
-      expect(result).toEqual(ok([other, summary]));
+      expect(result).toEqual(ok([other, listed]));
     });
 
     it("keeps each user's activation state unchanged", async () => {
       // Arrange
       const deactivated: UserSummary = {
-        ...summary,
+        ...listed,
         id: "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
         isActive: false,
         deactivatedAtUtc: "2026-10-20T09:30:00Z",
       };
-      const repository = new UserRepository(new FakeHttpClient(async () => [summary, deactivated]));
+      const repository = new UserRepository(new FakeHttpClient(async () => [listed, deactivated]));
 
       // Act
       const result = await repository.getAll();
 
       // Assert
-      expect(result).toEqual(ok([summary, deactivated]));
+      expect(result).toEqual(ok([listed, deactivated]));
+    });
+
+    it("keeps each user's current trainer unchanged", async () => {
+      // Arrange
+      const athlete: UserSummary = {
+        ...listed,
+        id: "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+        role: "USER",
+        trainer: profile,
+      };
+      const repository = new UserRepository(new FakeHttpClient(async () => [athlete, listed]));
+
+      // Act
+      const result = await repository.getAll();
+
+      // Assert
+      expect(result).toEqual(ok([athlete, listed]));
     });
 
     it.each([

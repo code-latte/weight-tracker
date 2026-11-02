@@ -13,8 +13,8 @@ namespace WeightTracker.Domain.Auth;
 /// </remarks>
 public sealed class RefreshToken : AggregateRoot
 {
-    /// <summary>Length of a hex encoded SHA-256 digest. The refresh_tokens.token_hash column must stay aligned.</summary>
-    public const int TokenHashMaxLength = 128;
+    /// <summary>Length of a hex encoded SHA-256 digest. The RefreshTokens.TokenHash column must stay aligned.</summary>
+    public const int TokenHashMaxLength = HashedTokens.MaxLength;
 
     public Id UserId { get; private set; }
 

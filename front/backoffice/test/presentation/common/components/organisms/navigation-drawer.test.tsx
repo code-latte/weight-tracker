@@ -34,7 +34,7 @@ function renderAsAdmin() {
 const items = [
   "Inicio",
   "Todos los atletas",
-  "Invitaciones pendientes",
+  "Invitaciones",
   "Planes asignados",
   "Calendario",
   "Plantillas de entrenamiento",
@@ -64,7 +64,7 @@ describe("NavigationDrawer", () => {
       "Inicio",
       "Atletas",
       "Todos los atletas",
-      "Invitaciones pendientes",
+      "Invitaciones",
       "Programación",
       "Planes asignados",
       "Calendario",
@@ -132,7 +132,7 @@ describe("NavigationDrawer", () => {
       within(nav)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Inicio", "Planes asignados"]);
+    ).toEqual(["Inicio", "Todos los atletas", "Invitaciones", "Planes asignados"]);
   });
 
   it("shows an icon on every item", async () => {
@@ -151,7 +151,13 @@ describe("NavigationDrawer", () => {
     await renderWithProviders(<NavigationDrawer />);
 
     // Assert
-    for (const text of ["Configuración", "Mi perfil", "Preferencias", "Cerrar sesión"]) {
+    for (const text of [
+      "Configuración",
+      "Mi perfil",
+      "Preferencias",
+      "Cerrar sesión",
+      "Invitaciones pendientes",
+    ]) {
       expect(screen.queryByText(text)).not.toBeInTheDocument();
     }
   });
@@ -164,7 +170,7 @@ describe("NavigationDrawer", () => {
 
     // Act
     await user.click(screen.getByText("Atletas"));
-    await user.click(screen.getByRole("button", { name: "Todos los atletas" }));
+    await user.click(screen.getByRole("button", { name: "Calendario" }));
 
     // Assert
     expect(execute).not.toHaveBeenCalled();
@@ -180,9 +186,46 @@ describe("NavigationDrawer", () => {
     expect(entry).toHaveAttribute("href", "/users");
     expect(entry).not.toHaveClass("Mui-selected");
     expect(screen.getByText("Usuarios")).toBeInTheDocument();
-    expect(screen.getByText("Invitaciones pendientes")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Invitaciones" })).toHaveAttribute(
+      "href",
+      "/invitations",
+    );
     expect(screen.queryByText("Atletas")).not.toBeInTheDocument();
     expect(screen.queryByText("Todos los atletas")).not.toBeInTheDocument();
+  });
+
+  it("lists the admin's users section in order, with Asignación de entrenadores linked to its screen", async () => {
+    // Arrange & Act
+    await renderAsAdmin();
+
+    // Assert
+    const entry = await screen.findByRole("link", { name: "Asignación de entrenadores" });
+    expect(entry).toHaveAttribute("href", "/trainer-assignments");
+    expect(entry).not.toHaveClass("Mui-selected");
+    const names = screen
+      .getAllByRole("link")
+      .map((link) => link.textContent)
+      .filter((name) =>
+        ["Todos los usuarios", "Asignación de entrenadores", "Invitaciones"].includes(name ?? ""),
+      );
+    expect(names).toEqual(["Todos los usuarios", "Asignación de entrenadores", "Invitaciones"]);
+  });
+
+  it("selects Asignación de entrenadores and no other users entry on its screen", async () => {
+    // Arrange
+    navigation.pathname = "/trainer-assignments";
+
+    // Act
+    await renderAsAdmin();
+
+    // Assert
+    expect(await screen.findByRole("link", { name: "Asignación de entrenadores" })).toHaveClass(
+      "Mui-selected",
+    );
+    expect(screen.getByRole("link", { name: "Todos los usuarios" })).not.toHaveClass(
+      "Mui-selected",
+    );
+    expect(screen.getByRole("link", { name: "Invitaciones" })).not.toHaveClass("Mui-selected");
   });
 
   it("selects Todos los usuarios and not Inicio on the users screen", async () => {
@@ -199,16 +242,53 @@ describe("NavigationDrawer", () => {
     expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveClass("Mui-selected");
   });
 
-  it("keeps the athletes copy for a trainer, with no link to the users screen", async () => {
+  it("keeps the athletes copy for a trainer, linked to its screens and not to the users one", async () => {
     // Arrange & Act
     await renderDrawerFor(async () => ok(completeProfile));
 
     // Assert
     expect(await screen.findByText("Atletas")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Todos los atletas" })).not.toHaveAttribute("href");
+    expect(screen.getByRole("link", { name: "Todos los atletas" })).toHaveAttribute(
+      "href",
+      "/athletes",
+    );
+    expect(screen.getByRole("link", { name: "Invitaciones" })).toHaveAttribute(
+      "href",
+      "/invitations",
+    );
     expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
     expect(screen.queryByText("Todos los usuarios")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /usuarios/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Asignación de entrenadores")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["/athletes", "Todos los atletas"],
+    ["/invitations", "Invitaciones"],
+  ])("selects the trainer's entry on %s and not Inicio", async (pathname, name) => {
+    // Arrange
+    navigation.pathname = pathname;
+
+    // Act
+    await renderDrawerFor(async () => ok(completeProfile));
+
+    // Assert
+    expect(await screen.findByRole("link", { name })).toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveClass("Mui-selected");
+  });
+
+  it("selects the admin's Invitaciones and not Todos los usuarios on the invitations screen", async () => {
+    // Arrange
+    navigation.pathname = "/invitations";
+
+    // Act
+    await renderAsAdmin();
+
+    // Assert
+    expect(await screen.findByRole("link", { name: "Todos los usuarios" })).not.toHaveClass(
+      "Mui-selected",
+    );
+    expect(screen.getByRole("link", { name: "Invitaciones" })).toHaveClass("Mui-selected");
   });
 
   it("shows the athletes copy while the profile loads", async () => {

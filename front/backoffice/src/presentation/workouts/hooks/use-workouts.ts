@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DomainErrorCode, Workout } from "@weight-tracker/core/domain";
+import type { DomainErrorCode, WorkoutListItem } from "@weight-tracker/core/domain";
 import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
 
@@ -7,7 +7,7 @@ type WorkoutsStatus = "loading" | "loaded" | "failed";
 
 interface WorkoutsState {
   status: WorkoutsStatus;
-  workouts: Workout[];
+  workouts: WorkoutListItem[];
   errorCode: DomainErrorCode | null;
   reload: () => void;
 }
@@ -17,7 +17,7 @@ export default function useWorkouts(): WorkoutsState {
   const container = useContainer();
   const { runWithSession } = useSession();
   const [status, setStatus] = useState<WorkoutsStatus>("loading");
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [workouts, setWorkouts] = useState<WorkoutListItem[]>([]);
   const [errorCode, setErrorCode] = useState<DomainErrorCode | null>(null);
   // Bumped by every read and on unmount, so an answer that arrives after either is ignored.
   const generation = useRef(0);

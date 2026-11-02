@@ -19,7 +19,9 @@ public class GetAllWorkoutsUseCaseTests
 
     private readonly Mock<IExerciseRepository> _exercises = new(MockBehavior.Strict);
 
-    private GetAllWorkoutsUseCase AUseCase() => new(_workouts.Object, _exercises.Object);
+    private readonly Mock<IUserRepository> _users = new(MockBehavior.Strict);
+
+    private GetAllWorkoutsUseCase AUseCase() => new(_workouts.Object, _exercises.Object, _users.Object);
 
     private static Workout AWorkout(Id ownerId, params Id[] exerciseIds) =>
         Workout.Rehydrate(
@@ -35,6 +37,16 @@ public class GetAllWorkoutsUseCaseTests
             .Setup(repository => repository.GetAllByIds(It.IsAny<IEnumerable<Id>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
+    private static User AUser(Id id) => User.Rehydrate(
+        id, Email.From($"{id.Value}@weighttracker.test"), PersonName.From("Ada"), PersonName.From("Lovelace"),
+        new DateOnly(1988, 5, 12), Role.USER, PasswordHash.From("stored-hash"), new DateTime(2026, 1, 1), true, null);
+
+    /// <summary>Every requested user exists, which the foreign keys guarantee outside tests.</summary>
+    private void EveryUserStored() =>
+        _users
+            .Setup(repository => repository.GetAllByIds(It.IsAny<IEnumerable<Id>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IEnumerable<Id> ids, CancellationToken _) => ids.Select(AUser).ToList());
+
     [Fact]
     public async Task Admin_ShouldSeeEveryWorkout()
     {
@@ -43,6 +55,7 @@ public class GetAllWorkoutsUseCaseTests
         var all = new[] { AWorkout(Id.New()), AWorkout(Id.New()) };
         _workouts.Setup(repository => repository.GetAll(It.IsAny<CancellationToken>())).ReturnsAsync(all);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         var result = await AUseCase().Execute(callerId, Role.ADMIN, CancellationToken.None);
@@ -61,6 +74,7 @@ public class GetAllWorkoutsUseCaseTests
         var visible = new[] { AWorkout(callerId) };
         _workouts.Setup(repository => repository.GetAllByUserOrTrainerId(callerId, It.IsAny<CancellationToken>())).ReturnsAsync(visible);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         var result = await AUseCase().Execute(callerId, Role.TRAINER, CancellationToken.None);
@@ -79,6 +93,7 @@ public class GetAllWorkoutsUseCaseTests
         var owned = new[] { AWorkout(callerId) };
         _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>())).ReturnsAsync(owned);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
@@ -99,6 +114,7 @@ public class GetAllWorkoutsUseCaseTests
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
         _workouts.VerifyNoOtherCalls();
         _exercises.VerifyNoOtherCalls();
+        _users.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -111,6 +127,7 @@ public class GetAllWorkoutsUseCaseTests
         var owned = new[] { AWorkout(callerId, pressBanca, sentadilla), AWorkout(callerId, pressBanca) };
         _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>())).ReturnsAsync(owned);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
@@ -134,6 +151,7 @@ public class GetAllWorkoutsUseCaseTests
         _exercises
             .Setup(repository => repository.GetAllByIds(It.IsAny<IEnumerable<Id>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([pressBanca]);
+        EveryUserStored();
 
         // Act
         var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
@@ -161,6 +179,7 @@ public class GetAllWorkoutsUseCaseTests
         _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([draft, published, selfPlannedDraft]);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
@@ -179,6 +198,7 @@ public class GetAllWorkoutsUseCaseTests
         _workouts.Setup(repository => repository.GetAllByUserOrTrainerId(callerId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([draft]);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         var result = await AUseCase().Execute(callerId, Role.TRAINER, CancellationToken.None);
@@ -197,6 +217,7 @@ public class GetAllWorkoutsUseCaseTests
         _workouts.Setup(repository => repository.GetAllByUserOrTrainerId(callerId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([prescribedToThem, prescribedByThem]);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         var result = await AUseCase().Execute(callerId, Role.TRAINER, CancellationToken.None);
@@ -213,6 +234,7 @@ public class GetAllWorkoutsUseCaseTests
         var draft = APrescribedWorkout(Id.New(), Id.New(), WorkoutStatus.DRAFT);
         _workouts.Setup(repository => repository.GetAll(It.IsAny<CancellationToken>())).ReturnsAsync([draft]);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         var result = await AUseCase().Execute(Id.New(), Role.ADMIN, CancellationToken.None);
@@ -230,6 +252,7 @@ public class GetAllWorkoutsUseCaseTests
         var draft = APrescribedWorkout(callerId, Id.New(), WorkoutStatus.DRAFT, hiddenExercise);
         _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>())).ReturnsAsync([draft]);
         NoExercisesStored();
+        EveryUserStored();
 
         // Act
         await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
@@ -238,5 +261,108 @@ public class GetAllWorkoutsUseCaseTests
         _exercises.Verify(repository => repository.GetAllByIds(
             It.Is<IEnumerable<Id>>(ids => ids.Contains(hiddenExercise) == false),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ShouldLoadEachReferencedOwnerAndTrainerOnce()
+    {
+        // Arrange
+        var athlete = Id.New();
+        var otherAthlete = Id.New();
+        var trainer = Id.New();
+        var all = new[]
+        {
+            AWorkout(athlete),
+            APrescribedWorkout(athlete, trainer, WorkoutStatus.PUBLISHED),
+            APrescribedWorkout(otherAthlete, trainer, WorkoutStatus.DRAFT),
+        };
+        _workouts.Setup(repository => repository.GetAll(It.IsAny<CancellationToken>())).ReturnsAsync(all);
+        NoExercisesStored();
+        EveryUserStored();
+
+        // Act
+        await AUseCase().Execute(Id.New(), Role.ADMIN, CancellationToken.None);
+
+        // Assert
+        _users.Verify(repository => repository.GetAllByIds(
+            It.Is<IEnumerable<Id>>(ids => ids.Count() == 3 && ids.Contains(athlete) && ids.Contains(otherAthlete) && ids.Contains(trainer)),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _users.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task ShouldNotAskForATrainerOfASelfPlannedWorkout()
+    {
+        // Arrange
+        var callerId = Id.New();
+        _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>())).ReturnsAsync([AWorkout(callerId)]);
+        NoExercisesStored();
+        EveryUserStored();
+
+        // Act
+        await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+
+        // Assert
+        _users.Verify(repository => repository.GetAllByIds(
+            It.Is<IEnumerable<Id>>(ids => ids.SequenceEqual(new[] { callerId })),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task EmptyList_ShouldReadUsersWithAnEmptyIdSet()
+    {
+        // Arrange
+        var callerId = Id.New();
+        _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        NoExercisesStored();
+        EveryUserStored();
+
+        // Act
+        var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+
+        // Assert
+        result.Users.Should().BeEmpty();
+        _users.Verify(repository => repository.GetAllByIds(
+            It.Is<IEnumerable<Id>>(ids => ids.Any() == false),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ShouldReturnTheReferencedUsersById()
+    {
+        // Arrange
+        var callerId = Id.New();
+        var trainerId = Id.New();
+        _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([APrescribedWorkout(callerId, trainerId, WorkoutStatus.PUBLISHED)]);
+        NoExercisesStored();
+        EveryUserStored();
+
+        // Act
+        var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+
+        // Assert
+        result.Users.Keys.Should().BeEquivalentTo([callerId, trainerId]);
+        result.Users[trainerId].Id.Should().Be(trainerId);
+    }
+
+    [Fact]
+    public async Task MissingUser_ShouldFailInsteadOfReturningAPartialItem()
+    {
+        // Arrange
+        var callerId = Id.New();
+        var trainerId = Id.New();
+        _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([APrescribedWorkout(callerId, trainerId, WorkoutStatus.PUBLISHED)]);
+        NoExercisesStored();
+        _users
+            .Setup(repository => repository.GetAllByIds(It.IsAny<IEnumerable<Id>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([AUser(callerId)]);
+
+        // Act
+        var act = async () => await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 }

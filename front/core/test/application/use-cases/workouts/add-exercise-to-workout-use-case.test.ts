@@ -10,6 +10,7 @@ import {
   type Workout,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
+  type WorkoutListItem,
 } from "../../../../src/domain";
 
 const workoutId = "7b0c1f7e-3a54-4d4e-9d0e-1a2b3c4d5e6f";
@@ -45,7 +46,7 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
 
   constructor(private readonly result: Result<WorkoutExerciseDetail, DomainError>) {}
 
-  async getAll(): Promise<Result<Workout[], DomainError>> {
+  async getAll(): Promise<Result<WorkoutListItem[], DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }

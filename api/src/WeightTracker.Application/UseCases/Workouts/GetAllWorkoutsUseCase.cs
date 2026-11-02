@@ -19,15 +19,21 @@ public class GetAllWorkoutsUseCase
 
     private IExerciseRepository _exercises;
 
+    private IUserRepository _users;
+
     public GetAllWorkoutsUseCase(
         IWorkoutRepository workouts,
-        IExerciseRepository exercises
+        IExerciseRepository exercises,
+        IUserRepository users
     )
     {
         _workouts = workouts;
         _exercises = exercises;
+        _users = users;
     }
 
+    /// <exception cref="UnauthorizedOperationException">When the caller's role may not list workouts.</exception>
+    /// <exception cref="InvalidOperationException">When an owner or trainer of a listed workout does not exist.</exception>
     public async Task<WorkoutListDTO> Execute(Id callerId, Role callerRole, CancellationToken cancellationToken)
     {
         var workouts = (await ScopedWorkouts(callerId, callerRole, cancellationToken)).ToList();
@@ -41,7 +47,22 @@ public class GetAllWorkoutsUseCase
 
         var exercises = await _exercises.GetAllByIds(exerciseIds, cancellationToken);
 
-        return new WorkoutListDTO(workouts, exercises.ToDictionary(exercise => exercise.Id));
+        // Only owners and trainers of the scoped workouts, so the join never widens visibility either
+        var userIds = workouts
+            .Select(workout => workout.UserId)
+            .Concat(workouts.Where(workout => workout.TrainerId is not null).Select(workout => workout.TrainerId!))
+            .Distinct()
+            .ToList();
+
+        var users = (await _users.GetAllByIds(userIds, cancellationToken)).ToDictionary(user => user.Id);
+
+        // Foreign keys keep every referenced user in place, so a missing one is a data-integrity failure
+        var missing = userIds.FirstOrDefault(userId => users.ContainsKey(userId) == false);
+
+        if (missing is not null)
+            throw new InvalidOperationException($"User '{missing}' referenced by a listed workout does not exist");
+
+        return new WorkoutListDTO(workouts, exercises.ToDictionary(exercise => exercise.Id), users);
     }
 
     private async Task<IEnumerable<Workout>> ScopedWorkouts(Id callerId, Role callerRole, CancellationToken cancellationToken)

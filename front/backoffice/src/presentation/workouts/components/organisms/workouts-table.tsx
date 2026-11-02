@@ -1,7 +1,7 @@
 "use client";
 
 import EditOutlined from "@mui/icons-material/EditOutlined";
-import type { Workout } from "@weight-tracker/core/domain";
+import type { WorkoutListItem } from "@weight-tracker/core/domain";
 import NextLink from "next/link";
 import IconButton from "@/presentation/common/components/atoms/icon-button";
 import Table from "@/presentation/common/components/atoms/table";
@@ -11,13 +11,19 @@ import TableContainer from "@/presentation/common/components/atoms/table-contain
 import TableHead from "@/presentation/common/components/atoms/table-head";
 import TableRow from "@/presentation/common/components/atoms/table-row";
 import Typography from "@/presentation/common/components/atoms/typography";
+import { fullNameOf } from "@/presentation/common/full-name";
 import useWeekLabel from "@/presentation/workouts/hooks/use-week-label";
 import { useTranslation } from "react-i18next";
 
 interface WorkoutsTableProps {
-  workouts: Workout[];
+  workouts: WorkoutListItem[];
   /** Whether the trainer column is rendered at all. */
   showTrainer: boolean;
+}
+
+/** The person's full name, or their email when they have no name. */
+function displayNameOf(person: WorkoutListItem["athlete"]): string {
+  return fullNameOf(person) ?? person.email;
 }
 
 /** The workouts in the order the API returns them, one row each. */
@@ -47,8 +53,12 @@ export default function WorkoutsTable({ workouts, showTrainer }: WorkoutsTablePr
             <TableRow key={workout.id}>
               <TableCell>{workout.name}</TableCell>
               <TableCell>{weekLabelOf(workout.workoutDate)}</TableCell>
-              <TableCell>{workout.userId}</TableCell>
-              {showTrainer && <TableCell>{workout.trainerId ?? ""}</TableCell>}
+              <TableCell>{displayNameOf(workout.athlete)}</TableCell>
+              {showTrainer && (
+                <TableCell>
+                  {workout.trainer ? displayNameOf(workout.trainer) : t("assignedPlans.noTrainer")}
+                </TableCell>
+              )}
               <TableCell align="right">{workout.exercises.length}</TableCell>
               <TableCell align="right" padding="checkbox">
                 <IconButton

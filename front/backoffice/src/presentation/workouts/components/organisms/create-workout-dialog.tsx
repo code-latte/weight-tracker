@@ -20,8 +20,10 @@ import DialogContent from "@/presentation/common/components/atoms/dialog-content
 import DialogTitle from "@/presentation/common/components/atoms/dialog-title";
 import TextField from "@/presentation/common/components/atoms/text-field";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
+import PersonPicker from "@/presentation/workouts/components/molecules/person-picker";
 import WeekField from "@/presentation/workouts/components/molecules/week-field";
 import useCreateWorkout from "@/presentation/workouts/hooks/use-create-workout";
+import useWorkoutAssignees from "@/presentation/workouts/hooks/use-workout-assignees";
 import { currentWeekStart, weekMiddleOf } from "@/presentation/workouts/week";
 
 interface CreateWorkoutDialogProps {
@@ -78,6 +80,10 @@ function CreateWorkoutForm({ onClose }: { onClose: () => void }) {
   const [errors, setErrors] = useState<CreateWorkoutFormViolations>({});
   // Mirrors whom the API requires a trainer from; the API keeps the rule.
   const withTrainer = profile?.role === "ADMIN";
+  const assignees = useWorkoutAssignees(
+    profile?.role === "ADMIN" || profile?.role === "TRAINER" ? profile.role : null,
+  );
+  const optionsLoaded = assignees.status === "loaded";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -111,11 +117,43 @@ function CreateWorkoutForm({ onClose }: { onClose: () => void }) {
     };
   }
 
+  /** Props of a picker: the chosen id lives in the form values and its message clears when a person is chosen. */
+  function picker(name: "userId" | "trainerId", requiredMessage: string) {
+    const violation = errors[name];
+
+    return {
+      label: t(`createWorkout.fields.${name}`),
+      value: values[name],
+      onChange: (id: string) => {
+        setValues((current) => ({ ...current, [name]: id }));
+        setErrors((current) => ({ ...current, [name]: undefined }));
+      },
+      disabled: creating || !optionsLoaded,
+      error: violation
+        ? violation === "required"
+          ? requiredMessage
+          : t(`createWorkout.validation.${violation}`)
+        : undefined,
+    };
+  }
+
   return (
     <Box component="form" noValidate onSubmit={(event) => void handleSubmit(event)}>
       <DialogTitle id="create-workout-title">{t("createWorkout.title")}</DialogTitle>
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          {assignees.status === "failed" && assignees.errorCode && (
+            <Alert
+              severity="error"
+              action={
+                <Button color="inherit" size="small" onClick={assignees.reload}>
+                  {t("createWorkout.retry")}
+                </Button>
+              }
+            >
+              {tc(`errors:${assignees.errorCode}`)}
+            </Alert>
+          )}
           {errorCode && <Alert severity="error">{tc(`errors:${errorCode}`)}</Alert>}
           <TextField {...field("name")} autoFocus />
           <TextField {...field("description")} multiline minRows={2} />
@@ -127,15 +165,25 @@ function CreateWorkoutForm({ onClose }: { onClose: () => void }) {
               errors.workoutDate ? t(`createWorkout.validation.${errors.workoutDate}`) : undefined
             }
           />
-          <TextField {...field("userId")} />
-          {withTrainer && <TextField {...field("trainerId")} />}
+          <PersonPicker
+            {...picker("userId", t("createWorkout.validation.athleteRequired"))}
+            options={assignees.athletes}
+            noOptionsText={t("createWorkout.noAthletes")}
+          />
+          {withTrainer && (
+            <PersonPicker
+              {...picker("trainerId", t("createWorkout.validation.trainerRequired"))}
+              options={assignees.trainers}
+              noOptionsText={t("createWorkout.noTrainers")}
+            />
+          )}
         </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={creating}>
           {t("createWorkout.actions.cancel")}
         </Button>
-        <Button type="submit" variant="contained" disabled={creating}>
+        <Button type="submit" variant="contained" disabled={creating || !optionsLoaded}>
           {t("createWorkout.actions.create")}
         </Button>
       </DialogActions>

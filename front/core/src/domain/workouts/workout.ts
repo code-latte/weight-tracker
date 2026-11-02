@@ -1,6 +1,8 @@
 import type { components } from "../../contract/generated/api";
 
 export type Workout = components["schemas"]["WorkoutResponse"];
+/** A workout as listed: the workout plus its athlete and, when it has one, its trainer. */
+export type WorkoutListItem = components["schemas"]["WorkoutListItemResponse"];
 export type WorkoutDetail = components["schemas"]["WorkoutDetailResponse"];
 export type WorkoutExerciseDetail = components["schemas"]["WorkoutExerciseDetailResponse"];
 export type CreateWorkoutRequest = components["schemas"]["CreateWorkoutRequest"];

@@ -9,26 +9,52 @@ import {
   type Workout,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
+  type WorkoutListItem,
 } from "../../../../src/domain";
 
-const workout: Workout = {
+const athlete = {
+  id: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
+  email: "ana@example.com",
+  name: "Ana",
+  surname: "García",
+  role: "USER",
+};
+
+const trainer = {
+  id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
+  email: "luis@example.com",
+  name: "Luis",
+  surname: "Pérez",
+  role: "TRAINER",
+};
+
+const workout: WorkoutListItem = {
   id: "7b0c1f7e-3a54-4d4e-9d0e-1a2b3c4d5e6f",
   name: "Pierna",
   description: null,
   workoutDate: "2026-11-02",
-  userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
+  userId: athlete.id,
   trainerId: null,
   status: "DRAFT",
   exercises: [],
+  athlete,
+  trainer: null,
+};
+
+const prescribed: WorkoutListItem = {
+  ...workout,
+  id: "8c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+  trainerId: trainer.id,
+  trainer,
 };
 
 class FakeWorkoutRepository implements WorkoutRepositoryInterface {
   listCalls = 0;
   otherCalls = 0;
 
-  constructor(private readonly result: Result<Workout[], DomainError>) {}
+  constructor(private readonly result: Result<WorkoutListItem[], DomainError>) {}
 
-  async getAll(): Promise<Result<Workout[], DomainError>> {
+  async getAll(): Promise<Result<WorkoutListItem[], DomainError>> {
     this.listCalls += 1;
     return this.result;
   }
@@ -79,6 +105,19 @@ describe("GetWorkoutsUseCase", () => {
 
     // Assert
     expect(result).toEqual(ok([workout]));
+  });
+
+  it("keeps the athlete and the trainer of each workout, and a missing trainer as null", async () => {
+    // Arrange
+    const useCase = new GetWorkoutsUseCase(new FakeWorkoutRepository(ok([workout, prescribed])));
+
+    // Act
+    const result = await useCase.execute();
+
+    // Assert
+    expect(result).toEqual(ok([workout, prescribed]));
+    expect(result.ok && result.value.map((item) => item.athlete)).toEqual([athlete, athlete]);
+    expect(result.ok && result.value.map((item) => item.trainer)).toEqual([null, trainer]);
   });
 
   it("lists the workouts once and calls nothing else", async () => {

@@ -5,8 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DomainError, fail, ok } from "@weight-tracker/core/domain";
 import type {
   CreateWorkoutRequest,
+  DomainErrorCode,
   Result,
+  TrainerAthlete,
   UserProfile,
+  UserSummary,
   Workout,
 } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
@@ -36,6 +39,44 @@ const created: Workout = {
   exercises: [],
 };
 
+const beaId = "7b3e4a2f-1f7d-4c75-8e90-2f8b9e3c4d5e";
+
+function athleteOf(id: string, name: string, surname: string, email: string): TrainerAthlete {
+  return {
+    id: `r-${email}`,
+    athleteId: id,
+    email,
+    name,
+    surname,
+    trainerName: "Ana",
+    trainerSurname: "García",
+    startedAtUtc: "2026-01-01T00:00:00Z",
+  };
+}
+
+function userOf(
+  id: string,
+  role: string,
+  name: string,
+  surname: string,
+  email: string,
+  isActive = true,
+): UserSummary {
+  return { id, email, name, surname, role, isActive, deactivatedAtUtc: null, trainer: null };
+}
+
+const myAthletes = [
+  athleteOf(athleteId, "Ana", "García", "ana@example.com"),
+  athleteOf(beaId, "Bea", "López", "bea@example.com"),
+];
+
+const users = [
+  userOf(athleteId, "USER", "Ana", "García", "ana@example.com"),
+  userOf("c-1", "USER", "Carla", "Ruiz", "carla@example.com", false),
+  userOf(trainerId, "TRAINER", "Luis", "Pérez", "luis@example.com"),
+  userOf("m-1", "ADMIN", "Marta", "Gil", "marta@example.com"),
+];
+
 /** Stands in for the assigned plans screen: owns the open state and can open the dialog again. */
 function Harness() {
   const [open, setOpen] = useState(true);
@@ -53,30 +94,43 @@ function Harness() {
 function renderDialog({
   profile = completeProfile,
   createWorkout = async () => ok(created),
+  getMyAthletes = async () => ok(myAthletes),
+  getUsers = async () => ok(users),
 }: {
   profile?: UserProfile;
   createWorkout?: (request: CreateWorkoutRequest) => Promise<Result<Workout, DomainError>>;
+  getMyAthletes?: () => Promise<Result<TrainerAthlete[], DomainError>>;
+  getUsers?: () => Promise<Result<UserSummary[], DomainError>>;
 } = {}) {
   const execute = vi.fn(createWorkout);
+  const myAthletesExecute = vi.fn(getMyAthletes);
+  const usersExecute = vi.fn(getUsers);
 
   return {
     execute,
+    getMyAthletes: myAthletesExecute,
+    getUsers: usersExecute,
     rendered: renderWithProviders(<Harness />, {
       getSessionUseCase: () => ({
         execute: async () => ok({ accessToken: "a", refreshToken: "r" }),
       }),
       getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
       createWorkoutUseCase: () => ({ execute }),
+      getMyAthletesUseCase: () => ({ execute: myAthletesExecute }),
+      getUsersUseCase: () => ({ execute: usersExecute }),
     }),
   };
 }
 
-/** Waits until the profile is read, so the fields that depend on the role are settled. */
+/** Waits until the profile and the people are read, so the fields that depend on them are settled. */
 async function openedDialog() {
   const dialog = await screen.findByRole("dialog", { name: "Nuevo entrenamiento" });
-  await waitFor(() => expect(screen.getByRole("textbox", { name: "Nombre" })).toBeEnabled());
+  await waitFor(() => expect(athleteField()).toBeEnabled());
   return dialog;
 }
+
+const athleteField = () => screen.getByRole("combobox", { name: "Atleta" });
+const trainerField = () => screen.getByRole("combobox", { name: "Entrenador" });
 
 async function fill(
   user: ReturnType<typeof userEvent.setup>,
@@ -91,7 +145,25 @@ async function fill(
   }
 }
 
-const trainerValues = { Nombre: "  Pierna  ", "ID del atleta": athleteId };
+async function choose(
+  user: ReturnType<typeof userEvent.setup>,
+  field: () => HTMLElement,
+  option: string,
+) {
+  await user.click(field());
+  await user.click(await screen.findByRole("option", { name: option }));
+}
+
+const ana = "Ana García · ana@example.com";
+const luis = "Luis Pérez · luis@example.com";
+
+/** Fills the name and chooses Ana: everything a trainer needs to create a workout. */
+async function fillTrainerForm(user: ReturnType<typeof userEvent.setup>) {
+  await fill(user, { Nombre: "  Pierna  " });
+  await choose(user, athleteField, ana);
+}
+
+const optionNames = () => screen.getAllByRole("option").map((option) => option.textContent);
 
 const weekField = () => screen.getByRole("group", { name: "Semana" });
 
@@ -116,9 +188,11 @@ describe("CreateWorkoutDialog", () => {
 
     // Assert
     await openedDialog();
-    for (const name of ["Nombre", "Descripción", "ID del atleta"]) {
+    for (const name of ["Nombre", "Descripción"]) {
       expect(screen.getByRole("textbox", { name })).toHaveValue("");
     }
+    expect(athleteField()).toHaveValue("");
+    expect(screen.queryByRole("textbox", { name: "ID del atleta" })).not.toBeInTheDocument();
     expect(within(weekField()).getByText("Semana del 26 oct – 1 nov")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Crear" })).toBeInTheDocument();
@@ -130,7 +204,7 @@ describe("CreateWorkoutDialog", () => {
 
     // Assert
     await openedDialog();
-    expect(await screen.findByRole("textbox", { name: "ID del entrenador" })).toBeInTheDocument();
+    expect(trainerField()).toHaveValue("");
   });
 
   it("does not ask a trainer for the trainer", async () => {
@@ -139,6 +213,7 @@ describe("CreateWorkoutDialog", () => {
 
     // Assert
     await openedDialog();
+    expect(screen.queryByRole("combobox", { name: "Entrenador" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "ID del entrenador" })).not.toBeInTheDocument();
   });
 
@@ -153,13 +228,12 @@ describe("CreateWorkoutDialog", () => {
     await user.click(screen.getByRole("button", { name: "Crear" }));
 
     // Assert
-    expect(await screen.findAllByText("Este campo es obligatorio.")).toHaveLength(2);
+    expect(await screen.findByText("Selecciona un atleta.")).toBeInTheDocument();
+    expect(screen.getAllByText("Este campo es obligatorio.")).toHaveLength(1);
     expect(screen.getByRole("textbox", { name: "Nombre" })).toHaveAccessibleDescription(
       "Este campo es obligatorio.",
     );
-    expect(screen.getByRole("textbox", { name: "ID del atleta" })).toHaveAccessibleDescription(
-      "Este campo es obligatorio.",
-    );
+    expect(athleteField()).toHaveAccessibleDescription("Selecciona un atleta.");
     expect(screen.getByRole("textbox", { name: "Descripción" })).not.toHaveAccessibleDescription();
     expect(within(weekField()).queryByText("Este campo es obligatorio.")).not.toBeInTheDocument();
     expect(execute).not.toHaveBeenCalled();
@@ -184,19 +258,14 @@ describe("CreateWorkoutDialog", () => {
       label: "Descripción",
       message: "No puede superar los 1024 caracteres.",
     },
-    {
-      case: "an athlete id that is not a UUID",
-      values: { "ID del atleta": "ana" },
-      label: "ID del atleta",
-      message: "Introduce un identificador válido.",
-    },
   ])("reports $case and sends nothing", async ({ values, label, message }) => {
     // Arrange
     const { execute, rendered } = renderDialog();
     await rendered;
     await openedDialog();
     const user = userEvent.setup();
-    await fill(user, { ...trainerValues, ...values });
+    await fillTrainerForm(user);
+    await fill(user, values);
 
     // Act
     await user.click(screen.getByRole("button", { name: "Crear" }));
@@ -208,23 +277,57 @@ describe("CreateWorkoutDialog", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("asks an admin to fill the trainer and sends nothing", async () => {
+  it("reports an athlete id that is not a UUID and sends nothing", async () => {
     // Arrange
-    const { execute, rendered } = renderDialog({ profile: adminProfile });
+    const { execute, rendered } = renderDialog({
+      getMyAthletes: async () => ok([athleteOf("ana", "Ana", "García", "ana@example.com")]),
+    });
     await rendered;
     await openedDialog();
     const user = userEvent.setup();
-    await screen.findByRole("textbox", { name: "ID del entrenador" });
-    await fill(user, trainerValues);
+    await fillTrainerForm(user);
 
     // Act
     await user.click(screen.getByRole("button", { name: "Crear" }));
 
     // Assert
-    expect(
-      await screen.findByRole("textbox", { name: "ID del entrenador" }),
-    ).toHaveAccessibleDescription("Este campo es obligatorio.");
+    await waitFor(() =>
+      expect(athleteField()).toHaveAccessibleDescription("Introduce un identificador válido."),
+    );
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("asks an admin to choose the trainer and sends nothing", async () => {
+    // Arrange
+    const { execute, rendered } = renderDialog({ profile: adminProfile });
+    await rendered;
+    await openedDialog();
+    const user = userEvent.setup();
+    await fillTrainerForm(user);
+
+    // Act
+    await user.click(screen.getByRole("button", { name: "Crear" }));
+
+    // Assert
+    await waitFor(() =>
+      expect(trainerField()).toHaveAccessibleDescription("Selecciona un entrenador."),
+    );
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("clears the message of a picker when a person is chosen", async () => {
+    // Arrange
+    await renderDialog().rendered;
+    await openedDialog();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Crear" }));
+    expect(await screen.findByText("Selecciona un atleta.")).toBeInTheDocument();
+
+    // Act
+    await choose(user, athleteField, ana);
+
+    // Assert
+    expect(screen.queryByText("Selecciona un atleta.")).not.toBeInTheDocument();
   });
 
   it("sends a trainer's workout trimmed, without description nor trainer, once", async () => {
@@ -233,7 +336,7 @@ describe("CreateWorkoutDialog", () => {
     await rendered;
     await openedDialog();
     const user = userEvent.setup();
-    await fill(user, trainerValues);
+    await fillTrainerForm(user);
     await user.click(within(weekField()).getByRole("button", { name: "Semana siguiente" }));
 
     // Act
@@ -254,8 +357,9 @@ describe("CreateWorkoutDialog", () => {
     await rendered;
     await openedDialog();
     const user = userEvent.setup();
-    await screen.findByRole("textbox", { name: "ID del entrenador" });
-    await fill(user, { ...trainerValues, Descripción: "Día 1", "ID del entrenador": trainerId });
+    await fillTrainerForm(user);
+    await fill(user, { Descripción: "Día 1" });
+    await choose(user, trainerField, luis);
 
     // Act
     await user.click(screen.getByRole("button", { name: "Crear" }));
@@ -272,13 +376,171 @@ describe("CreateWorkoutDialog", () => {
     );
   });
 
+  describe("people", () => {
+    it("offers a trainer exactly their athletes, in order, without reading every user", async () => {
+      // Arrange
+      const { getMyAthletes, getUsers, rendered } = renderDialog();
+      await rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(athleteField());
+
+      // Assert
+      expect(optionNames()).toEqual([ana, "Bea López · bea@example.com"]);
+      expect(getMyAthletes).toHaveBeenCalledTimes(1);
+      expect(getUsers).not.toHaveBeenCalled();
+    });
+
+    it("offers an admin the active athletes and the active trainers of one users request", async () => {
+      // Arrange
+      const { getMyAthletes, getUsers, rendered } = renderDialog({ profile: adminProfile });
+      await rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(athleteField());
+      const athletes = optionNames();
+      await user.click(screen.getByRole("option", { name: ana }));
+      await user.click(trainerField());
+
+      // Assert
+      expect(athletes).toEqual([ana]);
+      expect(optionNames()).toEqual([luis]);
+      expect(getUsers).toHaveBeenCalledTimes(1);
+      expect(getMyAthletes).not.toHaveBeenCalled();
+    });
+
+    it("shows only the email of a person without a name", async () => {
+      // Arrange
+      await renderDialog({
+        getMyAthletes: async () => ok([athleteOf(athleteId, "", "", "new@example.com")]),
+      }).rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(athleteField());
+
+      // Assert
+      expect(optionNames()).toEqual(["new@example.com"]);
+    });
+
+    it("filters by name ignoring accents", async () => {
+      // Arrange
+      await renderDialog().rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.type(athleteField(), "garcia");
+
+      // Assert
+      expect(optionNames()).toEqual([ana]);
+    });
+
+    it("filters by email", async () => {
+      // Arrange
+      await renderDialog().rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.type(athleteField(), "bea@");
+
+      // Assert
+      expect(optionNames()).toEqual(["Bea López · bea@example.com"]);
+    });
+
+    it("says so when no athlete matches", async () => {
+      // Arrange
+      await renderDialog().rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.type(athleteField(), "zzz");
+
+      // Assert
+      expect(await screen.findByText("Ningún atleta coincide.")).toBeInTheDocument();
+    });
+
+    it("says so when no trainer matches", async () => {
+      // Arrange
+      await renderDialog({ profile: adminProfile }).rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.type(trainerField(), "zzz");
+
+      // Assert
+      expect(await screen.findByText("Ningún entrenador coincide.")).toBeInTheDocument();
+    });
+
+    it("disables the pickers and Crear while loading but keeps the other fields editable", async () => {
+      // Arrange
+      await renderDialog({ getMyAthletes: () => new Promise(() => {}) }).rendered;
+      await screen.findByRole("dialog", { name: "Nuevo entrenamiento" });
+      const user = userEvent.setup();
+
+      // Act
+      await fill(user, { Nombre: "Pierna" });
+
+      // Assert
+      expect(screen.getByRole("textbox", { name: "Nombre" })).toHaveValue("Pierna");
+      expect(athleteField()).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Crear" })).toBeDisabled();
+    });
+
+    it("shows the error with a retry that reads the people again", async () => {
+      // Arrange
+      let failing = true;
+      const { getMyAthletes, rendered } = renderDialog({
+        getMyAthletes: async () =>
+          failing ? fail(new DomainError("NETWORK", "Offline")) : ok(myAthletes),
+      });
+      await rendered;
+      const user = userEvent.setup();
+      const retry = await screen.findByRole("button", { name: "Reintentar" });
+      expect(athleteField()).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Crear" })).toBeDisabled();
+      failing = false;
+
+      // Act
+      await user.click(retry);
+
+      // Assert
+      await waitFor(() => expect(athleteField()).toBeEnabled());
+      expect(getMyAthletes).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Crear" })).toBeEnabled();
+    });
+
+    it.each(["FORBIDDEN", "NETWORK"] as DomainErrorCode[])(
+      "shows the %s error and keeps Crear disabled",
+      async (code) => {
+        // Arrange & Act
+        await renderDialog({
+          getMyAthletes: async () => fail(new DomainError(code, "Rejected")),
+        }).rendered;
+
+        // Assert
+        expect(await screen.findByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Crear" })).toBeDisabled();
+      },
+    );
+  });
+
   it("disables Crear while the workout is being created", async () => {
     // Arrange
     const { rendered } = renderDialog({ createWorkout: () => new Promise(() => {}) });
     await rendered;
     await openedDialog();
     const user = userEvent.setup();
-    await fill(user, trainerValues);
+    await fillTrainerForm(user);
 
     // Act
     await user.click(screen.getByRole("button", { name: "Crear" }));
@@ -293,7 +555,7 @@ describe("CreateWorkoutDialog", () => {
     await rendered;
     await openedDialog();
     const user = userEvent.setup();
-    await fill(user, trainerValues);
+    await fillTrainerForm(user);
 
     // Act
     await user.click(screen.getByRole("button", { name: "Crear" }));
@@ -314,7 +576,7 @@ describe("CreateWorkoutDialog", () => {
     await rendered;
     await openedDialog();
     const user = userEvent.setup();
-    await fill(user, trainerValues);
+    await fillTrainerForm(user);
 
     // Act
     await user.click(screen.getByRole("button", { name: "Crear" }));
@@ -323,6 +585,7 @@ describe("CreateWorkoutDialog", () => {
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Nuevo entrenamiento" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Nombre" })).toHaveValue("  Pierna  ");
+    expect(athleteField()).toHaveValue(ana);
     expect(push).not.toHaveBeenCalled();
   });
 
@@ -333,6 +596,7 @@ describe("CreateWorkoutDialog", () => {
     await openedDialog();
     const user = userEvent.setup();
     await fill(user, { Nombre: "Pierna" });
+    await choose(user, athleteField, ana);
     await user.click(screen.getByRole("button", { name: "Cancelar" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
@@ -342,6 +606,7 @@ describe("CreateWorkoutDialog", () => {
     // Assert
     await openedDialog();
     expect(screen.getByRole("textbox", { name: "Nombre" })).toHaveValue("");
+    expect(athleteField()).toHaveValue("");
     expect(execute).not.toHaveBeenCalled();
   });
 
@@ -349,15 +614,17 @@ describe("CreateWorkoutDialog", () => {
     // Arrange
     await renderDialog({ profile: adminProfile }).rendered;
     await openedDialog();
-    await screen.findByRole("textbox", { name: "ID del entrenador" });
 
     // Act
     await act(() => i18n.changeLanguage("en"));
 
     // Assert
     expect(screen.getByRole("dialog", { name: "New workout" })).toBeInTheDocument();
-    for (const name of ["Name", "Description", "Athlete ID", "Trainer ID"]) {
+    for (const name of ["Name", "Description"]) {
       expect(screen.getByRole("textbox", { name })).toBeInTheDocument();
+    }
+    for (const name of ["Athlete", "Trainer"]) {
+      expect(screen.getByRole("combobox", { name })).toBeInTheDocument();
     }
     const week = screen.getByRole("group", { name: "Week" });
     expect(within(week).getByText("Week of Oct 26 – Nov 1")).toBeInTheDocument();
@@ -417,7 +684,7 @@ describe("CreateWorkoutDialog", () => {
       await rendered;
       await openedDialog();
       const user = userEvent.setup();
-      await fill(user, trainerValues);
+      await fillTrainerForm(user);
 
       // Act
       await user.click(screen.getByRole("button", { name: "Crear" }));
@@ -450,7 +717,7 @@ describe("CreateWorkoutDialog", () => {
       await rendered;
       await openedDialog();
       const user = userEvent.setup();
-      await fill(user, trainerValues);
+      await fillTrainerForm(user);
       expect(
         within(weekField()).getByText("Semana del 28 dic 2026 – 3 ene 2027"),
       ).toBeInTheDocument();

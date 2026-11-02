@@ -2,7 +2,7 @@ import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DomainError, fail, ok } from "@weight-tracker/core/domain";
-import type { Result, UserProfile, Workout } from "@weight-tracker/core/domain";
+import type { Result, UserProfile, WorkoutListItem } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
 import AssignedPlansView from "@/presentation/workouts/views/assigned-plans-view";
 import renderWithProviders, { completeProfile } from "../../../support/render-with-providers";
@@ -29,9 +29,28 @@ const exercise = {
   restMinutes: null,
   sets: [],
   superSeriesId: null,
-} satisfies Workout["exercises"][number];
+} satisfies WorkoutListItem["exercises"][number];
 
-const legs: Workout = {
+const ana = {
+  id: "u-1",
+  email: "ana@example.com",
+  name: "Ana",
+  surname: "García",
+  role: "USER",
+};
+
+const luis = {
+  id: "t-1",
+  email: "luis@example.com",
+  name: "Luis",
+  surname: "Pérez",
+  role: "TRAINER",
+};
+
+/** An athlete with neither name nor surname, who is shown by email. */
+const nameless = { id: "u-2", email: "new@example.com", name: "", surname: "", role: "USER" };
+
+const legs: WorkoutListItem = {
   id: "7b0c1f7e-3a54-4d4e-9d0e-1a2b3c4d5e6f",
   name: "Pierna",
   description: null,
@@ -40,9 +59,11 @@ const legs: Workout = {
   trainerId: "t-1",
   status: "DRAFT",
   exercises: [exercise, { ...exercise, id: "e-2" }, { ...exercise, id: "e-3" }],
+  athlete: ana,
+  trainer: luis,
 };
 
-const pushDay: Workout = {
+const pushDay: WorkoutListItem = {
   ...legs,
   id: "8c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
   name: "Empuje",
@@ -50,10 +71,12 @@ const pushDay: Workout = {
   userId: "u-2",
   trainerId: null,
   exercises: [],
+  athlete: nameless,
+  trainer: null,
 };
 
 /** A workout dated `workoutDate`, for the tests about how a date reads as its week. */
-function datedWorkout(id: string, workoutDate: string): Workout {
+function datedWorkout(id: string, workoutDate: string): WorkoutListItem {
   return { ...pushDay, id, name: `W ${workoutDate}`, workoutDate };
 }
 
@@ -67,7 +90,7 @@ function renderAssignedPlans({
   getWorkouts = async () => ok([legs, pushDay]),
 }: {
   profile?: UserProfile;
-  getWorkouts?: () => Promise<Result<Workout[], DomainError>>;
+  getWorkouts?: () => Promise<Result<WorkoutListItem[], DomainError>>;
 } = {}) {
   const execute = vi.fn(getWorkouts);
 
@@ -79,6 +102,7 @@ function renderAssignedPlans({
       }),
       getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
       getWorkoutsUseCase: () => ({ execute }),
+      getMyAthletesUseCase: () => ({ execute: async () => ok([]) }),
     }),
   };
 }
@@ -138,11 +162,24 @@ describe("AssignedPlansView", () => {
       within(legsRow)
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
-    ).toEqual(["Pierna", "Semana del 26 oct – 1 nov", "u-1", "3", ""]);
+    ).toEqual(["Pierna", "Semana del 26 oct – 1 nov", "Ana García", "3", ""]);
     expect(within(pushRow).getAllByRole("cell")[3]).toHaveTextContent("0");
   });
 
-  it("shows the trainer column to an admin, empty when the workout has no trainer", async () => {
+  it("shows the email of an athlete without a name and no athlete id", async () => {
+    // Arrange & Act
+    await renderAssignedPlans().rendered;
+
+    // Assert
+    await screen.findByText("Pierna");
+    const [legsRow, pushRow] = bodyRows();
+    expect(within(pushRow).getAllByRole("cell")[2]).toHaveTextContent("new@example.com");
+    expect(screen.queryByText("u-1")).not.toBeInTheDocument();
+    expect(within(legsRow).queryByText("u-1")).not.toBeInTheDocument();
+    expect(screen.queryByText("u-2")).not.toBeInTheDocument();
+  });
+
+  it("shows the trainer column to an admin with the trainer's name or Sin entrenador", async () => {
     // Arrange & Act
     await renderAssignedPlans({ profile: adminProfile }).rendered;
 
@@ -153,17 +190,20 @@ describe("AssignedPlansView", () => {
       within(legsRow)
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
-    ).toEqual(["Pierna", "Semana del 26 oct – 1 nov", "u-1", "t-1", "3", ""]);
-    expect(within(pushRow).getAllByRole("cell")[3]).toBeEmptyDOMElement();
+    ).toEqual(["Pierna", "Semana del 26 oct – 1 nov", "Ana García", "Luis Pérez", "3", ""]);
+    expect(within(pushRow).getAllByRole("cell")[3]).toHaveTextContent("Sin entrenador");
+    expect(screen.queryByText("t-1")).not.toBeInTheDocument();
   });
 
-  it("hides the trainer column and every trainer id from a trainer", async () => {
+  it("hides the trainer column and every trainer name from a trainer", async () => {
     // Arrange & Act
     await renderAssignedPlans({ profile: completeProfile }).rendered;
 
     // Assert
     await screen.findByText("Pierna");
     expect(screen.queryByRole("columnheader", { name: "Entrenador" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Luis Pérez")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sin entrenador")).not.toBeInTheDocument();
     expect(screen.queryByText("t-1")).not.toBeInTheDocument();
     expect(within(bodyRows()[0]).getAllByRole("cell")).toHaveLength(5);
   });
@@ -189,7 +229,7 @@ describe("AssignedPlansView", () => {
   it("shows the error and reads the workouts again when Reintentar is pressed", async () => {
     // Arrange
     const getWorkouts = vi
-      .fn<() => Promise<Result<Workout[], DomainError>>>()
+      .fn<() => Promise<Result<WorkoutListItem[], DomainError>>>()
       .mockResolvedValueOnce(fail(new DomainError("NETWORK", "")))
       .mockResolvedValueOnce(ok([legs]));
     const { execute, rendered } = renderAssignedPlans({ getWorkouts });
@@ -291,5 +331,6 @@ describe("AssignedPlansView", () => {
     }
     expect(screen.getByText("Week of Oct 26 – Nov 1")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Edit Pierna" })).toBeInTheDocument();
+    expect(screen.getByText("No trainer")).toBeInTheDocument();
   });
 });

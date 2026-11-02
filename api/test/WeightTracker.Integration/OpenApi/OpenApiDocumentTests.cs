@@ -292,6 +292,32 @@ public class OpenApiDocumentTests : IntegrationTest
     }
 
     [Fact]
+    public async Task ListWorkouts_ShouldDocumentTheAthleteAndANullableTrainerOnEachItem()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var itemReference = Operation(document, "/workouts", "get")
+            .GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("items").GetProperty("$ref").GetString();
+        itemReference.Should().Be("#/components/schemas/WorkoutListItemResponse");
+
+        var item = document.GetProperty("components").GetProperty("schemas").GetProperty("WorkoutListItemResponse");
+        item.GetProperty("required").EnumerateArray().Select(name => name.GetString()).Should().Contain("athlete");
+        var athlete = item.GetProperty("properties").GetProperty("athlete").GetRawText();
+        athlete.Should().Contain("#/components/schemas/UserProfileResponse");
+        var trainer = item.GetProperty("properties").GetProperty("trainer").GetRawText();
+        trainer.Should().Contain("#/components/schemas/UserProfileResponse");
+        trainer.Should().Match(text => text.Contains("\"null\"") || text.Contains("\"nullable\": true") || text.Contains("\"nullable\":true"));
+
+        var createdReference = Operation(document, "/workouts", "post")
+            .GetProperty("responses").GetProperty("201").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("$ref").GetString();
+        createdReference.Should().Be("#/components/schemas/WorkoutResponse");
+    }
+
+    [Fact]
     public async Task UserSummary_ShouldDocumentTheActivationFields()
     {
         // Arrange & Act

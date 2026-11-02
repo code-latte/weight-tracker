@@ -23,7 +23,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/WorkoutResponse"
+                    "$ref": "#/components/schemas/WorkoutListItemResponse"
                   }
                 }
               },
@@ -31,7 +31,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/WorkoutResponse"
+                    "$ref": "#/components/schemas/WorkoutListItemResponse"
                   }
                 }
               },
@@ -39,7 +39,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/WorkoutResponse"
+                    "$ref": "#/components/schemas/WorkoutListItemResponse"
                   }
                 }
               }
@@ -4997,6 +4997,73 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "WorkoutListItemResponse": {
+        "required": [
+          "id",
+          "name",
+          "description",
+          "workoutDate",
+          "userId",
+          "trainerId",
+          "status",
+          "exercises",
+          "athlete",
+          "trainer"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "workoutDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trainerId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "exercises": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkoutExerciseResponse"
+            }
+          },
+          "athlete": {
+            "$ref": "#/components/schemas/UserProfileResponse"
+          },
+          "trainer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UserProfileResponse"
+              }
+            ]
           }
         }
       },

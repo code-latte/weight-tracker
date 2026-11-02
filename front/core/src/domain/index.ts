@@ -33,6 +33,7 @@ export type {
   Workout,
   WorkoutDetail,
   WorkoutExerciseDetail,
+  WorkoutListItem,
 } from "./workouts/workout";
 export type { Exercise } from "./exercises/exercise";
 export type {

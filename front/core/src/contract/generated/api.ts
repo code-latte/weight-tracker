@@ -26,9 +26,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["WorkoutResponse"][];
-                        "application/json": components["schemas"]["WorkoutResponse"][];
-                        "text/json": components["schemas"]["WorkoutResponse"][];
+                        "text/plain": components["schemas"]["WorkoutListItemResponse"][];
+                        "application/json": components["schemas"]["WorkoutListItemResponse"][];
+                        "text/json": components["schemas"]["WorkoutListItemResponse"][];
                     };
                 };
                 /** @description Unauthorized */
@@ -2672,6 +2672,22 @@ export interface components {
             sets: components["schemas"]["SetResponse"][];
             /** Format: int32 */
             superSeriesId: null | number | string;
+        };
+        WorkoutListItemResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: null | string;
+            /** Format: date */
+            workoutDate: string;
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            trainerId: null | string;
+            status: string;
+            exercises: components["schemas"]["WorkoutExerciseResponse"][];
+            athlete: components["schemas"]["UserProfileResponse"];
+            trainer: null | components["schemas"]["UserProfileResponse"];
         };
         WorkoutResponse: {
             /** Format: uuid */

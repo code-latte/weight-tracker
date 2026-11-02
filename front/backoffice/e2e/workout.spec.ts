@@ -10,6 +10,15 @@ const cors = {
 
 const athleteId = "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c";
 
+/** The athlete of every stored workout: listed beside each one, and offered by the create dialog. */
+const athlete = {
+  id: athleteId,
+  email: "bea@example.com",
+  name: "Bea",
+  surname: "López",
+  role: "USER",
+};
+
 interface StoredWorkout {
   id: string;
   name: string;
@@ -180,6 +189,24 @@ async function mockWorkoutsApi(
   ]);
   const sent: SentRequests = { additions: [], updates: [], reorders: [] };
 
+  await page.route(`${api}/trainer-athletes`, (route) =>
+    route.request().method() === "OPTIONS"
+      ? route.fulfill({ status: 204, headers: cors })
+      : route.fulfill(
+          json([
+            {
+              id: "rel-1",
+              athleteId: athlete.id,
+              email: athlete.email,
+              name: athlete.name,
+              surname: athlete.surname,
+              trainerName: "Ana",
+              trainerSurname: "García",
+              startedAtUtc: "2026-10-01T09:00:00Z",
+            },
+          ]),
+        ),
+  );
   await page.route(`${api}/workouts`, (route) => {
     const request = route.request();
 
@@ -197,7 +224,9 @@ async function mockWorkoutsApi(
       workouts.set(created.id, created);
       return route.fulfill(json(created, 201));
     }
-    return route.fulfill(json([...workouts.values()]));
+    return route.fulfill(
+      json([...workouts.values()].map((workout) => ({ ...workout, athlete, trainer: null }))),
+    );
   });
   await page.route(`${api}/workouts/*`, (route) => {
     if (route.request().method() === "OPTIONS") {
@@ -348,7 +377,8 @@ test("creates a workout from the dialog and lands on its screen", async ({ page 
   await page.getByRole("button", { name: "Nuevo entrenamiento" }).click();
   const dialog = page.getByRole("dialog", { name: "Nuevo entrenamiento" });
   await dialog.getByLabel("Nombre").fill("Pierna");
-  await dialog.getByLabel("ID del atleta").fill(athleteId);
+  await dialog.getByRole("combobox", { name: "Atleta" }).click();
+  await page.getByRole("option", { name: "Bea López · bea@example.com" }).click();
   const creation = page.waitForRequest(
     (request) => request.url() === `${api}/workouts` && request.method() === "POST",
   );

@@ -54,11 +54,11 @@ public class WorkoutsController : AuthorizedController
     }
 
     /// <summary>
-    /// Lists the workouts the caller is entitled to see. The scoping rule itself lives in
-    /// the use case; the controller only resolves who the caller is.
+    /// Lists the workouts the caller is entitled to see, each with the public profiles of its athlete and trainer.
+    /// The scoping rule itself lives in the use case; the controller only resolves who the caller is.
     /// </summary>
     [HttpGet]
-    [ProducesResponseType<IReadOnlyList<WorkoutResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<IReadOnlyList<WorkoutListItemResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
@@ -67,7 +67,7 @@ public class WorkoutsController : AuthorizedController
         {
             var result = await _getAllWorkouts.Execute(CurrentUser!.Id, CurrentUser.Role, cancellationToken);
 
-            return Ok(result.Workouts.Select(workout => WorkoutResponse.From(workout, result.Exercises)).ToList());
+            return Ok(result.Workouts.Select(workout => WorkoutListItemResponse.From(workout, result.Exercises, result.Users)).ToList());
         }
         catch (Exception exception)
         {

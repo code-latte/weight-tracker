@@ -10,7 +10,8 @@
       "exercises": "Exercises"
     },
     "empty": "No workouts assigned yet.",
-    "edit": "Edit {{name}}"
+    "edit": "Edit {{name}}",
+    "noTrainer": "No trainer"
   },
   "createWorkout": {
     "title": "New workout",
@@ -18,8 +19,8 @@
       "name": "Name",
       "description": "Description",
       "date": "Week",
-      "userId": "Athlete ID",
-      "trainerId": "Trainer ID"
+      "userId": "Athlete",
+      "trainerId": "Trainer"
     },
     "actions": {
       "cancel": "Cancel",
@@ -29,8 +30,13 @@
       "required": "This field is required.",
       "maxLength": "It cannot be longer than {{max}} characters.",
       "date": "Enter a valid date.",
-      "uuid": "Enter a valid identifier."
-    }
+      "uuid": "Enter a valid identifier.",
+      "athleteRequired": "Select an athlete.",
+      "trainerRequired": "Select a trainer."
+    },
+    "noAthletes": "No athletes match.",
+    "noTrainers": "No trainers match.",
+    "retry": "Retry"
   },
   "workout": {
     "catalog": {

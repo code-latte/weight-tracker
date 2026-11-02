@@ -9,6 +9,7 @@ import {
   type Workout,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
+  type WorkoutListItem,
 } from "../../../src/domain";
 import { HttpError, WorkoutRepository } from "../../../src/infrastructure";
 
@@ -21,6 +22,20 @@ const workout: Workout = {
   trainerId: null,
   status: "DRAFT",
   exercises: [],
+};
+
+const listedPerson = {
+  id: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
+  email: "ana@example.com",
+  name: "Ana",
+  surname: "García",
+  role: "USER",
+};
+
+const listedWorkout: WorkoutListItem = {
+  ...workout,
+  athlete: listedPerson,
+  trainer: null,
 };
 
 const workoutExercise: WorkoutExerciseDetail = {
@@ -95,7 +110,7 @@ describe("WorkoutRepository", () => {
   describe("getAll", () => {
     it("gets /workouts without a body", async () => {
       // Arrange
-      const httpClient = new FakeHttpClient(async () => [workout]);
+      const httpClient = new FakeHttpClient(async () => [listedWorkout]);
       const repository = new WorkoutRepository(httpClient);
 
       // Act
@@ -107,13 +122,35 @@ describe("WorkoutRepository", () => {
 
     it("returns the workouts on success", async () => {
       // Arrange
-      const repository = new WorkoutRepository(new FakeHttpClient(async () => [workout]));
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => [listedWorkout]));
 
       // Act
       const result = await repository.getAll();
 
       // Assert
-      expect(result).toEqual(ok([workout]));
+      expect(result).toEqual(ok([listedWorkout]));
+    });
+
+    it("keeps the athlete and the trainer of each workout, and a missing trainer as null", async () => {
+      // Arrange
+      const prescribed: WorkoutListItem = {
+        ...listedWorkout,
+        trainerId: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
+        trainer: { ...listedPerson, id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d", role: "TRAINER" },
+      };
+      const repository = new WorkoutRepository(
+        new FakeHttpClient(async () => [listedWorkout, prescribed]),
+      );
+
+      // Act
+      const result = await repository.getAll();
+
+      // Assert
+      expect(result).toEqual(ok([listedWorkout, prescribed]));
+      expect(result.ok && result.value.map((item) => item.trainer)).toEqual([
+        null,
+        prescribed.trainer,
+      ]);
     });
 
     it.each([

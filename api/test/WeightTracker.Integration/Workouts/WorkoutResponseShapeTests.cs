@@ -302,4 +302,53 @@ public class WorkoutResponseShapeTests : IntegrationTest
         entry.TryGetProperty("restMinutes", out var rest).Should().BeTrue();
         rest.ValueKind.Should().Be(JsonValueKind.Null);
     }
+
+    private static readonly string[] PublicProfileProperties = ["id", "email", "name", "surname", "role"];
+
+    [Fact]
+    public async Task PrescribedWorkout_ShouldCarryThePublicProfilesOfItsAthleteAndTrainer()
+    {
+        // Arrange & Act
+        var workout = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.TrainedWorkoutId);
+
+        // Assert
+        var athlete = workout.GetProperty("athlete");
+        var trainer = workout.GetProperty("trainer");
+        athlete.GetProperty("id").GetGuid().Should().Be(workout.GetProperty("userId").GetGuid());
+        athlete.GetProperty("email").GetString().Should().Be(SeedData.UserEmail);
+        athlete.GetProperty("role").GetString().Should().Be("USER");
+        trainer.GetProperty("id").GetGuid().Should().Be(workout.GetProperty("trainerId").GetGuid());
+        trainer.GetProperty("email").GetString().Should().Be(SeedData.TrainerEmail);
+        trainer.GetProperty("role").GetString().Should().Be("TRAINER");
+        athlete.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(PublicProfileProperties);
+        trainer.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(PublicProfileProperties);
+    }
+
+    [Fact]
+    public async Task SelfPlannedWorkout_ShouldCarryItsAthleteAndANullTrainer()
+    {
+        // Arrange & Act
+        var workout = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.OwnedWorkoutId);
+
+        // Assert
+        workout.GetProperty("athlete").GetProperty("id").GetGuid().Should().Be(SeedData.UserId);
+        workout.TryGetProperty("trainer", out var trainer).Should().BeTrue();
+        trainer.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task CreatedWorkout_ShouldNotCarryAthleteOrTrainer()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await user.PostAsJsonAsync("/workouts", new { name = "Leg day", workoutDate = "2026-11-10" });
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        created.TryGetProperty("athlete", out _).Should().BeFalse();
+        created.TryGetProperty("trainer", out _).Should().BeFalse();
+    }
 }

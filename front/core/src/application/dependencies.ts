@@ -27,6 +27,7 @@ import type {
   Workout,
   WorkoutDetail,
   WorkoutExerciseDetail,
+  WorkoutListItem,
 } from "../domain";
 import type {
   AthleteInvitationRepositoryInterface,
@@ -67,7 +68,7 @@ export default interface Dependencies {
   createUserUseCase: UseCaseInterface<CreateUserRequest, CreatedUserResponse>;
   activateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
   deactivateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
-  getWorkoutsUseCase: UseCaseInterface<void, Workout[]>;
+  getWorkoutsUseCase: UseCaseInterface<void, WorkoutListItem[]>;
   getWorkoutByIdUseCase: UseCaseInterface<GetWorkoutByIdInput, WorkoutDetail>;
   createWorkoutUseCase: UseCaseInterface<CreateWorkoutRequest, Workout>;
   updateWorkoutUseCase: UseCaseInterface<UpdateWorkoutInput, Workout>;

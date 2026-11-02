@@ -32,6 +32,15 @@ public class WorkoutScopingTests : WorkoutEndpointTest
             .ToList();
     }
 
+    private async Task<JsonElement> WorkoutVisibleTo(string email, Guid workoutId)
+    {
+        var client = await AuthenticatedClientFor(email);
+
+        var payload = await client.GetFromJsonAsync<JsonElement>("/workouts", JsonOptions);
+
+        return payload.EnumerateArray().Single(workout => workout.GetProperty("id").GetGuid() == workoutId);
+    }
+
     [Fact]
     public async Task GetAll_ShouldRejectATokenWhoseUserNoLongerExists()
     {
@@ -192,5 +201,47 @@ public class WorkoutScopingTests : WorkoutEndpointTest
         statuses[SeedData.PrescribedDraftWorkoutId].Should().Be("DRAFT");
         statuses[SeedData.TrainedWorkoutId].Should().Be("PUBLISHED");
         statuses[SeedData.PrescribedStartedWorkoutId].Should().Be("STARTED");
+    }
+
+    [Fact]
+    public async Task User_ShouldSeeThemselvesAsTheAthleteAndTheirTrainer()
+    {
+        // Arrange & Act
+        var workout = await WorkoutVisibleTo(SeedCredentials.User, SeedData.TrainedWorkoutId);
+
+        // Assert
+        workout.GetProperty("athlete").GetProperty("id").GetGuid().Should().Be(SeedData.UserId);
+        workout.GetProperty("trainer").GetProperty("id").GetGuid().Should().Be(SeedData.TrainerId);
+    }
+
+    [Fact]
+    public async Task Trainer_ShouldStillSeeTheAthleteOnceTheRelationshipHasEnded()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        (await trainer.PutAsJsonAsync($"/trainer-athletes/{SeedData.TrainerId}/end", new { athleteId = SeedData.UserId }))
+            .EnsureSuccessStatusCode();
+
+        // Act
+        var workout = await WorkoutVisibleTo(SeedCredentials.Trainer, SeedData.TrainedWorkoutId);
+
+        // Assert
+        workout.GetProperty("athlete").GetProperty("id").GetGuid().Should().Be(SeedData.UserId);
+        workout.GetProperty("trainer").GetProperty("id").GetGuid().Should().Be(SeedData.TrainerId);
+    }
+
+    [Fact]
+    public async Task Admin_ShouldStillSeeADeactivatedAthlete()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+        (await admin.PutAsync($"/users/{SeedData.UserId}/deactivate", null)).EnsureSuccessStatusCode();
+
+        // Act
+        var workout = await WorkoutVisibleTo(SeedCredentials.Admin, SeedData.OwnedWorkoutId);
+
+        // Assert
+        workout.GetProperty("athlete").GetProperty("id").GetGuid().Should().Be(SeedData.UserId);
+        workout.GetProperty("athlete").GetProperty("email").GetString().Should().Be(SeedData.UserEmail);
     }
 }

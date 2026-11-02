@@ -132,8 +132,9 @@ function workoutExercise(
   exerciseId: string,
   effort: string,
   sets: WorkoutExerciseDetail["sets"],
+  { perSide = false, restMinutes = null }: Partial<WorkoutExerciseDetail> = {},
 ): WorkoutExerciseDetail {
-  return { id, exerciseId, effort, sets, superSeriesId: null };
+  return { id, exerciseId, effort, perSide, restMinutes, sets, superSeriesId: null };
 }
 
 const squatInWorkout = workoutExercise("we-1", squat.id, "HIGH", [
@@ -167,19 +168,24 @@ function savedWorkout({ id, ...request }: UpdateWorkoutInput): Workout {
   };
 }
 
-/** What the API answers to an exercise save: the entry with the sets it received. */
+/** What the API answers to an exercise save: the entry with the sets, rest and per side it received. */
 function entryOf(
-  { exerciseId, effort, sets }: AddExerciseToWorkoutInput,
+  { exerciseId, effort, sets, perSide, restMinutes }: AddExerciseToWorkoutInput,
   id: string,
 ): WorkoutExerciseDetail {
   return {
     id,
     exerciseId: exerciseId ?? "",
     effort: effort ?? "",
+    perSide: perSide ?? false,
+    restMinutes: restMinutes ?? null,
     superSeriesId: null,
-    sets: (sets ?? []).map(({ count, targetType, target, maxTarget }) => ({
+    sets: (sets ?? []).map(({ count, targetType, target, maxTarget, targetMinutes }) => ({
       count: count ?? 0,
-      target: { type: targetType ?? "", value: target ?? null, maxValue: maxTarget ?? null },
+      target:
+        targetType === "Minutes"
+          ? { type: targetType, minutes: targetMinutes ?? null }
+          : { type: targetType ?? "", value: target ?? null, maxValue: maxTarget ?? null },
     })),
   };
 }
@@ -196,7 +202,9 @@ async function addSet(
   }
   await user.type(within(form).getByRole("spinbutton", { name: "Series" }), count);
   if (value) {
-    await user.type(within(form).getByRole("spinbutton", { name: "Valor" }), value);
+    // A minutes value is typed as `M:SS`, in a text field.
+    const role = type === "Minutos" ? "textbox" : "spinbutton";
+    await user.type(within(form).getByRole(role, { name: "Valor" }), value);
   }
   if (max) {
     await user.type(within(form).getByRole("spinbutton", { name: "Máximo" }), max);
@@ -1883,6 +1891,7 @@ describe("WorkoutView", () => {
         { count: 2, targetType: "Reps", target: 15 },
         { count: 1, targetType: "MaxReps" },
       ],
+      perSide: false,
     });
     expect(mutations.updateExercise).not.toHaveBeenCalled();
   });
@@ -1909,6 +1918,7 @@ describe("WorkoutView", () => {
       exerciseId: "ex-squat",
       effort: "HIGH",
       sets: [{ count: 1, targetType: "RepsRange", target: 8, maxTarget: 12 }],
+      perSide: false,
     });
     expect(mutations.addExercise).not.toHaveBeenCalled();
   });
@@ -2368,6 +2378,286 @@ describe("WorkoutView", () => {
         "Intense",
         "Very intense",
       ]);
+    });
+  });
+
+  describe("minutes, rest and per side", () => {
+    const plank = workoutExercise(
+      "we-1",
+      squat.id,
+      "HIGH",
+      [
+        { count: 3, target: { type: "Minutes", minutes: 1.5 } },
+        { count: 1, target: { type: "Minutes", minutes: 20 } },
+      ],
+      { perSide: true, restMinutes: 1.5 },
+    );
+    const withPlank = async () => ok({ ...workout, exercises: [plank] });
+    const restField = () =>
+      within(configurationDialog()).getByRole("textbox", { name: "Descanso entre series" });
+    const perSideSwitch = () =>
+      within(configurationDialog()).getByRole("switch", { name: "Por lado" });
+
+    it("offers minutes after the other target types", async () => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await editExercise(user, 0);
+      const form = within(configurationDialog()).getByRole("group", { name: "Añadir serie" });
+
+      // Act
+      await user.click(within(form).getByRole("combobox", { name: "Tipo" }));
+
+      // Assert
+      expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+        "Repeticiones",
+        "Segundos",
+        "Máximas repeticiones",
+        "Rango de repeticiones",
+        "Minutos",
+      ]);
+    });
+
+    it("adds a minutes set typed as M:SS without a request", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await editExercise(user, 0);
+
+      // Act
+      await addSet(user, { count: "3", type: "Minutos", value: "1:30" });
+
+      // Assert
+      expect(setSummaries()).toEqual(["3 × 10 repeticiones", "3 × 1:30 min"]);
+      expect(mutationCalls(mutations)).toBe(0);
+    });
+
+    it.each(["1.5", "1:60", "0"])("reports the invalid minutes %j", async (value) => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await editExercise(user, 0);
+
+      // Act
+      await addSet(user, { count: "1", type: "Minutos", value });
+
+      // Assert
+      const form = within(configurationDialog()).getByRole("group", { name: "Añadir serie" });
+      expect(within(form).getByRole("textbox", { name: "Valor" })).toHaveAccessibleDescription(
+        "Usa minutos (2) o minutos:segundos (1:30).",
+      );
+      expect(setSummaries()).toEqual(["3 × 10 repeticiones"]);
+    });
+
+    it("opens a chosen exercise with no rest and not per side", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await chooseFromCatalog(user, "Sentadilla");
+
+      // Assert
+      expect(restField()).toHaveValue("");
+      expect(perSideSwitch()).not.toBeChecked();
+    });
+
+    it("loads the stored rest, per side and minutes as M or M:SS", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withPlank }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await editExercise(user, 0);
+
+      // Assert
+      expect(restField()).toHaveValue("1:30");
+      expect(perSideSwitch()).toBeChecked();
+      expect(setSummaries()).toEqual(["3 × 1:30 min por lado", "1 × 20 min por lado"]);
+    });
+
+    it("shows whole minutes of rest without seconds", async () => {
+      // Arrange
+      const getWorkout = async () =>
+        ok({
+          ...workout,
+          exercises: [workoutExercise("we-1", squat.id, "HIGH", [], { restMinutes: 2 })],
+        });
+      await renderWorkout({ getWorkout }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await editExercise(user, 0);
+
+      // Assert
+      expect(restField()).toHaveValue("2");
+    });
+
+    it("marks every set per side once the switch is on, without a request", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await editExercise(user, 0);
+
+      // Act
+      await user.click(perSideSwitch());
+
+      // Assert
+      expect(setSummaries()).toEqual(["3 × 10 repeticiones por lado"]);
+      expect(mutationCalls(mutations)).toBe(0);
+    });
+
+    it("sends minutes and rest as decimals and per side, once", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({ getWorkout: withoutExercises });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await chooseFromCatalog(user, "Prensa de piernas");
+      await chooseEffort(user, "RIR 3");
+      await addSet(user, { count: "3", type: "Minutos", value: "1:30" });
+      await user.type(restField(), "2");
+      await user.click(perSideSwitch());
+
+      // Act
+      await user.click(within(configurationDialog()).getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      await waitFor(() => expect(mutations.addExercise).toHaveBeenCalledTimes(1));
+      expect(mutations.addExercise).toHaveBeenCalledWith({
+        workoutId: "w-1",
+        exerciseId: "ex-press",
+        effort: "MID",
+        sets: [{ count: 3, targetType: "Minutes", targetMinutes: 1.5 }],
+        perSide: true,
+        restMinutes: 2,
+      });
+    });
+
+    it("keeps a stored exercise's rest and per side when only its sets change", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({ getWorkout: withPlank });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await editExercise(user, 0);
+      await user.click(
+        within(configurationDialog()).getAllByRole("button", { name: "Quitar serie" })[1]!,
+      );
+
+      // Act
+      await user.click(within(configurationDialog()).getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      await waitFor(() => expect(mutations.updateExercise).toHaveBeenCalledTimes(1));
+      expect(mutations.updateExercise).toHaveBeenCalledWith({
+        workoutId: "w-1",
+        exerciseId: "ex-squat",
+        effort: "HIGH",
+        sets: [{ count: 3, targetType: "Minutes", targetMinutes: 1.5 }],
+        perSide: true,
+        restMinutes: 1.5,
+      });
+    });
+
+    it("reports an invalid rest and sends nothing", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await editExercise(user, 0);
+      await user.type(restField(), "1:75");
+
+      // Act
+      await user.click(within(configurationDialog()).getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      expect(restField()).toHaveAccessibleDescription("Usa minutos (2) o minutos:segundos (1:30).");
+      expect(mutationCalls(mutations)).toBe(0);
+    });
+
+    it("keeps the rest and per side as edited when the API refuses them", async () => {
+      // Arrange
+      const { rendered } = renderWorkout({
+        updateExercise: async () => fail(new DomainError("VALIDATION", "")),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await editExercise(user, 0);
+      await user.type(restField(), "0:45");
+      await user.click(perSideSwitch());
+
+      // Act
+      await user.click(within(configurationDialog()).getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      expect(
+        await within(configurationDialog()).findByText("Revisa los datos introducidos."),
+      ).toBeInTheDocument();
+      expect(restField()).toHaveValue("0:45");
+      expect(perSideSwitch()).toBeChecked();
+    });
+
+    it("shows minutes, per side and rest in the workout list", async () => {
+      // Arrange / Act
+      await renderWorkout({ getWorkout: withPlank }).rendered;
+
+      // Assert
+      await loaded();
+      const [item] = workoutItems();
+      const setsLine = within(item!).getByText("3 × 1:30 min, 1 × 20 min · por lado");
+      const effortLine = within(item!).getByText("Esfuerzo: RIR 0");
+      const restLine = within(item!).getByText("Descanso: 1:30 min");
+      expect(
+        setsLine.compareDocumentPosition(effortLine) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        effortLine.compareDocumentPosition(restLine) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("shows no rest line for an exercise without rest", async () => {
+      // Arrange / Act
+      await renderWorkout().rendered;
+
+      // Assert
+      await loaded();
+      const [item] = workoutItems();
+      expect(within(item!).queryByText(/^Descanso/)).not.toBeInTheDocument();
+    });
+
+    it("shows rest and per side in English", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withPlank }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await editExercise(user, 0);
+
+      // Act
+      await act(() => i18n.changeLanguage("en"));
+
+      // Assert
+      const dialog = screen.getByRole("dialog", { name: "Exercise configuration" });
+      expect(
+        within(dialog).getByRole("textbox", { name: "Rest between sets" }),
+      ).toHaveAccessibleDescription("Minutes or m:ss, e.g. 1:30");
+      expect(within(dialog).getByRole("switch", { name: "Per side" })).toBeChecked();
+      expect(
+        within(within(dialog).getByRole("list", { name: "Sets" }))
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["3 × 1:30 min per side", "1 × 20 min per side"]);
     });
   });
 });

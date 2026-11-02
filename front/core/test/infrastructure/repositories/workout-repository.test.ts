@@ -27,7 +27,12 @@ const workoutExercise: WorkoutExerciseDetail = {
   id: "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
   exerciseId: "1f2e3d4c-5b6a-4978-8695-a4b3c2d1e0f9",
   effort: "HIGH",
-  sets: [{ count: 3, target: { type: "REPS", value: 10, maxValue: null } }],
+  perSide: true,
+  restMinutes: 1.5,
+  sets: [
+    { count: 3, target: { type: "REPS", value: 10, maxValue: null } },
+    { count: 1, target: { type: "Minutes", minutes: 2 } },
+  ],
   superSeriesId: null,
 };
 
@@ -53,7 +58,12 @@ const updateRequest: UpdateWorkoutRequest = {
 const addExerciseRequest: AddExerciseRequest = {
   exerciseId: workoutExercise.exerciseId,
   effort: "HIGH",
-  sets: [{ count: 3, targetType: "REPS", target: 10 }],
+  sets: [
+    { count: 3, targetType: "REPS", target: 10 },
+    { count: 1, targetType: "Minutes", targetMinutes: 2 },
+  ],
+  perSide: true,
+  restMinutes: 1.5,
 };
 
 const reorderRequest: ReorderWorkoutExercisesRequest = {

@@ -29,7 +29,7 @@ public class UpdateWorkoutExerciseUseCase
     }
 
     /// <summary>
-    /// Replaces the effort and every set prescription of an exercise of an existing workout.
+    /// Replaces the effort, the per-side flag, the rest and every set prescription of an exercise of an existing workout.
     /// </summary>
     /// <param name="routeExerciseId">Catalog exercise addressed by the route.</param>
     /// <param name="bodyExerciseId">Catalog exercise named by the body. It must be the same one.</param>
@@ -50,6 +50,8 @@ public class UpdateWorkoutExerciseUseCase
         Id bodyExerciseId,
         Effort effort,
         IReadOnlyList<SetPrescription> sets,
+        bool perSide,
+        TimeInMinutes? rest,
         CancellationToken cancellationToken)
     {
         if (routeExerciseId != bodyExerciseId)
@@ -60,7 +62,7 @@ public class UpdateWorkoutExerciseUseCase
 
         _authorizer.EnsureCanEdit(workout, callerId, callerRole, "PUT /workouts/{workoutId}/exercises/{exerciseId}");
 
-        workout.UpdateExercise(routeExerciseId, effort, sets);
+        workout.UpdateExercise(routeExerciseId, effort, sets, perSide, rest);
 
         await _workouts.Save(workout, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

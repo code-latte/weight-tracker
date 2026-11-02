@@ -19,6 +19,8 @@ const workoutExercise: WorkoutExerciseDetail = {
   id: "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
   exerciseId,
   effort: "MID",
+  perSide: true,
+  restMinutes: 0.75,
   sets: [{ count: 2, target: { type: "Reps", value: 15, maxValue: null } }],
   superSeriesId: null,
 };
@@ -30,6 +32,8 @@ const body: AddExerciseRequest & { exerciseId: string } = {
     { count: 2, targetType: "Reps", target: 15 },
     { count: 1, targetType: "MaxReps" },
   ],
+  perSide: true,
+  restMinutes: 0.75,
 };
 
 class FakeWorkoutRepository implements WorkoutRepositoryInterface {

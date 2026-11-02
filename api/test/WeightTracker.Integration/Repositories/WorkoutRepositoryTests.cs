@@ -383,4 +383,51 @@ public class WorkoutRepositoryTests : IntegrationTest
             Id.From(SeedData.PrescribedStartedWorkoutId),
         });
     }
+
+    [Fact]
+    public async Task Save_ShouldPersistAMinutesTargetPerSideAndRestOfANewAggregate()
+    {
+        // Arrange
+        var workout = Workout.Create(Id.From(SeedData.UserId), null, Name, null, new DateTime(2026, 11, 3));
+        workout.AddExercise(
+            Plancha,
+            Effort.MID,
+            [new SetPrescription(1, new SetTarget.Minutes(TimeInMinutes.From(1.25m)))],
+            perSide: true,
+            rest: TimeInMinutes.From(0.75m));
+
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        var entry = EntryFor(stored!, Plancha);
+        entry.Sets.Single().Should().Be(new SetPrescription(1, new SetTarget.Minutes(TimeInMinutes.From(1.25m))));
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(TimeInMinutes.From(0.75m));
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistAnUpdatedPerSideFlagAndRestOfAnExistingAggregate()
+    {
+        // Arrange
+        var stored = await Read(Id.From(SeedData.OwnedWorkoutId));
+        stored!.UpdateExercise(
+            PressBanca,
+            Effort.MID,
+            [new SetPrescription(3, new SetTarget.Reps(10))],
+            perSide: true,
+            rest: TimeInMinutes.From(2m));
+
+        await Write(repository => repository.Save(stored, CancellationToken.None));
+
+        // Act
+        var reloaded = await Read(Id.From(SeedData.OwnedWorkoutId));
+
+        // Assert
+        var entry = EntryFor(reloaded!, PressBanca);
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(TimeInMinutes.From(2m));
+    }
 }

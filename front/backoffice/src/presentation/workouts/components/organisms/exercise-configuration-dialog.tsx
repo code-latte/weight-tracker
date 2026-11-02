@@ -8,6 +8,8 @@ import {
   type ExerciseConfigurationViolations,
   type SetFormValues,
   type SetFormViolations,
+  minutesFromText,
+  minutesToText,
   targetFieldsOf,
   validateExerciseConfiguration,
   validateSetForm,
@@ -29,6 +31,7 @@ import IconButton from "@/presentation/common/components/atoms/icon-button";
 import List from "@/presentation/common/components/atoms/list";
 import ListItem from "@/presentation/common/components/atoms/list-item";
 import MenuItem from "@/presentation/common/components/atoms/menu-item";
+import Switch from "@/presentation/common/components/atoms/switch";
 import TextField from "@/presentation/common/components/atoms/text-field";
 import Typography from "@/presentation/common/components/atoms/typography";
 import ExerciseVideo from "@/presentation/workouts/components/molecules/exercise-video";
@@ -45,7 +48,7 @@ function isEffort(value: string): value is Effort {
   return (EFFORTS as string[]).includes(value);
 }
 /** The API's set target types. */
-const TARGET_TYPES = ["Reps", "Duration", "MaxReps", "RepsRange"];
+const TARGET_TYPES = ["Reps", "Duration", "MaxReps", "RepsRange", "Minutes"];
 
 const emptyDraft: SetFormValues = { count: "", type: "Reps", value: "", maxValue: "" };
 
@@ -60,21 +63,31 @@ interface ExerciseConfigurationDialogProps {
   onClose: () => void;
 }
 
+/** A minutes target is shown as `M` or `M:SS`, never as the API's decimal. */
 function toFormValues({ count, target }: WorkoutExerciseDetail["sets"][number]): SetFormValues {
+  let value = target.value == null ? "" : String(target.value);
+  if (target.type === "Minutes") {
+    value = target.minutes == null ? "" : minutesToText(target.minutes);
+  }
   return {
     count: String(count),
     type: target.type,
-    value: target.value == null ? "" : String(target.value),
+    value,
     maxValue: target.maxValue == null ? "" : String(target.maxValue),
   };
 }
 
-/** A listed set as the API expects it: numbers, and only the target fields its type needs. */
+/**
+ * A listed set as the API expects it: numbers, and only the target fields its type needs. Minutes go as a decimal
+ * with at most two decimals.
+ */
 function toPrescription(set: SetFormValues): SetPrescription {
   const needs = targetFieldsOf(set.type);
   const prescription: SetPrescription = { count: Number(set.count), targetType: set.type };
 
-  if (needs.value) {
+  if (set.type === "Minutes") {
+    prescription.targetMinutes = minutesFromText(set.value);
+  } else if (needs.value) {
     prescription.target = Number(set.value);
   }
   if (needs.maxValue) {
@@ -84,8 +97,8 @@ function toPrescription(set: SetFormValues): SetPrescription {
 }
 
 /**
- * Configures a workout exercise: its effort and its list of sets, built with the set form. Guardar adds an exercise
- * chosen from the catalog to the workout, or replaces a listed one's effort and sets. Cancelar, Escape and a click
+ * Configures a workout exercise: its effort, rest, per side and its list of sets, built with the set form. Guardar
+ * adds an exercise chosen from the catalog to the workout, or replaces a listed one's prescription. Cancelar, Escape and a click
  * outside close it without a request, except while the save is in progress. The caller keys it by the item, so every
  * opening starts from the stored values.
  */
@@ -110,7 +123,12 @@ export default function ExerciseConfigurationDialog({
   } = useExerciseLabels();
   const { saving, errorCode, save } = useSaveWorkoutExercise();
   const titleId = useId();
+  const perSideLabelId = useId();
   const [effort, setEffort] = useState(item.workoutExercise.effort);
+  const [rest, setRest] = useState(
+    item.workoutExercise.restMinutes == null ? "" : minutesToText(item.workoutExercise.restMinutes),
+  );
+  const [perSide, setPerSide] = useState(item.workoutExercise.perSide ?? false);
   const [sets, setSets] = useState<SetFormValues[]>(item.workoutExercise.sets.map(toFormValues));
   const [draft, setDraft] = useState<SetFormValues>(emptyDraft);
   const [draftErrors, setDraftErrors] = useState<SetFormViolations>({});
@@ -121,6 +139,8 @@ export default function ExerciseConfigurationDialog({
   const efforts: string[] = isEffort(effort) || effort === "" ? EFFORTS : [...EFFORTS, effort];
   const draftNeeds = targetFieldsOf(draft.type);
   const positiveInteger = t("workout.configuration.validation.positiveInteger");
+  const minutesFormat = t("workout.configuration.validation.minutesFormat");
+  const draftIsMinutes = draft.type === "Minutes";
 
   function changeDraft(field: keyof SetFormValues, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -146,6 +166,7 @@ export default function ExerciseConfigurationDialog({
     const violations = validateExerciseConfiguration({
       effort: isEffort(effort) ? effort : "",
       setCount: sets.length,
+      rest,
     });
     setErrors(violations);
     if (Object.keys(violations).length > 0 || !isEffort(effort)) {
@@ -156,6 +177,9 @@ export default function ExerciseConfigurationDialog({
       exerciseId: workoutExercise.exerciseId,
       effort,
       sets: sets.map(toPrescription),
+      perSide,
+      // An empty rest means none, so it is left out.
+      ...(rest.trim() === "" ? {} : { restMinutes: minutesFromText(rest) }),
     });
     if (entry) {
       onSaved(entry);
@@ -235,6 +259,17 @@ export default function ExerciseConfigurationDialog({
                 </MenuItem>
               ))}
             </TextField>
+            <TextField
+              label={t("workout.configuration.rest")}
+              value={rest}
+              disabled={saving}
+              onChange={(event) => {
+                setRest(event.target.value);
+                setErrors((current) => ({ ...current, rest: undefined }));
+              }}
+              error={Boolean(errors.rest)}
+              helperText={errors.rest ? minutesFormat : t("workout.configuration.restHint")}
+            />
             <Box>
               <Typography variant="subtitle2" component="h4">
                 {t("workout.configuration.sets")}
@@ -269,7 +304,7 @@ export default function ExerciseConfigurationDialog({
                         </IconButton>
                       }
                     >
-                      <Typography variant="body2">{setSummary(set)}</Typography>
+                      <Typography variant="body2">{setSummary({ ...set, perSide })}</Typography>
                     </ListItem>
                   ))}
                 </List>
@@ -307,13 +342,22 @@ export default function ExerciseConfigurationDialog({
               {draftNeeds.value && (
                 <TextField
                   label={t("workout.configuration.targetValue")}
-                  type="number"
+                  // Minutes take `M:SS`, which a number field would refuse.
+                  type={draftIsMinutes ? "text" : "number"}
                   size="small"
                   value={draft.value}
                   disabled={saving}
                   onChange={(event) => changeDraft("value", event.target.value)}
                   error={Boolean(draftErrors.value)}
-                  helperText={draftErrors.value ? positiveInteger : undefined}
+                  helperText={
+                    draftErrors.value === "minutesFormat"
+                      ? minutesFormat
+                      : draftErrors.value
+                        ? positiveInteger
+                        : draftIsMinutes
+                          ? t("workout.configuration.minutesHint")
+                          : undefined
+                  }
                 />
               )}
               {draftNeeds.maxValue && (
@@ -328,6 +372,18 @@ export default function ExerciseConfigurationDialog({
                   helperText={draftErrors.maxValue ? positiveInteger : undefined}
                 />
               )}
+              {/* Per side applies to every set of the exercise; it sits in the free cell beside Valor. */}
+              <Box sx={{ display: "flex", alignItems: "center", minHeight: 40 }}>
+                <Switch
+                  checked={perSide}
+                  disabled={saving}
+                  onChange={(event) => setPerSide(event.target.checked)}
+                  slotProps={{ input: { "aria-labelledby": perSideLabelId } }}
+                />
+                <Typography id={perSideLabelId} variant="body2">
+                  {t("workout.configuration.perSide")}
+                </Typography>
+              </Box>
             </Box>
             <Button
               variant="outlined"

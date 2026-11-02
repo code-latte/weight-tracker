@@ -60,11 +60,15 @@ public sealed record WorkoutDetailResponse(
 
 /// <param name="Id">Identifier of this entry of the workout.</param>
 /// <param name="ExerciseId">Identifier of the catalog exercise performed in this entry.</param>
+/// <param name="PerSide">Whether the targets of the sets are per side (1x8 reps means 8 on each side).</param>
+/// <param name="RestMinutes">Rest between sets in minutes, <c>null</c> when none is prescribed.</param>
 /// <param name="SuperSeriesId">Superseries this entry belongs to, <c>null</c> when it is performed on its own.</param>
 public sealed record WorkoutExerciseDetailResponse(
     Guid Id,
     Guid ExerciseId,
     string Effort,
+    bool PerSide,
+    decimal? RestMinutes,
     IReadOnlyList<SetResponse> Sets,
     int? SuperSeriesId)
 {
@@ -73,6 +77,8 @@ public sealed record WorkoutExerciseDetailResponse(
             entry.Id.Value,
             entry.ExerciseId.Value,
             entry.Effort.ToString(),
+            entry.PerSide,
+            entry.Rest?.Value,
             entry.Sets.Select(SetResponse.From).ToList(),
             entry.SuperSeriesId?.Value);
 }
@@ -82,6 +88,8 @@ public sealed record WorkoutExerciseDetailResponse(
 /// <param name="Translations">Names of the exercise, one per language.</param>
 /// <param name="BodyPart">Body part derived from <paramref name="Muscle"/>.</param>
 /// <param name="Type">Kind of training of the exercise, independent of <paramref name="Muscle"/>.</param>
+/// <param name="PerSide">Whether the targets of the sets are per side (1x8 reps means 8 on each side).</param>
+/// <param name="RestMinutes">Rest between sets in minutes, <c>null</c> when none is prescribed.</param>
 /// <param name="SuperSeriesId">Superseries this entry belongs to, <c>null</c> when it is performed on its own.</param>
 public sealed record WorkoutExerciseResponse(
     Guid Id,
@@ -91,6 +99,8 @@ public sealed record WorkoutExerciseResponse(
     string BodyPart,
     string Type,
     string Effort,
+    bool PerSide,
+    decimal? RestMinutes,
     IReadOnlyList<SetResponse> Sets,
     int? SuperSeriesId)
 {
@@ -103,6 +113,8 @@ public sealed record WorkoutExerciseResponse(
             exercise.BodyPart.ToString(),
             exercise.Type.ToString(),
             entry.Effort.ToString(),
+            entry.PerSide,
+            entry.Rest?.Value,
             entry.Sets.Select(SetResponse.From).ToList(),
             entry.SuperSeriesId?.Value);
 }
@@ -126,11 +138,16 @@ public sealed record SetTargetResponse(string Type)
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MaxValue { get; init; }
 
+    /// <summary>Minutes of a <c>Minutes</c> target, with up to two decimals. Omitted for every other type.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Minutes { get; init; }
+
     public static SetTargetResponse From(SetTarget target) => target switch
     {
         SetTarget.Reps reps => new SetTargetResponse(SetTargetTypes.Reps) { Value = reps.value },
         SetTarget.Duration duration => new SetTargetResponse(SetTargetTypes.Duration) { Value = duration.value },
         SetTarget.RepsRange range => new SetTargetResponse(SetTargetTypes.RepsRange) { Value = range.min, MaxValue = range.max },
+        SetTarget.Minutes minutes => new SetTargetResponse(SetTargetTypes.Minutes) { Minutes = minutes.value.Value },
         _ => new SetTargetResponse(SetTargetTypes.MaxReps),
     };
 }

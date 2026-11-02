@@ -108,4 +108,45 @@ public class SetTargetTests
         // Assert
         description.Should().Be("8-12 reps.");
     }
+
+    [Fact]
+    public void Minutes_ShouldBeEqualWhenTheirValuesAreEqual()
+    {
+        // Arrange
+        var first = new SetTarget.Minutes(TimeInMinutes.From(1.25m));
+        var second = new SetTarget.Minutes(TimeInMinutes.From(1.25m));
+
+        // Act
+        var areEqual = first == second;
+
+        // Assert
+        areEqual.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Minutes_ShouldDifferFromAnotherValue()
+    {
+        // Arrange
+        var first = new SetTarget.Minutes(TimeInMinutes.From(1.25m));
+        var second = new SetTarget.Minutes(TimeInMinutes.From(1.5m));
+
+        // Act
+        var areEqual = first == second;
+
+        // Assert
+        areEqual.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Minutes_ShouldDescribeItselfInMinutes()
+    {
+        // Arrange
+        var target = new SetTarget.Minutes(TimeInMinutes.From(30m));
+
+        // Act
+        var text = target.ToString();
+
+        // Assert
+        text.Should().Be("30 min.");
+    }
 }

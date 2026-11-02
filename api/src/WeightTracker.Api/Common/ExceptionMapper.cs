@@ -48,6 +48,7 @@ public class ExceptionMapper
             or SuperSeriesSetCountMismatchException
             or InvalidWorkoutAssignmentException
             or InvalidSetPrescriptionException
+            or InvalidTimeInMinutesException
             or WorkoutExerciseRequiresSetsException
             or ExerciseIdMismatchException
             or PasswordNotStrongEnoughException => Problem(

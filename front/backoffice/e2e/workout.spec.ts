@@ -65,6 +65,8 @@ function entryFor(id: string, exerciseId: string) {
     id,
     exerciseId,
     effort: "MID",
+    perSide: false,
+    restMinutes: null,
     superSeriesId: null,
     sets: [{ count: 3, target: { type: "Reps", value: 10, maxValue: null } }],
   };
@@ -127,18 +129,36 @@ interface SentSet {
   targetType: string;
   target?: number;
   maxTarget?: number;
+  targetMinutes?: number;
 }
 
-/** An entry as the API answers it, with the sets it received. */
-function entryOf(id: string, exerciseId: string, effort: string, sets: SentSet[]) {
+interface SentExercise {
+  exerciseId: string;
+  effort: string;
+  sets: SentSet[];
+  perSide?: boolean;
+  restMinutes?: number;
+}
+
+/** An entry as the API answers it, with the sets, rest and per side it received. */
+function entryOf(
+  id: string,
+  exerciseId: string,
+  { effort, sets, perSide, restMinutes }: SentExercise,
+) {
   return {
     id,
     exerciseId,
     effort,
+    perSide: perSide ?? false,
+    restMinutes: restMinutes ?? null,
     superSeriesId: null,
     sets: sets.map((set) => ({
       count: set.count,
-      target: { type: set.targetType, value: set.target ?? null, maxValue: set.maxTarget ?? null },
+      target:
+        set.targetType === "Minutes"
+          ? { type: set.targetType, minutes: set.targetMinutes ?? null }
+          : { type: set.targetType, value: set.target ?? null, maxValue: set.maxTarget ?? null },
     })),
   };
 }
@@ -206,14 +226,9 @@ async function mockWorkoutsApi(
     if (!workout) {
       return route.fulfill(json({ status: 404 }, 404));
     }
-    const body = request.postDataJSON() as { exerciseId: string; effort: string; sets: SentSet[] };
+    const body = request.postDataJSON() as SentExercise;
     sent.additions.push(body);
-    const entry = entryOf(
-      "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
-      body.exerciseId,
-      body.effort,
-      body.sets,
-    );
+    const entry = entryOf("9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a", body.exerciseId, body);
     workouts.set(workoutId, { ...workout, exercises: [...workout.exercises, entry] });
     return route.fulfill(json(entry, 201));
   });
@@ -231,9 +246,9 @@ async function mockWorkoutsApi(
       return route.fulfill(json({ status: 404 }, 404));
     }
     if (request.method() === "PUT") {
-      const body = request.postDataJSON() as { effort: string; sets: SentSet[] };
+      const body = request.postDataJSON() as SentExercise;
       sent.updates.push(body);
-      const entry = entryOf(current.id, exerciseId, body.effort, body.sets);
+      const entry = entryOf(current.id, exerciseId, body);
       workouts.set(workoutId, {
         ...workout,
         exercises: workout.exercises.map((other) => (other === current ? entry : other)),
@@ -441,6 +456,7 @@ test("adds an exercise through the catalog and configuration dialogs and keeps i
         { count: 2, targetType: "Reps", target: 15 },
         { count: 1, targetType: "MaxReps" },
       ],
+      perSide: false,
     },
   ]);
   await page.reload();
@@ -452,6 +468,44 @@ test("adds an exercise through the catalog and configuration dialogs and keeps i
   const details = page.getByRole("dialog", { name: "Configuración del ejercicio" });
   await expect(details.getByText("2 × 15 repeticiones", { exact: true })).toBeVisible();
   await expect(details.getByText("1 × máximo", { exact: true })).toBeVisible();
+});
+
+test("prescribes a minutes set, rest and per side and keeps them after a reload", async ({
+  page,
+}) => {
+  // Arrange
+  const sent = await signIn(page);
+  await page.goto(`/workout?id=${existing.id}`);
+  const dialog = await chooseFromCatalog(page, "Sentadilla");
+  await dialog.getByRole("combobox", { name: "Esfuerzo" }).click();
+  await page.getByRole("option", { name: "RIR 3", exact: true }).click();
+  await dialog.getByRole("textbox", { name: "Descanso entre series" }).fill("2");
+  await dialog.getByRole("switch", { name: "Por lado" }).check();
+  const form = dialog.getByRole("group", { name: "Añadir serie" });
+  await form.getByRole("combobox", { name: "Tipo" }).click();
+  await page.getByRole("option", { name: "Minutos" }).click();
+  await form.getByRole("spinbutton", { name: "Series" }).fill("3");
+  await form.getByRole("textbox", { name: "Valor" }).fill("1:30");
+  await dialog.getByRole("button", { name: "Añadir serie" }).click();
+
+  // Act
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+
+  // Assert
+  await expect(dialog).toBeHidden();
+  expect(sent.additions).toEqual([
+    {
+      exerciseId: catalog[0]!.id,
+      effort: "MID",
+      sets: [{ count: 3, targetType: "Minutes", targetMinutes: 1.5 }],
+      perSide: true,
+      restMinutes: 2,
+    },
+  ]);
+  await page.reload();
+  const exercisesCard = page.getByRole("region", { name: "Ejercicios" });
+  await expect(exercisesCard.getByText("3 × 1:30 min · por lado", { exact: true })).toBeVisible();
+  await expect(exercisesCard.getByText("Descanso: 2 min", { exact: true })).toBeVisible();
 });
 
 test("filters the catalog by type and prescribes a strength exercise in RIR", async ({ page }) => {

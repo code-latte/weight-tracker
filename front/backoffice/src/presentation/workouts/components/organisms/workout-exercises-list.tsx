@@ -18,6 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import DeleteOutlined from "@mui/icons-material/DeleteOutlined";
 import EditOutlined from "@mui/icons-material/EditOutlined";
+import { minutesToText } from "@weight-tracker/core/application";
 import type { DomainErrorCode, Exercise, WorkoutExerciseDetail } from "@weight-tracker/core/domain";
 import { useTranslation } from "react-i18next";
 import Alert from "@/presentation/common/components/atoms/alert";
@@ -101,10 +102,10 @@ export default function WorkoutExercisesList({
   }
 
   /**
-   * The sets on one line, comma separated, and the effort in its type's scale on the next; empty properties are left
-   * out.
+   * The sets on one line, comma separated and marked when they are per side, the effort in its type's scale on the
+   * next, and the rest on the last; empty properties are left out. Minutes are shown as `M` or `M:SS`.
    */
-  function linesOf({ sets, effort }: WorkoutExerciseDetail, type?: string) {
+  function linesOf({ sets, effort, perSide, restMinutes }: WorkoutExerciseDetail, type?: string) {
     const lines: string[] = [];
 
     if (sets.length > 0) {
@@ -112,14 +113,20 @@ export default function WorkoutExercisesList({
         compactSetSummary({
           count,
           type: target.type,
-          value: target.value,
+          value:
+            target.type === "Minutes" && target.minutes != null
+              ? minutesToText(target.minutes)
+              : target.value,
           maxValue: target.maxValue,
         }),
       );
-      lines.push(summaries.join(", "));
+      lines.push(summaries.join(", ") + (perSide ? t("workout.exercises.perSideSuffix") : ""));
     }
     if (effort) {
       lines.push(t("workout.exercises.effortLine", { effort: effortLabel(effort, type) }));
+    }
+    if (restMinutes != null) {
+      lines.push(t("workout.exercises.restLine", { rest: minutesToText(restMinutes) }));
     }
     return lines;
   }

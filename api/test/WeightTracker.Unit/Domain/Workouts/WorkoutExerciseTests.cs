@@ -174,4 +174,47 @@ public class WorkoutExerciseTests
         // Assert
         entry.SuperSeriesId.Should().Be(superSeriesId);
     }
+
+    [Fact]
+    public void Create_ShouldDefaultToNotPerSideAndNoRest()
+    {
+        // Arrange
+        var exerciseId = Id.New();
+
+        // Act
+        var entry = WorkoutExercise.Create(exerciseId, Effort.MID, [TwoByTen]);
+
+        // Assert
+        entry.PerSide.Should().BeFalse();
+        entry.Rest.Should().BeNull();
+    }
+
+    [Fact]
+    public void Create_ShouldKeepThePerSideFlagAndTheRest()
+    {
+        // Arrange
+        var exerciseId = Id.New();
+        var rest = TimeInMinutes.From(1.5m);
+
+        // Act
+        var entry = WorkoutExercise.Create(exerciseId, Effort.MID, [TwoByTen], perSide: true, rest: rest);
+
+        // Assert
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(rest);
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRestoreThePerSideFlagAndTheRest()
+    {
+        // Arrange
+        var rest = TimeInMinutes.From(2m);
+
+        // Act
+        var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [TwoByTen], perSide: true, rest: rest);
+
+        // Assert
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(rest);
+    }
 }

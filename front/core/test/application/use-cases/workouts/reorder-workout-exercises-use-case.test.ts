@@ -30,6 +30,8 @@ const workoutDetail: WorkoutDetail = {
     id: `0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4${index}`,
     exerciseId,
     effort: "HIGH",
+    perSide: false,
+    restMinutes: null,
     sets: [],
     superSeriesId: null,
   })),

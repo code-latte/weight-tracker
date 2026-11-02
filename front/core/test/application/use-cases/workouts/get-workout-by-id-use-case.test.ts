@@ -24,6 +24,8 @@ const workoutDetail: WorkoutDetail = {
       id: "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
       exerciseId: "1f2e3d4c-5b6a-4978-8695-a4b3c2d1e0f9",
       effort: "HIGH",
+      perSide: false,
+      restMinutes: null,
       sets: [{ count: 3, target: { type: "REPS", value: 10, maxValue: null } }],
       superSeriesId: null,
     },

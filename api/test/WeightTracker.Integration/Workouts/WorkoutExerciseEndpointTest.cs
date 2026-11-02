@@ -24,6 +24,13 @@ public abstract class WorkoutExerciseEndpointTest : WorkoutEndpointTest
     protected static object Body(Guid exerciseId, object effort, params object[] sets)
         => new { exerciseId, effort, sets };
 
+    /// <summary>A body that also carries the per-side flag and the rest. Either is left out when null.</summary>
+    protected static object BodyWith(Guid exerciseId, object effort, bool? perSide, decimal? restMinutes, params object[] sets)
+        => new { exerciseId, effort, sets, perSide, restMinutes };
+
+    protected static object MinutesSet(int count, decimal? targetMinutes)
+        => new { count, targetType = "Minutes", targetMinutes };
+
     protected static object Sets(int count, string targetType, int? target = null)
         => new { count, targetType, target };
 
@@ -61,6 +68,12 @@ public abstract class WorkoutExerciseEndpointTest : WorkoutEndpointTest
     protected static IReadOnlyList<int?> MaxValuesOf(JsonElement entry)
         => entry.GetProperty("sets").EnumerateArray()
             .Select(set => set.GetProperty("target").TryGetProperty("maxValue", out var maxValue) ? maxValue.GetInt32() : (int?)null)
+            .ToList();
+
+    /// <summary>The <c>minutes</c> of every set target of one entry, null where it is omitted.</summary>
+    protected static IReadOnlyList<decimal?> MinutesOf(JsonElement entry)
+        => entry.GetProperty("sets").EnumerateArray()
+            .Select(set => set.GetProperty("target").TryGetProperty("minutes", out var minutes) ? minutes.GetDecimal() : (decimal?)null)
             .ToList();
 
     /// <summary>Ids of the stored set rows of one workout entry, in position order.</summary>

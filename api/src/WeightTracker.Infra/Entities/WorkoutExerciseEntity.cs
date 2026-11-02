@@ -19,6 +19,10 @@ public class WorkoutExerciseEntity
     /// <summary>Value of the <c>Effort</c> enum.</summary>
     public int Effort { get; set; }
 
+    public bool PerSide { get; set; }
+
+    public decimal? RestMinutes { get; set; }
+
     /// <summary>Superseries label, only unique together with <c>WorkoutId</c>. Null when the exercise is not grouped.</summary>
     public int? SuperSeriesId { get; set; }
 

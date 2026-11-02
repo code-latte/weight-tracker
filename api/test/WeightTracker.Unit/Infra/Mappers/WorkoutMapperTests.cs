@@ -444,4 +444,77 @@ public class WorkoutMapperTests
         // Assert
         act.Should().Throw<PersistenceMappingException>();
     }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveAMinutesTarget()
+    {
+        // Arrange
+        var original = AWorkoutWithOneSet(new SetTarget.Minutes(TimeInMinutes.From(1.25m)));
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.Exercises.Single().Sets.Single().target.Should().Be(new SetTarget.Minutes(TimeInMinutes.From(1.25m)));
+    }
+
+    [Fact]
+    public void MapToEntity_ShouldStoreMinutesOnlyInTheMinutesColumn()
+    {
+        // Arrange
+        var workout = AWorkoutWithOneSet(new SetTarget.Minutes(TimeInMinutes.From(30m)));
+
+        // Act
+        var set = WorkoutMapper.MapToEntity(workout).WorkoutExercises.Single().Sets.Single();
+
+        // Assert
+        set.TargetType.Should().Be(SetTargetTypes.Minutes);
+        set.TargetMinutes.Should().Be(30m);
+        set.TargetValue.Should().BeNull();
+        set.TargetMaxValue.Should().BeNull();
+    }
+
+    [Fact]
+    public void MapToEntity_ShouldLeaveTheMinutesColumnEmptyForARepsTarget()
+    {
+        // Arrange
+        var workout = AWorkoutWithOneSet(new SetTarget.Reps(8));
+
+        // Act
+        var set = WorkoutMapper.MapToEntity(workout).WorkoutExercises.Single().Sets.Single();
+
+        // Assert
+        set.TargetMinutes.Should().BeNull();
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveThePerSideFlagAndTheRest()
+    {
+        // Arrange
+        var rest = TimeInMinutes.From(1.5m);
+        var original = Workout.Rehydrate(
+            Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.DRAFT,
+            [WorkoutExercise.Rehydrate(Id.New(), PlanchaId, Effort.MID, [new SetPrescription(1, new SetTarget.Reps(8))], perSide: true, rest: rest)]);
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        var entry = restored.Exercises.Single();
+        entry.PerSide.Should().BeTrue();
+        entry.Rest.Should().Be(rest);
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveNoRest()
+    {
+        // Arrange
+        var original = AFullyLoadedWorkout();
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.Exercises.Should().OnlyContain(entry => entry.PerSide == false && entry.Rest == null);
+    }
 }

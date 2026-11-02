@@ -257,4 +257,46 @@ public class UserTests
         // Assert
         act.Should().Throw<InvalidUserActivationStateException>();
     }
+
+    [Theory]
+    [InlineData(Role.TRAINER, false, true)]
+    [InlineData(Role.TRAINER, true, false)]
+    [InlineData(Role.ADMIN, false, false)]
+    [InlineData(Role.USER, false, false)]
+    public void CanBeTrainer_ShouldOnlyAllowActiveTrainers(Role role, bool deactivated, bool expected)
+    {
+        // Arrange
+        var user = User.Create(
+            Email.From("user@weighttracker.test"), PersonName.From("Ada"), PersonName.From("Lovelace"),
+            Birth, role, PasswordHash.From("hash"), CreatedAt);
+        if (deactivated)
+            user.Deactivate(DeactivatedAt);
+
+        // Act
+        var canBeTrainer = user.CanBeTrainer();
+
+        // Assert
+        canBeTrainer.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(Role.USER, false, true)]
+    [InlineData(Role.USER, true, false)]
+    [InlineData(Role.TRAINER, false, false)]
+    [InlineData(Role.ADMIN, false, false)]
+    public void CanBeAthlete_ShouldOnlyAllowActiveUsers(Role role, bool deactivated, bool expected)
+    {
+        // Arrange
+        var user = User.Create(
+            Email.From("user@weighttracker.test"), PersonName.From("Ada"), PersonName.From("Lovelace"),
+            Birth, role, PasswordHash.From("hash"), CreatedAt);
+        if (deactivated)
+            user.Deactivate(DeactivatedAt);
+
+        // Act
+        var canBeAthlete = user.CanBeAthlete();
+
+        // Assert
+        canBeAthlete.Should().Be(expected);
+    }
 }

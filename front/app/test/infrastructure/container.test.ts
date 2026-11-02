@@ -35,6 +35,17 @@ const keys: (keyof Dependencies)[] = [
   "removeExerciseFromWorkoutUseCase",
   "reorderWorkoutExercisesUseCase",
   "getExercisesUseCase",
+  "trainerAthleteRepository",
+  "athleteInvitationRepository",
+  "getMyAthletesUseCase",
+  "getTrainerAthletesUseCase",
+  "linkAthleteToTrainerUseCase",
+  "endTrainerAthleteUseCase",
+  "getAthleteInvitationsUseCase",
+  "inviteAthleteUseCase",
+  "revokeAthleteInvitationUseCase",
+  "acceptAthleteInvitationUseCase",
+  "rejectAthleteInvitationUseCase",
 ];
 
 describe("container", () => {

@@ -10,7 +10,7 @@ import DialogActions from "@/presentation/common/components/atoms/dialog-actions
 import DialogContent from "@/presentation/common/components/atoms/dialog-content";
 import DialogTitle from "@/presentation/common/components/atoms/dialog-title";
 import Typography from "@/presentation/common/components/atoms/typography";
-import { fullNameOf } from "@/presentation/users/filter-users";
+import { fullNameOf } from "@/presentation/common/full-name";
 import useChangeUserActivation from "@/presentation/users/hooks/use-change-user-activation";
 
 export type ActivationChange = "activated" | "deactivated";

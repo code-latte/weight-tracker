@@ -9,3 +9,5 @@ export type { default as UseCaseInterface } from "./use-case-interface";
 export type { default as UserRepositoryInterface } from "./user-repository-interface";
 export type { default as WorkoutRepositoryInterface } from "./workout-repository-interface";
 export type { default as ExerciseRepositoryInterface } from "./exercise-repository-interface";
+export type { default as TrainerAthleteRepositoryInterface } from "./trainer-athlete-repository-interface";
+export type { default as AthleteInvitationRepositoryInterface } from "./athlete-invitation-repository-interface";

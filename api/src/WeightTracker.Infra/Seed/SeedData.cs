@@ -136,5 +136,28 @@ public static class SeedData
     /// <summary>Identifier of the superseries seeded in the superseries workouts.</summary>
     public const int SeededSuperSeries = 1;
 
+    /// <summary>The trainer prepares the user, active since <see cref="CreatedAt"/>.</summary>
+    public static readonly Guid ActiveTrainerAthleteId = new("00000000-0000-0000-0000-000000000051");
+
+    /// <summary>An earlier, ended relationship between the trainer and the user.</summary>
+    public static readonly Guid EndedTrainerAthleteId = new("00000000-0000-0000-0000-000000000052");
+
+    /// <summary>From the trainer to the user, pending and far from expiring.</summary>
+    public static readonly Guid PendingInvitationId = new("00000000-0000-0000-0000-000000000061");
+
+    public const string PendingInvitationToken = "seed-pending-invitation-token";
+
+    /// <summary>From the trainer to the user, still pending but already expired.</summary>
+    public static readonly Guid ExpiredInvitationId = new("00000000-0000-0000-0000-000000000062");
+
+    public const string ExpiredInvitationToken = "seed-expired-invitation-token";
+
+    /// <summary>From the trainer to an email nobody has registered, pending.</summary>
+    public static readonly Guid UnregisteredInvitationId = new("00000000-0000-0000-0000-000000000063");
+
+    public const string UnregisteredInvitationToken = "seed-unregistered-invitation-token";
+
+    public const string UnregisteredInvitationEmail = "invited@weighttracker.test";
+
     public static readonly DateTime CreatedAt = new(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc);
 }

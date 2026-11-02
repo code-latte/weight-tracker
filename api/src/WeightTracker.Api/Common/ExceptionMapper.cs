@@ -39,6 +39,8 @@ public class ExceptionMapper
             or InvalidPasswordException
             or InvalidPasswordHashException
             or InvalidUserActivationStateException
+            or InvalidTrainerAthleteStateException
+            or InvalidTrainerInvitationStateException
             or TrainerCannotBeWorkoutOwnerException
             or InvalidSuperSeriesIdException
             or SuperSeriesRequiresTwoExercisesException
@@ -64,14 +66,16 @@ public class ExceptionMapper
                 UserDeactivatedException.Code
             ),
 
-            UnauthorizedOperationException or AdminSignupNotAllowedException => Problem(
+            UnauthorizedOperationException or AdminSignupNotAllowedException
+                or InvalidInvitationTokenException => Problem(
                 StatusCodes.Status403Forbidden,
                 exception.Message
             ),
 
             UserNotFoundException or ExerciseNotInWorkoutException or ExerciseNotFoundException
                 or SuperSeriesNotFoundException or WorkoutNotFoundException
-                or WorkoutExerciseNotInWorkoutException => Problem(
+                or WorkoutExerciseNotInWorkoutException or TrainerAthleteNotFoundException
+                or TrainerInvitationNotFoundException => Problem(
                 StatusCodes.Status404NotFound,
                 exception.Message
             ),
@@ -80,13 +84,11 @@ public class ExceptionMapper
                 or ExerciseAlreadyInWorkoutException or ExerciseAlreadyInSuperSeriesException
                 or InvalidWorkoutStatusTransitionException or WorkoutLockedException
                 or WorkoutExerciseOrderMismatchException or UserAlreadyActiveException
-                or UserAlreadyDeactivatedException => Problem(
+                or UserAlreadyDeactivatedException or AthleteAlreadyHasTrainerException
+                or InvalidTrainerAthleteRoleException or InvalidTrainerAthleteStatusTransitionException
+                or PendingInvitationAlreadyExistsException or InvalidTrainerInvitationStatusTransitionException
+                or TrainerInvitationExpiredException => Problem(
                 StatusCodes.Status409Conflict,
-                exception.Message
-            ),
-
-            TrainerAthletesNotImplementedException => Problem(
-                StatusCodes.Status501NotImplemented,
                 exception.Message
             ),
 

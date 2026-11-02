@@ -1,0 +1,43 @@
+{
+  "list": {
+    "title": "Trainer assignment",
+    "search": "Search by athlete, email or trainer",
+    "assignmentFilter": "Trainer",
+    "filter": {
+      "withTrainer": "With trainer",
+      "withoutTrainer": "Without trainer"
+    },
+    "columns": {
+      "fullName": "Full name",
+      "email": "Email",
+      "trainer": "Trainer",
+      "actions": "Actions"
+    },
+    "noTrainer": "No trainer",
+    "actions": {
+      "open": "Actions for {{name}}",
+      "assign": "Assign trainer",
+      "endRelationship": "End relationship"
+    },
+    "empty": "No athletes yet.",
+    "noMatches": "No athletes match your search."
+  },
+  "assign": {
+    "title": "Assign a trainer to {{name}}",
+    "fields": {
+      "trainer": "Trainer"
+    },
+    "noOptions": "No trainers match.",
+    "submit": "Assign",
+    "cancel": "Cancel",
+    "success": "Trainer assigned.",
+    "validation": {
+      "required": "Select a trainer."
+    },
+    "errors": {
+      "VALIDATION": "Select a valid trainer.",
+      "NOT_FOUND": "The trainer or the athlete no longer exists.",
+      "CONFLICT": "This trainer cannot be assigned: the athlete already has one or the relationship is not valid."
+    }
+  }
+}

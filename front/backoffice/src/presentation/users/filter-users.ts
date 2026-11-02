@@ -1,19 +1,5 @@
-import type { UserProfile, UserSummary } from "@weight-tracker/core/domain";
-
-/** Lower case and without accents, so "garcia" finds "García". */
-function normalized(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLocaleLowerCase();
-}
-
-/** Name and surname in one line, or `null` when the user has neither. */
-export function fullNameOf(user: Pick<UserProfile, "name" | "surname">): string | null {
-  const fullName = `${user.name} ${user.surname}`.trim();
-
-  return fullName === "" ? null : fullName;
-}
+import type { UserSummary } from "@weight-tracker/core/domain";
+import { normalized } from "@/presentation/common/search-text";
 
 /**
  * The users the table shows: the active ones, plus the inactive ones when asked; of the selected role, if any; whose

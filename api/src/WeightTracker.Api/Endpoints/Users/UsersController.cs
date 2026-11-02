@@ -10,7 +10,7 @@ namespace WeightTracker.Api.Endpoints.Users;
 
 /// <summary>
 /// Users. The <c>me</c> routes act on the caller's own profile, the user the token belongs to;
-/// <c>GET /users</c> lists the users the caller may see, and <c>POST /users</c> lets an administrator
+/// <c>GET /users</c> lets an administrator list every user, and <c>POST /users</c> lets an administrator
 /// create someone else's account. The <c>activate</c> and <c>deactivate</c> routes let an administrator
 /// switch another account on and off.
 /// </summary>
@@ -81,22 +81,21 @@ public class UsersController : AuthorizedController
     }
 
     /// <summary>
-    /// Lists the users the caller is entitled to see. An administrator gets every user; a trainer's
-    /// athletes are not implemented yet and answer <c>501</c>. The scoping rule lives in the use case.
+    /// Lists every user with their current trainer. Only administrators may call it; trainers list their athletes through
+    /// <c>GET /trainer-athletes</c>.
     /// </summary>
     [HttpGet]
-    [RequireRole(Role.ADMIN, Role.TRAINER)]
-    [ProducesResponseType<IReadOnlyList<UserSummaryResponse>>(StatusCodes.Status200OK)]
+    [RequireRole(Role.ADMIN)]
+    [ProducesResponseType<IReadOnlyList<UserListItemResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status501NotImplemented)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         try
         {
-            var users = await _getAllUsers.Execute(CurrentUser!.Id, CurrentUser.Role, cancellationToken);
+            var users = await _getAllUsers.Execute(CurrentUser!.Role, cancellationToken);
 
-            return Ok(users.Select(UserSummaryResponse.From).ToList());
+            return Ok(users.Select(UserListItemResponse.From).ToList());
         }
         catch (Exception exception)
         {

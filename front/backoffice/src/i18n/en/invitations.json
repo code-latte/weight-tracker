@@ -1,0 +1,55 @@
+{
+  "list": {
+    "title": "Invitations",
+    "searchByEmail": "Search by email",
+    "searchByTrainerOrEmail": "Search by trainer or email",
+    "statusFilter": "Status",
+    "invite": "Invite athlete",
+    "columns": {
+      "trainer": "Trainer",
+      "email": "Email",
+      "athleteEmail": "Athlete email",
+      "status": "Status",
+      "sentAt": "Sent",
+      "expiresAt": "Expires",
+      "actions": "Actions"
+    },
+    "revoke": "Revoke",
+    "empty": "No invitations yet.",
+    "noMatches": "No invitations match your search."
+  },
+  "status": {
+    "PENDING": "Pending",
+    "ACCEPTED": "Accepted",
+    "REJECTED": "Rejected",
+    "REVOKED": "Revoked"
+  },
+  "invite": {
+    "title": "Invite athlete",
+    "fields": {
+      "email": "Email"
+    },
+    "submit": "Send invitation",
+    "cancel": "Cancel",
+    "success": "Invitation sent.",
+    "validation": {
+      "required": "This field is required.",
+      "email": "Enter a valid email."
+    },
+    "errors": {
+      "VALIDATION": "Enter a valid email.",
+      "CONFLICT": "This email cannot be invited: it already has a pending invitation, already trains with someone, or is not an athlete account."
+    }
+  },
+  "revoke": {
+    "title": "Revoke the invitation to {{email}}?",
+    "body": "The link will stop working and it can no longer be accepted.",
+    "confirm": "Revoke",
+    "cancel": "Cancel",
+    "success": "Invitation revoked.",
+    "errors": {
+      "CONFLICT": "This invitation is no longer pending. Reload the list.",
+      "NOT_FOUND": "This invitation no longer exists."
+    }
+  }
+}

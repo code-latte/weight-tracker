@@ -14,6 +14,7 @@ export type {
   CreatedUserResponse,
   CreateUserRequest,
   UpdateProfileRequest,
+  UserActivationSummary,
   UserProfile,
   UserSummary,
 } from "./users/user";
@@ -34,3 +35,16 @@ export type {
   WorkoutExerciseDetail,
 } from "./workouts/workout";
 export type { Exercise } from "./exercises/exercise";
+export type {
+  TrainerAthlete,
+  TrainerAthleteInput,
+  TrainerAthleteRelationship,
+  TrainerAthleteRequest,
+} from "./trainer-athletes/trainer-athlete";
+export type {
+  AthleteInvitation,
+  CreatedAthleteInvitation,
+  InvitationResponseInput,
+  InvitationTokenRequest,
+  InviteAthleteRequest,
+} from "./athlete-invitations/athlete-invitation";

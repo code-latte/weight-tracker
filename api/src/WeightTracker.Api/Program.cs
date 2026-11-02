@@ -9,8 +9,10 @@ using WeightTracker.Api.OpenApi;
 using WeightTracker.Application.Common;
 using WeightTracker.Application.Interfaces;
 using WeightTracker.Application.Services;
+using WeightTracker.Application.UseCases.AthleteInvitations;
 using WeightTracker.Application.UseCases.Auth;
 using WeightTracker.Application.UseCases.Exercises;
+using WeightTracker.Application.UseCases.TrainerAthletes;
 using WeightTracker.Application.UseCases.Users;
 using WeightTracker.Application.UseCases.Workouts;
 using WeightTracker.Infra.Persistence;
@@ -30,6 +32,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
     );
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.Configure<TrainerInvitationOptions>(builder.Configuration.GetSection(TrainerInvitationOptions.SectionName));
 
 var jwtOptions =
     builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
@@ -44,6 +47,17 @@ if (Encoding.UTF8.GetByteCount(jwtOptions.SigningKey) < JwtOptions.MinimumSignin
             + "Supply it through configuration or the Jwt__SigningKey environment variable."
     );
 
+var trainerInvitationOptions =
+    builder.Configuration.GetSection(TrainerInvitationOptions.SectionName).Get<TrainerInvitationOptions>()
+    ?? new TrainerInvitationOptions();
+
+// Fail fast: a lifetime below a day would make every invitation invalid and surface as a caller error
+if (trainerInvitationOptions.ExpirationDays < TrainerInvitationOptions.MinimumExpirationDays)
+    throw new InvalidOperationException(
+        $"TrainerInvitations:ExpirationDays must be at least {TrainerInvitationOptions.MinimumExpirationDays}. "
+            + "Supply it through configuration or the TrainerInvitations__ExpirationDays environment variable."
+    );
+
 builder.Services.AddDbContext<WeightTrackerDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
@@ -53,13 +67,18 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IExerciseRepository, ExerciseRepository>();
 builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<ITrainerAthleteRepository, TrainerAthleteRepository>();
+builder.Services.AddScoped<ITrainerInvitationRepository, TrainerInvitationRepository>();
 
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+builder.Services.AddScoped<IInvitationTokenService, InvitationTokenService>();
 builder.Services.AddScoped<WorkoutEditAuthorizer>();
 builder.Services.AddScoped<WorkoutStatusAuthorizer>();
 builder.Services.AddScoped<WorkoutAssignmentValidator>();
+builder.Services.AddScoped<InvitationViewLoader>();
+builder.Services.AddScoped<TrainerAthleteViewLoader>();
 
 builder.Services.AddScoped<GetAllExercisesUseCase>();
 builder.Services.AddScoped<GetExerciseByIdUseCase>();
@@ -83,6 +102,14 @@ builder.Services.AddScoped<CreateUserUseCase>();
 builder.Services.AddScoped<GetAllUsersUseCase>();
 builder.Services.AddScoped<ActivateUserUseCase>();
 builder.Services.AddScoped<DeactivateUserUseCase>();
+builder.Services.AddScoped<LinkAthleteToTrainerUseCase>();
+builder.Services.AddScoped<EndTrainerAthleteRelationshipUseCase>();
+builder.Services.AddScoped<GetTrainerAthletesUseCase>();
+builder.Services.AddScoped<InviteAthleteUseCase>();
+builder.Services.AddScoped<RevokeInvitationUseCase>();
+builder.Services.AddScoped<AcceptInvitationUseCase>();
+builder.Services.AddScoped<RejectInvitationUseCase>();
+builder.Services.AddScoped<GetTrainerInvitationsUseCase>();
 
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<ExceptionMapper>();

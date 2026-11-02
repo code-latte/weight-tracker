@@ -105,4 +105,17 @@ public class UserRepositoryTests : IntegrationTest
         // Assert
         user.Should().BeNull();
     }
+
+    [Fact]
+    public async Task GetAllByIds_ShouldReturnOnlyTheKnownRequestedUsers()
+    {
+        // Arrange
+        var requested = new[] { Id.From(SeedData.UserId), Id.From(SeedData.AdminId), Id.New() };
+
+        // Act
+        var users = await OnRepository(repository => repository.GetAllByIds(requested, CancellationToken.None));
+
+        // Assert
+        users.Select(user => user.Id).Should().BeEquivalentTo([Id.From(SeedData.UserId), Id.From(SeedData.AdminId)]);
+    }
 }

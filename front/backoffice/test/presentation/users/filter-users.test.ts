@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UserSummary } from "@weight-tracker/core/domain";
-import { filterUsers, fullNameOf } from "@/presentation/users/filter-users";
+import { filterUsers } from "@/presentation/users/filter-users";
 
 const ana: UserSummary = {
   id: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
@@ -10,6 +10,7 @@ const ana: UserSummary = {
   role: "TRAINER",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
 };
 const luis: UserSummary = {
   id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
@@ -19,6 +20,7 @@ const luis: UserSummary = {
   role: "USER",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
 };
 const marta: UserSummary = {
   id: "7b3e4a2f-1f7d-4c75-8e9a-2f8b9e3c4d5e",
@@ -28,6 +30,7 @@ const marta: UserSummary = {
   role: "ADMIN",
   isActive: true,
   deactivatedAtUtc: null,
+  trainer: null,
 };
 const users = [ana, luis, marta];
 const carla: UserSummary = {
@@ -38,6 +41,7 @@ const carla: UserSummary = {
   role: "TRAINER",
   isActive: false,
   deactivatedAtUtc: "2026-10-20T09:30:00Z",
+  trainer: null,
 };
 
 describe("filterUsers", () => {
@@ -131,31 +135,5 @@ describe("filterUsers with inactive users", () => {
 
     // Assert
     expect(result).toEqual([carla]);
-  });
-});
-
-describe("fullNameOf", () => {
-  it("joins name and surname", () => {
-    // Arrange / Act
-    const result = fullNameOf(ana);
-
-    // Assert
-    expect(result).toBe("Ana García");
-  });
-
-  it("keeps the part that is present", () => {
-    // Arrange / Act
-    const result = fullNameOf({ name: "", surname: "García" });
-
-    // Assert
-    expect(result).toBe("García");
-  });
-
-  it("answers null when both are empty", () => {
-    // Arrange / Act
-    const result = fullNameOf({ name: "", surname: "" });
-
-    // Assert
-    expect(result).toBeNull();
   });
 });

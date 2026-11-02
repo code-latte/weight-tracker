@@ -1,7 +1,9 @@
 using FluentAssertions;
+using WeightTracker.Domain.AthleteInvitations;
 using WeightTracker.Domain.Auth;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exercises;
+using WeightTracker.Domain.TrainerAthletes;
 using WeightTracker.Domain.Users;
 using WeightTracker.Infra.Exceptions;
 using WeightTracker.Infra.Mappers;
@@ -469,6 +471,216 @@ public class AggregateMapperTests
 
             // Act
             var act = () => RefreshTokenMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+    }
+
+    public class TrainerAthletes
+    {
+        private static TrainerAthlete ARelationship() => TrainerAthlete.Create(Id.New(), Id.New(), CreatedAt);
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveAnActiveRelationship()
+        {
+            // Arrange
+            var original = ARelationship();
+
+            // Act
+            var restored = TrainerAthleteMapper.MapToDomain(TrainerAthleteMapper.MapToEntity(original));
+
+            // Assert
+            restored.Id.Should().Be(original.Id);
+            restored.TrainerId.Should().Be(original.TrainerId);
+            restored.UserId.Should().Be(original.UserId);
+            restored.Status.Should().Be(TrainerAthleteStatus.ACTIVE);
+            restored.StartedAtUtc.Should().Be(CreatedAt);
+            restored.FinishedAtUtc.Should().BeNull();
+            restored.IsNew.Should().BeFalse();
+        }
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveAnEndedRelationship()
+        {
+            // Arrange
+            var original = ARelationship();
+            original.End(CreatedAt.AddDays(30));
+
+            // Act
+            var restored = TrainerAthleteMapper.MapToDomain(TrainerAthleteMapper.MapToEntity(original));
+
+            // Assert
+            restored.Status.Should().Be(TrainerAthleteStatus.ENDED);
+            restored.FinishedAtUtc.Should().Be(CreatedAt.AddDays(30));
+        }
+
+        [Fact]
+        public void MapToEntity_ShouldStampEveryTimestampAsUtc()
+        {
+            // Arrange
+            var original = ARelationship();
+            original.End(CreatedAt.AddDays(30));
+
+            // Act
+            var entity = TrainerAthleteMapper.MapToEntity(original);
+
+            // Assert
+            entity.StartedAtUtc.Kind.Should().Be(DateTimeKind.Utc);
+            entity.FinishedAtUtc!.Value.Kind.Should().Be(DateTimeKind.Utc);
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAnUnknownStatus()
+        {
+            // Arrange
+            var entity = TrainerAthleteMapper.MapToEntity(ARelationship());
+            entity.Status = 99;
+
+            // Act
+            var act = () => TrainerAthleteMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAnEndedRowWithoutEndDate()
+        {
+            // Arrange
+            var entity = TrainerAthleteMapper.MapToEntity(ARelationship());
+            entity.Status = (int)TrainerAthleteStatus.ENDED;
+
+            // Act
+            var act = () => TrainerAthleteMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAnEmptyTrainerIdentifier()
+        {
+            // Arrange
+            var entity = TrainerAthleteMapper.MapToEntity(ARelationship());
+            entity.TrainerId = Guid.Empty;
+
+            // Act
+            var act = () => TrainerAthleteMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+    }
+
+    public class TrainerInvitations
+    {
+        private static TrainerInvitation AnInvitation(Id? userId) => TrainerInvitation.Create(
+            Id.New(), Email.From("athlete@weighttracker.test"), userId, "token-hash", CreatedAt, CreatedAt.AddDays(7));
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveAPendingInvitationForARegisteredAthlete()
+        {
+            // Arrange
+            var original = AnInvitation(Id.New());
+
+            // Act
+            var restored = TrainerInvitationMapper.MapToDomain(TrainerInvitationMapper.MapToEntity(original));
+
+            // Assert
+            restored.Id.Should().Be(original.Id);
+            restored.TrainerId.Should().Be(original.TrainerId);
+            restored.InviteEmail.Should().Be(original.InviteEmail);
+            restored.UserId.Should().Be(original.UserId);
+            restored.TokenHash.Should().Be("token-hash");
+            restored.Status.Should().Be(TrainerInvitationStatus.PENDING);
+            restored.CreatedAtUtc.Should().Be(CreatedAt);
+            restored.ExpiresAtUtc.Should().Be(CreatedAt.AddDays(7));
+            restored.AcceptedAtUtc.Should().BeNull();
+            restored.IsNew.Should().BeFalse();
+        }
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveAnUnregisteredEmail()
+        {
+            // Arrange
+            var original = AnInvitation(null);
+
+            // Act
+            var restored = TrainerInvitationMapper.MapToDomain(TrainerInvitationMapper.MapToEntity(original));
+
+            // Assert
+            restored.UserId.Should().BeNull();
+        }
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveTheAcceptance()
+        {
+            // Arrange
+            var original = AnInvitation(Id.New());
+            original.Accept(CreatedAt.AddDays(1));
+
+            // Act
+            var restored = TrainerInvitationMapper.MapToDomain(TrainerInvitationMapper.MapToEntity(original));
+
+            // Assert
+            restored.Status.Should().Be(TrainerInvitationStatus.ACCEPTED);
+            restored.AcceptedAtUtc.Should().Be(CreatedAt.AddDays(1));
+        }
+
+        [Fact]
+        public void MapToEntity_ShouldStampEveryTimestampAsUtc()
+        {
+            // Arrange
+            var original = AnInvitation(Id.New());
+            original.Accept(CreatedAt.AddDays(1));
+
+            // Act
+            var entity = TrainerInvitationMapper.MapToEntity(original);
+
+            // Assert
+            entity.CreatedAtUtc.Kind.Should().Be(DateTimeKind.Utc);
+            entity.ExpiresAtUtc.Kind.Should().Be(DateTimeKind.Utc);
+            entity.AcceptedAtUtc!.Value.Kind.Should().Be(DateTimeKind.Utc);
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAnUnknownStatus()
+        {
+            // Arrange
+            var entity = TrainerInvitationMapper.MapToEntity(AnInvitation(null));
+            entity.Status = 99;
+
+            // Act
+            var act = () => TrainerInvitationMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAnAcceptedRowWithoutAcceptanceDate()
+        {
+            // Arrange
+            var entity = TrainerInvitationMapper.MapToEntity(AnInvitation(Id.New()));
+            entity.Status = (int)TrainerInvitationStatus.ACCEPTED;
+
+            // Act
+            var act = () => TrainerInvitationMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAMalformedStoredEmail()
+        {
+            // Arrange
+            var entity = TrainerInvitationMapper.MapToEntity(AnInvitation(null));
+            entity.InviteEmail = "not-an-email";
+
+            // Act
+            var act = () => TrainerInvitationMapper.MapToDomain(entity);
 
             // Assert
             act.Should().Throw<PersistenceMappingException>();

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ComponentType } from "react";
+import AssignmentIndOutlined from "@mui/icons-material/AssignmentIndOutlined";
 import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
 import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
@@ -55,17 +56,24 @@ interface DrawerItemProps {
 }
 
 /**
- * The people section: an admin manages every user from it; anyone else, or a visitor whose profile has not loaded yet,
- * sees the athletes copy, whose screen does not exist yet.
+ * The people section: an admin manages every user and their trainer assignment from it; anyone else, or a visitor whose profile has not loaded yet,
+ * sees the athletes copy. Both reach the invitations screen, which shows what each role may see.
  */
 function peopleSection(isAdmin: boolean): { title: string; items: MenuItemDefinition[] } {
   return {
     title: isAdmin ? "menu.users.title" : "menu.athletes.title",
     items: [
-      isAdmin
-        ? { label: "menu.users.all", icon: GroupOutlined, href: "/users" }
-        : { label: "menu.athletes.all", icon: GroupOutlined },
-      { label: "menu.athletes.pendingInvitations", icon: PersonAddAltOutlined },
+      ...(isAdmin
+        ? [
+            { label: "menu.users.all", icon: GroupOutlined, href: "/users" },
+            {
+              label: "menu.users.trainerAssignments",
+              icon: AssignmentIndOutlined,
+              href: "/trainer-assignments",
+            },
+          ]
+        : [{ label: "menu.athletes.all", icon: GroupOutlined, href: "/athletes" }]),
+      { label: "menu.athletes.invitations", icon: PersonAddAltOutlined, href: "/invitations" },
     ],
   };
 }

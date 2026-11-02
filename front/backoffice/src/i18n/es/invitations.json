@@ -1,0 +1,55 @@
+{
+  "list": {
+    "title": "Invitaciones",
+    "searchByEmail": "Buscar por email",
+    "searchByTrainerOrEmail": "Buscar por entrenador o email",
+    "statusFilter": "Estado",
+    "invite": "Invitar atleta",
+    "columns": {
+      "trainer": "Entrenador",
+      "email": "Email",
+      "athleteEmail": "Email del atleta",
+      "status": "Estado",
+      "sentAt": "Enviada",
+      "expiresAt": "Caduca",
+      "actions": "Acciones"
+    },
+    "revoke": "Revocar",
+    "empty": "Todavía no hay invitaciones.",
+    "noMatches": "Ninguna invitación coincide con la búsqueda."
+  },
+  "status": {
+    "PENDING": "Pendiente",
+    "ACCEPTED": "Aceptada",
+    "REJECTED": "Rechazada",
+    "REVOKED": "Revocada"
+  },
+  "invite": {
+    "title": "Invitar atleta",
+    "fields": {
+      "email": "Email"
+    },
+    "submit": "Enviar invitación",
+    "cancel": "Cancelar",
+    "success": "Invitación enviada.",
+    "validation": {
+      "required": "Este campo es obligatorio.",
+      "email": "Introduce un email válido."
+    },
+    "errors": {
+      "VALIDATION": "Introduce un email válido.",
+      "CONFLICT": "No se puede invitar a este email: ya tiene una invitación pendiente, ya entrena con alguien o no es una cuenta de atleta."
+    }
+  },
+  "revoke": {
+    "title": "¿Revocar la invitación a {{email}}?",
+    "body": "El enlace dejará de funcionar y no podrá aceptarse.",
+    "confirm": "Revocar",
+    "cancel": "Cancelar",
+    "success": "Invitación revocada.",
+    "errors": {
+      "CONFLICT": "Esta invitación ya no está pendiente. Recarga la lista.",
+      "NOT_FOUND": "Esta invitación ya no existe."
+    }
+  }
+}

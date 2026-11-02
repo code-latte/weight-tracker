@@ -211,10 +211,35 @@ public class OpenApiDocumentTests : IntegrationTest
 
         // Assert
         var operation = Operation(document, "/users", "get");
+        var responses = operation.GetProperty("responses").EnumerateObject().Select(property => property.Name).ToList();
+
+        operation.GetProperty("security")[0].TryGetProperty("Bearer", out _).Should().BeTrue();
+        responses.Should().Contain(["200", "401", "403"]);
+        responses.Should().NotContain("501");
+    }
+
+    [Theory]
+    [InlineData("/trainer-athletes", "get", new[] { "200", "401", "403" })]
+    [InlineData("/trainer-athletes/{trainerId}", "get", new[] { "200", "401", "403", "404" })]
+    [InlineData("/trainer-athletes/{trainerId}", "post", new[] { "201", "400", "401", "403", "404", "409" })]
+    [InlineData("/trainer-athletes/{trainerId}/end", "put", new[] { "200", "400", "401", "403", "404" })]
+    [InlineData("/athlete-invitations", "get", new[] { "200", "401", "403" })]
+    [InlineData("/athlete-invitations", "post", new[] { "201", "400", "401", "403", "409" })]
+    [InlineData("/athlete-invitations/{invitationId}/revoke", "put", new[] { "200", "401", "403", "404", "409" })]
+    [InlineData("/athlete-invitations/{invitationId}/accept", "put", new[] { "200", "400", "401", "403", "404", "409" })]
+    [InlineData("/athlete-invitations/{invitationId}/reject", "put", new[] { "200", "400", "401", "403", "404", "409" })]
+    public async Task TrainerAthleteOperations_ShouldDocumentTheirSecurityAndResponses(
+        string path, string method, string[] statuses)
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var operation = Operation(document, path, method);
 
         operation.GetProperty("security")[0].TryGetProperty("Bearer", out _).Should().BeTrue();
         operation.GetProperty("responses").EnumerateObject().Select(property => property.Name)
-            .Should().Contain(["200", "401", "403", "501"]);
+            .Should().Contain(statuses);
     }
 
     [Fact]
@@ -245,6 +270,25 @@ public class OpenApiDocumentTests : IntegrationTest
         operation.GetProperty("security")[0].TryGetProperty("Bearer", out _).Should().BeTrue();
         operation.GetProperty("responses").EnumerateObject().Select(property => property.Name)
             .Should().Contain(["200", "401", "403", "404", "409"]);
+    }
+
+    [Fact]
+    public async Task ListUsers_ShouldDocumentANullableTrainerOnEachItem()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var itemReference = Operation(document, "/users", "get")
+            .GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("items").GetProperty("$ref").GetString();
+        itemReference.Should().Be("#/components/schemas/UserListItemResponse");
+
+        var trainer = document
+            .GetProperty("components").GetProperty("schemas").GetProperty("UserListItemResponse")
+            .GetProperty("properties").GetProperty("trainer").GetRawText();
+        trainer.Should().Contain("#/components/schemas/UserProfileResponse");
+        trainer.Should().Match(text => text.Contains("\"null\"") || text.Contains("\"nullable\": true") || text.Contains("\"nullable\":true"));
     }
 
     [Fact]

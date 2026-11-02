@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using WeightTracker.Api.Common;
 using WeightTracker.Application.Exceptions;
+using WeightTracker.Domain.AthleteInvitations;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exceptions;
+using WeightTracker.Domain.TrainerAthletes;
 using WeightTracker.Domain.Workouts;
 using Xunit;
 
@@ -36,19 +38,6 @@ public class ExceptionMapperTests
 
         // Assert
         status.Should().Be(StatusCodes.Status401Unauthorized);
-    }
-
-    [Fact]
-    public void Map_ShouldReturnNotImplementedWhenATrainerListsTheirAthletes()
-    {
-        // Arrange
-        var exception = new TrainerAthletesNotImplementedException();
-
-        // Act
-        var status = StatusOf(exception);
-
-        // Assert
-        status.Should().Be(StatusCodes.Status501NotImplemented);
     }
 
     [Fact]
@@ -376,6 +365,72 @@ public class ExceptionMapperTests
         // Arrange
         var exception = new InvalidUserActivationStateException(Id.New());
 
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(StatusCodes.Status400BadRequest);
+    }
+
+    public static TheoryData<Exception, int> TrainerAthleteFailures() => new()
+    {
+        { new TrainerAthleteNotFoundException(Id.New(), Id.New()), StatusCodes.Status404NotFound },
+        { new AthleteAlreadyHasTrainerException(Id.New()), StatusCodes.Status409Conflict },
+        { new InvalidTrainerAthleteRoleException("wrong role"), StatusCodes.Status409Conflict },
+        {
+            new InvalidTrainerAthleteStatusTransitionException(TrainerAthleteStatus.ENDED, TrainerAthleteStatus.ENDED),
+            StatusCodes.Status409Conflict
+        },
+    };
+
+    [Theory]
+    [MemberData(nameof(TrainerAthleteFailures))]
+    public void Map_ShouldMapEveryTrainerAthleteFailure(Exception exception, int expected)
+    {
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(expected);
+    }
+
+    public static TheoryData<Exception, int> TrainerInvitationFailures() => new()
+    {
+        { new TrainerInvitationNotFoundException(Id.New()), StatusCodes.Status404NotFound },
+        {
+            new PendingInvitationAlreadyExistsException(Email.From("athlete@weighttracker.test")),
+            StatusCodes.Status409Conflict
+        },
+        { new InvalidInvitationTokenException(), StatusCodes.Status403Forbidden },
+        {
+            new InvalidTrainerInvitationStatusTransitionException(
+                TrainerInvitationStatus.ACCEPTED, TrainerInvitationStatus.REJECTED),
+            StatusCodes.Status409Conflict
+        },
+        { new TrainerInvitationExpiredException(Id.New()), StatusCodes.Status409Conflict },
+    };
+
+    [Theory]
+    [MemberData(nameof(TrainerInvitationFailures))]
+    public void Map_ShouldMapEveryTrainerInvitationFailure(Exception exception, int expected)
+    {
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(expected);
+    }
+
+    public static TheoryData<Exception> InvalidTrainerAggregateStates() => new()
+    {
+        new InvalidTrainerAthleteStateException(Id.New()),
+        new InvalidTrainerInvitationStateException(Id.New(), "it must expire after it is created"),
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidTrainerAggregateStates))]
+    public void Map_ShouldReturnBadRequestForAnInvalidTrainerAggregateState(Exception exception)
+    {
         // Act
         var status = StatusOf(exception);
 

@@ -19,6 +19,7 @@ const users = [
     role: "ADMIN",
     isActive: true,
     deactivatedAtUtc: null,
+    trainer: null,
   },
   {
     id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
@@ -28,6 +29,7 @@ const users = [
     role: "TRAINER",
     isActive: true,
     deactivatedAtUtc: null,
+    trainer: null,
   },
   {
     id: "7b0c1f7e-3a54-4d4e-9d0e-1a2b3c4d5e6f",
@@ -37,6 +39,7 @@ const users = [
     role: "USER",
     isActive: true,
     deactivatedAtUtc: null,
+    trainer: null,
   },
 ];
 
@@ -50,6 +53,7 @@ const inactive = {
   role: "TRAINER",
   isActive: false,
   deactivatedAtUtc: "2026-10-20T09:30:00Z",
+  trainer: null,
 };
 
 const created = {
@@ -74,7 +78,7 @@ test("an admin filters the users and creates a trainer from the modal", async ({
     }
     if (request.method() === "POST") {
       createBody = request.postDataJSON();
-      list = [...list, { ...created, isActive: true, deactivatedAtUtc: null }];
+      list = [...list, { ...created, isActive: true, deactivatedAtUtc: null, trainer: null }];
       return route.fulfill({
         status: 201,
         headers: cors,

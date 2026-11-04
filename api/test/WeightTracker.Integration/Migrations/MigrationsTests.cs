@@ -60,6 +60,19 @@ public class MigrationsTests : IAsyncLifetime
                ('00000000-0000-0000-0000-0000000000d2', 'athlete-migration@weighttracker.test', 'A', 'A', '1990-01-01', 1, 'hash', now(), true);
         """;
 
+    /// <summary>Last migration before <c>AddOwnerAndArchiveToExercises_202611031200</c>.</summary>
+    private const long BeforeExerciseOwnerVersion = 202610301452;
+
+    /// <summary>Last migration before <c>CreateFavoriteExercisesTable_202611031642</c>.</summary>
+    private const long BeforeFavoriteExercisesVersion = 202611031200;
+
+    /// <summary>A user and a custom exercise for the favorite tests. Roles are not enforced by the schema.</summary>
+    private const string UserAndExercise = """
+        INSERT INTO "Users" ("Id", "Email", "Name", "Surname", "DateBirth", "Role", "PasswordHash", "CreatedAt", "IsActive")
+        VALUES ('00000000-0000-0000-0000-0000000000f1', 'favorites-migration@weighttracker.test', 'F', 'F', '1990-01-01', 1, 'hash', now(), true);
+        INSERT INTO "Exercises" ("Id", "Muscle", "Type") VALUES ('00000000-0000-0000-0000-0000000000f2', 6, 1);
+        """;
+
     /// <summary>Entries in <c>infra/exercises.json</c>.</summary>
     private const int CatalogSize = 876;
 
@@ -74,6 +87,7 @@ public class MigrationsTests : IAsyncLifetime
         "RefreshTokens",
         "TrainerAthletes",
         "TrainerInvitations",
+        "FavoriteExercises",
     ];
 
     private readonly string _maintenanceConnectionString;
@@ -245,7 +259,7 @@ public class MigrationsTests : IAsyncLifetime
         DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
 
         // Assert
-        (await ColumnsOf("Exercises")).Should().BeEquivalentTo(["Id", "VideoUrl", "Muscle", "Type", "FreeExerciseDbId"]);
+        (await ColumnsOf("Exercises")).Should().BeEquivalentTo(["Id", "VideoUrl", "Muscle", "Type", "FreeExerciseDbId", "OwnerId", "ArchivedAtUtc"]);
         (await ColumnsOf("ExerciseTranslations")).Should().BeEquivalentTo(["Id", "ExerciseId", "LanguageCode", "Name"]);
         (await Scalar<int>("""
             SELECT character_maximum_length FROM information_schema.columns
@@ -527,6 +541,104 @@ public class MigrationsTests : IAsyncLifetime
         (await Scalar<bool>("""
             SELECT EXISTS (SELECT 1 FROM information_schema.columns
             WHERE table_name = 'Users' AND column_name IN ('IsActive', 'DeactivatedAtUtc'))
+            """)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AddOwnerAndArchive_ShouldKeepEveryExistingExerciseInTheSystemCatalog()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser, BeforeExerciseOwnerVersion);
+
+        // Act
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+
+        // Assert
+        (await Scalar<long>("SELECT count(*) FROM \"Exercises\"")).Should().Be(CatalogSize);
+        (await Scalar<long>("SELECT count(*) FROM \"Exercises\" WHERE \"OwnerId\" IS NULL AND \"ArchivedAtUtc\" IS NULL")).Should().Be(CatalogSize);
+    }
+
+    [Fact]
+    public async Task AddOwnerAndArchive_ShouldRejectAnOwnerThatIsNotAUser()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+
+        // Act
+        var act = () => Execute(_connectionString, """
+            INSERT INTO "Exercises" ("Id", "Muscle", "Type", "OwnerId")
+            VALUES ('00000000-0000-0000-0000-0000000000e1', 6, 1, '00000000-0000-0000-0000-0000000000e2');
+            """);
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.ForeignKeyViolation);
+    }
+
+    [Fact]
+    public async Task AddOwnerAndArchive_Down_ShouldRemoveBothColumnsAndTheirIndex()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+
+        // Act
+        DatabaseMigrator.MigrateDown(_connectionString, BeforeExerciseOwnerVersion);
+
+        // Assert
+        (await ColumnsOf("Exercises")).Should().BeEquivalentTo(["Id", "VideoUrl", "Muscle", "Type", "FreeExerciseDbId"]);
+        (await Scalar<bool>("""
+            SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'IX_Exercises_OwnerId')
+            """)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreateFavoriteExercises_ShouldRejectTheSameExerciseTwiceForAUser()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, UserAndExercise);
+        const string insert = """
+            INSERT INTO "FavoriteExercises" ("Id", "UserId", "ExerciseId", "CreatedAtUtc")
+            VALUES ('{0}', '00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000f2', now());
+            """;
+        await Execute(_connectionString, string.Format(insert, "00000000-0000-0000-0000-0000000000f3"));
+
+        // Act
+        var act = () => Execute(_connectionString, string.Format(insert, "00000000-0000-0000-0000-0000000000f4"));
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation);
+    }
+
+    [Fact]
+    public async Task CreateFavoriteExercises_ShouldRejectAnExerciseThatDoesNotExist()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, UserAndExercise);
+
+        // Act
+        var act = () => Execute(_connectionString, """
+            INSERT INTO "FavoriteExercises" ("Id", "UserId", "ExerciseId", "CreatedAtUtc")
+            VALUES ('00000000-0000-0000-0000-0000000000f5', '00000000-0000-0000-0000-0000000000f1',
+                    '00000000-0000-0000-0000-0000000000f6', now());
+            """);
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.ForeignKeyViolation);
+    }
+
+    [Fact]
+    public async Task CreateFavoriteExercises_Down_ShouldRemoveTheTable()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+
+        // Act
+        DatabaseMigrator.MigrateDown(_connectionString, BeforeFavoriteExercisesVersion);
+
+        // Assert
+        (await Scalar<bool>("""
+            SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'FavoriteExercises')
             """)).Should().BeFalse();
     }
 

@@ -15,6 +15,10 @@ public class ExerciseEntity
     /// <summary>Value of the <c>ExerciseTypes</c> enum.</summary>
     public int Type { get; set; }
 
+    public Guid? OwnerId { get; set; }
+
+    public DateTime? ArchivedAtUtc { get; set; }
+
     /// <summary>Navigation inside the Exercise aggregate boundary.</summary>
     public List<ExerciseTranslationEntity> Translations { get; set; } = [];
 }

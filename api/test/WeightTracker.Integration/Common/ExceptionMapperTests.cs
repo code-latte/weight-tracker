@@ -99,6 +99,45 @@ public class ExceptionMapperTests
     }
 
     [Fact]
+    public void Map_ShouldReturnForbiddenForASystemExerciseThatCannotBeChanged()
+    {
+        // Arrange
+        var exception = new SystemExerciseNotEditableException(Id.New());
+
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public void Map_ShouldReturnConflictForAnArchivedExercise()
+    {
+        // Arrange
+        var exception = new ExerciseArchivedException(Id.New());
+
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(StatusCodes.Status409Conflict);
+    }
+
+    [Fact]
+    public void Map_ShouldReturnConflictForAnExerciseThatCannotBeUsedInTheWorkout()
+    {
+        // Arrange
+        var exception = new ExerciseNotUsableInWorkoutException(Id.New(), Id.New());
+
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(StatusCodes.Status409Conflict);
+    }
+
+    [Fact]
     public void Map_ShouldReturnBadRequestForAnInvalidTimeInMinutes()
     {
         // Arrange

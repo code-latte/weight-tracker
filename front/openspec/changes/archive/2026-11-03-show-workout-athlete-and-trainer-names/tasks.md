@@ -10,7 +10,7 @@ Ordering note: the dialog work needs no `core` change, so it comes first and can
       on `trainer-assignments/hooks/use-trainer-assignments.ts`: `TRAINER` → `getMyAthletesUseCase` mapped to
       `{ id: athleteId, name, surname, email }`; `ADMIN` → one `getUsersUseCase` split into active `USER`s and active
       `TRAINER`s; `status`, `errorCode`, `reload`, late answers ignored. Verify with `pnpm --filter backoffice
-    typecheck` and lint (behaviour covered in 1.5).
+typecheck` and lint (behaviour covered in 1.5).
 - [x] 1.2 Add the `PersonPicker` molecule at `backoffice/src/presentation/workouts/components/molecules/person-picker.tsx`
       over the `Autocomplete` atom: "name · email" label (email only without a name), case- and accent-insensitive
       name/email filter via `normalized`, `noOptionsText`, `disabled`, `error`. Verify it imports no MUI widget and

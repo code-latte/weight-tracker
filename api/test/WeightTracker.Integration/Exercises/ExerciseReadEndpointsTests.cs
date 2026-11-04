@@ -14,10 +14,10 @@ using Xunit;
 namespace WeightTracker.Integration.Exercises;
 
 /// <summary>
-/// Both read routes are public, so no missing-token or invalid-token cases belong here. The catalog is
-/// read-only through the API, so the write cases only assert that nothing is served or changed.
+/// Both read routes are public, so a missing token is a valid request; the invalid-token cases live in
+/// <see cref="ExerciseOptionalCallerTests"/>. Custom exercises are created through the API in Arrange.
 /// </summary>
-public class ExerciseReadEndpointsTests : IntegrationTest
+public class ExerciseReadEndpointsTests : ExerciseEndpointTest
 {
     public ExerciseReadEndpointsTests(ApiFactory factory) : base(factory)
     { }
@@ -72,6 +72,8 @@ public class ExerciseReadEndpointsTests : IntegrationTest
         payload.GetProperty("type").GetString().Should().Be("STRENGTH");
         ExerciseJson.Translations(payload).Should().BeEquivalentTo([("es", "Sentadilla con barra"), ("en", "Barbell Squat")]);
         payload.TryGetProperty("name", out _).Should().BeFalse();
+        payload.GetProperty("ownerId").ValueKind.Should().Be(JsonValueKind.Null);
+        payload.GetProperty("archivedAtUtc").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]
@@ -123,51 +125,6 @@ public class ExerciseReadEndpointsTests : IntegrationTest
     }
 
     [Fact]
-    public async Task Post_ShouldNotCreateAnExerciseEvenForAnAdmin()
-    {
-        // Arrange
-        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
-        var body = new { muscle = "NECK", translations = new[] { new { languageCode = "es", name = "Nuevo ejercicio" } } };
-
-        // Act
-        var response = await admin.PostAsJsonAsync("/exercises", body);
-
-        // Assert
-        response.IsSuccessStatusCode.Should().BeFalse();
-        (await Client.GetFromJsonAsync<JsonElement>("/exercises", JsonOptions)).GetArrayLength().Should().Be(6);
-    }
-
-    [Fact]
-    public async Task Put_ShouldNotUpdateAnExerciseEvenForAnAdmin()
-    {
-        // Arrange
-        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
-
-        // Act
-        var response = await admin.PutAsJsonAsync($"/exercises/{SeedData.SentadillaId}", new { muscle = "GLUTES" });
-
-        // Assert
-        response.IsSuccessStatusCode.Should().BeFalse();
-        var stored = await Client.GetFromJsonAsync<JsonElement>($"/exercises/{SeedData.SentadillaId}", JsonOptions);
-        stored.GetProperty("muscle").GetString().Should().Be("QUADRICEPS");
-        ExerciseJson.Translations(stored).Should().BeEquivalentTo([("es", "Sentadilla con barra"), ("en", "Barbell Squat")]);
-    }
-
-    [Fact]
-    public async Task Delete_ShouldNotDeleteAnExerciseEvenForAnAdmin()
-    {
-        // Arrange
-        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
-
-        // Act
-        var response = await admin.DeleteAsync($"/exercises/{SeedData.CurlBicepsId}");
-
-        // Assert
-        response.IsSuccessStatusCode.Should().BeFalse();
-        (await Client.GetAsync($"/exercises/{SeedData.CurlBicepsId}")).StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
     public async Task GetById_ShouldReturnNotFoundForAnUnknownExercise()
     {
         // Arrange & Act
@@ -185,5 +142,134 @@ public class ExerciseReadEndpointsTests : IntegrationTest
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldReturnOnlySystemExercisesToAnAnonymousCaller()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var custom = await CreateExercise(trainer);
+
+        // Act
+        var exercises = await ExercisesSeenBy(Client);
+
+        // Assert
+        IdsOf(exercises).Should().NotContain(custom);
+        exercises.EnumerateArray().Should().OnlyContain(exercise => exercise.GetProperty("ownerId").ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task GetById_ShouldHideACustomExerciseFromAnAnonymousCaller()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var custom = await CreateExercise(user);
+
+        // Act
+        var response = await Client.GetAsync($"/exercises/{custom}");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldIncludeTheOwnCustomExerciseOfAnAuthenticatedCaller()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var custom = await CreateExercise(user);
+
+        // Act
+        var exercises = await ExercisesSeenBy(user);
+
+        // Assert
+        IdsOf(exercises).Should().Contain(custom).And.Contain(SeedData.SentadillaId);
+        exercises.EnumerateArray().Single(exercise => exercise.GetProperty("id").GetGuid() == custom)
+            .GetProperty("ownerId").GetGuid().Should().Be(SeedData.UserId);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldIncludeTheTrainersExerciseForAnAthleteWhoseVisibleWorkoutUsesIt()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var custom = await CreateExercise(trainer);
+        await AddToWorkout(trainer, SeedData.TrainedWorkoutId, custom);
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var exercises = await ExercisesSeenBy(user);
+
+        // Assert
+        IdsOf(exercises).Should().Contain(custom);
+        (await user.GetAsync($"/exercises/{custom}")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldExcludeAnExerciseUsedOnlyInAPrescribedDraftFromTheAthlete()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var custom = await CreateExercise(trainer);
+        await AddToWorkout(trainer, SeedData.PrescribedDraftWorkoutId, custom);
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var exercises = await ExercisesSeenBy(user);
+
+        // Assert
+        IdsOf(exercises).Should().NotContain(custom);
+        (await user.GetAsync($"/exercises/{custom}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldExcludeAnotherUsersExerciseThatIsInNoVisibleWorkoutFromATrainer()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var custom = await CreateExercise(user);
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+
+        // Act
+        var exercises = await ExercisesSeenBy(trainer);
+
+        // Assert
+        IdsOf(exercises).Should().NotContain(custom);
+        (await trainer.GetAsync($"/exercises/{custom}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldKeepAnArchivedOwnExerciseWithItsArchiveDate()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var custom = await CreateExercise(user);
+        (await user.DeleteAsync($"/exercises/{custom}")).EnsureSuccessStatusCode();
+
+        // Act
+        var exercises = await ExercisesSeenBy(user);
+
+        // Assert
+        var archived = exercises.EnumerateArray().Single(exercise => exercise.GetProperty("id").GetGuid() == custom);
+        archived.GetProperty("archivedAtUtc").ValueKind.Should().Be(JsonValueKind.String);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldReturnEveryExerciseToAnAdmin()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var usersExercise = await CreateExercise(user);
+        var trainersExercise = await CreateExercise(trainer);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var exercises = await ExercisesSeenBy(admin);
+
+        // Assert
+        IdsOf(exercises).Should().Contain([usersExercise, trainersExercise, SeedData.SentadillaId]);
+        (await admin.GetAsync($"/exercises/{usersExercise}")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

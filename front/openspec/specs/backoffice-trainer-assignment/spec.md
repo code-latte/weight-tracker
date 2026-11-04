@@ -1,6 +1,7 @@
 # backoffice-trainer-assignment Specification
 
 ## Purpose
+
 Gives an admin one backoffice screen listing every athlete with their current trainer, from which they assign a
 trainer to an athlete without one or end the relationship of an athlete who has one.
 

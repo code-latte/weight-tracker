@@ -1,5 +1,6 @@
 using WeightTracker.Application.Exceptions;
 using WeightTracker.Application.Interfaces;
+using WeightTracker.Application.Services;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Users;
 using WeightTracker.Domain.Workouts;
@@ -15,19 +16,19 @@ namespace WeightTracker.Application.UseCases.Workouts;
 /// </remarks>
 public class GetAllWorkoutsUseCase
 {
-    private IWorkoutRepository _workouts;
+    private WorkoutVisibility _visibility;
 
     private IExerciseRepository _exercises;
 
     private IUserRepository _users;
 
     public GetAllWorkoutsUseCase(
-        IWorkoutRepository workouts,
+        WorkoutVisibility visibility,
         IExerciseRepository exercises,
         IUserRepository users
     )
     {
-        _workouts = workouts;
+        _visibility = visibility;
         _exercises = exercises;
         _users = users;
     }
@@ -36,7 +37,7 @@ public class GetAllWorkoutsUseCase
     /// <exception cref="InvalidOperationException">When an owner or trainer of a listed workout does not exist.</exception>
     public async Task<WorkoutListDTO> Execute(Id callerId, Role callerRole, CancellationToken cancellationToken)
     {
-        var workouts = (await ScopedWorkouts(callerId, callerRole, cancellationToken)).ToList();
+        var workouts = await _visibility.VisibleTo(callerId, callerRole, cancellationToken);
 
         // Only exercises referenced by the scoped workouts, so the join never widens visibility
         var exerciseIds = workouts
@@ -64,21 +65,4 @@ public class GetAllWorkoutsUseCase
 
         return new WorkoutListDTO(workouts, exercises.ToDictionary(exercise => exercise.Id), users);
     }
-
-    private async Task<IEnumerable<Workout>> ScopedWorkouts(Id callerId, Role callerRole, CancellationToken cancellationToken)
-    {
-        return callerRole switch
-        {
-            Role.ADMIN => await _workouts.GetAll(cancellationToken),
-            Role.TRAINER => PublishedToCaller(await _workouts.GetAllByUserOrTrainerId(callerId, cancellationToken), callerId),
-            Role.USER => PublishedToCaller(await _workouts.GetAllByUserId(callerId, cancellationToken), callerId),
-            _ => throw new UnauthorizedOperationException("GET /workouts"),
-        };
-    }
-
-    /// <summary>
-    /// Leaves out the prescribed drafts of which the caller is the athlete: their trainer has not published them yet.
-    /// </summary>
-    private static IEnumerable<Workout> PublishedToCaller(IEnumerable<Workout> workouts, Id callerId)
-        => workouts.Where(workout => workout.IsHiddenFrom(callerId) == false);
 }

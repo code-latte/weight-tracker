@@ -68,7 +68,7 @@ public class ExceptionMapper
             ),
 
             UnauthorizedOperationException or AdminSignupNotAllowedException
-                or InvalidInvitationTokenException => Problem(
+                or InvalidInvitationTokenException or SystemExerciseNotEditableException => Problem(
                 StatusCodes.Status403Forbidden,
                 exception.Message
             ),
@@ -88,7 +88,8 @@ public class ExceptionMapper
                 or UserAlreadyDeactivatedException or AthleteAlreadyHasTrainerException
                 or InvalidTrainerAthleteRoleException or InvalidTrainerAthleteStatusTransitionException
                 or PendingInvitationAlreadyExistsException or InvalidTrainerInvitationStatusTransitionException
-                or TrainerInvitationExpiredException => Problem(
+                or TrainerInvitationExpiredException or ExerciseArchivedException
+                or ExerciseNotUsableInWorkoutException => Problem(
                 StatusCodes.Status409Conflict,
                 exception.Message
             ),

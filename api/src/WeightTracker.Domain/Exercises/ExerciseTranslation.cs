@@ -6,8 +6,8 @@ namespace WeightTracker.Domain.Exercises;
 /// The name of an exercise in one language.
 /// </summary>
 /// <remarks>
-/// Entity of the read-only Exercise catalog. It is only restored together with its <see cref="Exercise"/>,
-/// which keeps at most one translation per language.
+/// Entity of the Exercise aggregate. It is only created, restored and replaced together with its
+/// <see cref="Exercise"/>, which keeps at most one translation per language.
 /// </remarks>
 public sealed class ExerciseTranslation : Entity
 {
@@ -26,6 +26,12 @@ public sealed class ExerciseTranslation : Entity
     /// <summary>
     /// Restores a translation stored in the catalog.
     /// </summary>
+    /// <summary>
+    /// Creates a translation that does not exist in the system yet.
+    /// </summary>
+    public static ExerciseTranslation Create(LanguageCode languageCode, ExerciseName name)
+        => new(Id.New(), languageCode, name) { IsNew = true };
+
     public static ExerciseTranslation Rehydrate(Id id, LanguageCode languageCode, ExerciseName name)
         => new(id, languageCode, name);
 }

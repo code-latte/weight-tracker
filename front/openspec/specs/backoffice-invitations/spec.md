@@ -1,6 +1,7 @@
 # backoffice-invitations Specification
 
 ## Purpose
+
 Gives trainers a screen to follow, send and revoke their athlete invitations, and gives admins a read-only view of
 every invitation, each searchable and filterable by status.
 

@@ -25,6 +25,7 @@ import Typography from "@/presentation/common/components/atoms/typography";
 import HomeSkeleton from "@/presentation/common/components/molecules/home-skeleton";
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import AppShell from "@/presentation/common/components/organisms/app-shell";
+import useCurrentUser from "@/presentation/common/hooks/use-current-user";
 import ExerciseCatalogDialog from "@/presentation/workouts/components/organisms/exercise-catalog-dialog";
 import ExerciseConfigurationDialog from "@/presentation/workouts/components/organisms/exercise-configuration-dialog";
 import WorkoutDetailsCard from "@/presentation/workouts/components/organisms/workout-details-card";
@@ -32,11 +33,16 @@ import WorkoutExercisesCard from "@/presentation/workouts/components/organisms/w
 import WorkoutExercisesList, {
   type WorkoutExerciseItem,
 } from "@/presentation/workouts/components/organisms/workout-exercises-list";
+import useExerciseCatalogFilters from "@/presentation/workouts/hooks/use-exercise-catalog-filters";
+import useExerciseFavorites, {
+  type ExerciseFavoritesState,
+} from "@/presentation/workouts/hooks/use-exercise-favorites";
 import useExercises from "@/presentation/workouts/hooks/use-exercises";
 import useRemoveWorkoutExercise from "@/presentation/workouts/hooks/use-remove-workout-exercise";
 import useReorderWorkoutExercises from "@/presentation/workouts/hooks/use-reorder-workout-exercises";
 import useUpdateWorkout from "@/presentation/workouts/hooks/use-update-workout";
 import useWorkout from "@/presentation/workouts/hooks/use-workout";
+import { singleMuscleBodyPartsOf } from "@/presentation/workouts/catalog";
 import { weekMiddleOf, weekStartOf } from "@/presentation/workouts/week";
 
 function WorkoutNotFound() {
@@ -127,9 +133,18 @@ function inOrderOf(entries: WorkoutExerciseDetail[], ids: string[]) {
 }
 
 /** The editor once both reads are in: it owns the workout's form, its save, the exercises and the open dialog. */
-function LoadedWorkout({ workout, exercises }: { workout: WorkoutDetail; exercises: Exercise[] }) {
+function LoadedWorkout({
+  workout,
+  exercises,
+  favorites,
+}: {
+  workout: WorkoutDetail;
+  exercises: Exercise[];
+  favorites: ExerciseFavoritesState;
+}) {
   const { t: tc } = useTranslation();
   const { t } = useTranslation("workouts");
+  const { profile } = useCurrentUser();
   const propertiesTitleId = useId();
   const exercisesTitleId = useId();
   const { saving, errorCode, saved, save, clearSaved } = useUpdateWorkout();
@@ -139,10 +154,7 @@ function LoadedWorkout({ workout, exercises }: { workout: WorkoutDetail; exercis
     workoutDate: weekStartOf(workout.workoutDate),
   });
   const [errors, setErrors] = useState<WorkoutDetailsFormViolations>({});
-  const [filterText, setFilterText] = useState("");
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
-  const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
+  const filters = useExerciseCatalogFilters();
   const [dialog, setDialog] = useState<OpenDialog>({ kind: "none" });
   // The workout's saved exercises, kept up to date with what each exercise save answers.
   const [savedExercises, setSavedExercises] = useState<WorkoutExerciseDetail[]>(workout.exercises);
@@ -163,16 +175,7 @@ function LoadedWorkout({ workout, exercises }: { workout: WorkoutDetail; exercis
     () => new Map<string, Exercise>(exercises.map((exercise) => [exercise.id, exercise])),
     [exercises],
   );
-  // Body parts whose catalog exercises all work one muscle: the muscle would only repeat what the body part says.
-  const singleMuscleBodyParts = useMemo(() => {
-    const musclesOf = new Map<string, Set<string>>();
-    for (const { bodyPart, muscle } of exercises) {
-      musclesOf.set(bodyPart, (musclesOf.get(bodyPart) ?? new Set()).add(muscle));
-    }
-    return new Set(
-      [...musclesOf].filter(([, muscles]) => muscles.size === 1).map(([bodyPart]) => bodyPart),
-    );
-  }, [exercises]);
+  const singleMuscleBodyParts = useMemo(() => singleMuscleBodyPartsOf(exercises), [exercises]);
   const items = useMemo<WorkoutExerciseItem[]>(
     () =>
       savedExercises.map((workoutExercise) => ({
@@ -303,21 +306,14 @@ function LoadedWorkout({ workout, exercises }: { workout: WorkoutDetail; exercis
       <ExerciseCatalogDialog
         open={dialog.kind === "catalog"}
         exercises={available}
-        filterText={filterText}
-        onFilterTextChange={setFilterText}
-        selectedType={selectedType}
-        onToggleType={(type) => setSelectedType((current) => (current === type ? null : type))}
-        selectedBodyPart={selectedBodyPart}
-        onToggleBodyPart={(bodyPart) => {
-          setSelectedBodyPart((current) => (current === bodyPart ? null : bodyPart));
-          // A muscle only refines its own body part.
-          setSelectedMuscle(null);
-        }}
-        selectedMuscle={selectedMuscle}
+        filters={filters}
+        currentUserId={profile?.id ?? null}
         singleMuscleBodyParts={singleMuscleBodyParts}
-        onToggleMuscle={(muscle) =>
-          setSelectedMuscle((current) => (current === muscle ? null : muscle))
-        }
+        favoriteIds={favorites.favoriteIds}
+        favoritesStatus={favorites.status}
+        pendingFavoriteIds={favorites.pendingIds}
+        favoriteErrorCode={favorites.toggleErrorCode}
+        onToggleFavorite={(exerciseId) => void favorites.toggle(exerciseId)}
         onChoose={(exercise) =>
           setDialog({ kind: "configure", item: newItemOf(exercise), adding: true })
         }
@@ -342,6 +338,8 @@ function LoadedWorkout({ workout, exercises }: { workout: WorkoutDetail; exercis
 function WorkoutEditor({ id }: { id: string | null }) {
   const workout = useWorkout(id);
   const catalog = useExercises();
+  // Read beside the workout and the catalog, but it never blocks the screen: a failure leaves the stars off.
+  const favorites = useExerciseFavorites();
 
   if (workout.status === "failed" && workout.errorCode === "NOT_FOUND") {
     return <WorkoutNotFound />;
@@ -356,7 +354,9 @@ function WorkoutEditor({ id }: { id: string | null }) {
     return <HomeSkeleton />;
   }
 
-  return <LoadedWorkout workout={workout.workout} exercises={catalog.exercises} />;
+  return (
+    <LoadedWorkout workout={workout.workout} exercises={catalog.exercises} favorites={favorites} />
+  );
 }
 
 /** Reads the id from the query string, which needs a `Suspense` boundary in a static export. */

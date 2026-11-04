@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HttpClientInterface, HttpRequest } from "../../../src/application";
-import { ok, type Exercise } from "../../../src/domain";
+import { ok, type CreateExerciseRequest, type Exercise } from "../../../src/domain";
 import { ExerciseRepository, HttpError } from "../../../src/infrastructure";
 
 const exercise: Exercise = {
@@ -11,6 +11,8 @@ const exercise: Exercise = {
   bodyPart: "LEGS",
   type: "STRENGTH",
   translations: [],
+  ownerId: null,
+  archivedAtUtc: null,
 };
 
 class FakeHttpClient implements HttpClientInterface {
@@ -62,6 +64,23 @@ describe("ExerciseRepository", () => {
       expect(result).toEqual(ok([cardio, unknown]));
     });
 
+    it("returns each exercise's owner and archive date unchanged", async () => {
+      // Arrange
+      const custom = {
+        ...exercise,
+        id: "4c5d6e7f-8091-4b2c-9d3e-4f5a6b7c8d9e",
+        ownerId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
+        archivedAtUtc: "2026-11-01T10:00:00Z",
+      };
+      const repository = new ExerciseRepository(new FakeHttpClient(async () => [exercise, custom]));
+
+      // Act
+      const result = await repository.getAll();
+
+      // Assert
+      expect(result).toEqual(ok([exercise, custom]));
+    });
+
     it("returns an empty list when the catalog is empty", async () => {
       // Arrange
       const repository = new ExerciseRepository(new FakeHttpClient(async () => []));
@@ -96,6 +115,105 @@ describe("ExerciseRepository", () => {
 
       // Act
       const result = await repository.getAll();
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("create", () => {
+    const request: CreateExerciseRequest = {
+      languageCode: "es",
+      name: "Remo con banda",
+      muscle: "MIDDLE_BACK",
+      type: "STRENGTH",
+    };
+    const created: Exercise = {
+      ...exercise,
+      id: "6a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d",
+      ownerId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
+    };
+
+    it("posts the request to /exercises as the body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => created);
+      const repository = new ExerciseRepository(httpClient);
+
+      // Act
+      await repository.create(request);
+
+      // Assert
+      expect(httpClient.requests).toEqual([{ method: "POST", path: "/exercises", body: request }]);
+    });
+
+    it("sends the video link when the request has one", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => created);
+      const repository = new ExerciseRepository(httpClient);
+      const withLink = { ...request, videoUrl: "https://www.youtube.com/watch?v=abc" };
+
+      // Act
+      await repository.create(withLink);
+
+      // Assert
+      expect(httpClient.requests[0]).toEqual({
+        method: "POST",
+        path: "/exercises",
+        body: withLink,
+      });
+    });
+
+    it("does not add a video link the request does not have", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => created);
+      const repository = new ExerciseRepository(httpClient);
+
+      // Act
+      await repository.create(request);
+
+      // Assert
+      expect(httpClient.requests[0]?.body).not.toHaveProperty("videoUrl");
+    });
+
+    it("returns the created exercise unchanged", async () => {
+      // Arrange
+      const repository = new ExerciseRepository(new FakeHttpClient(async () => created));
+
+      // Act
+      const result = await repository.create(request);
+
+      // Assert
+      expect(result).toEqual(ok(created));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => {
+        throw new HttpError(status, { status, detail: "Refused" });
+      });
+      const repository = new ExerciseRepository(httpClient);
+
+      // Act
+      const result = await repository.create(request);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+      const repository = new ExerciseRepository(httpClient);
+
+      // Act
+      const result = await repository.create(request);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

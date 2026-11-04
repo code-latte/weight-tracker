@@ -16,7 +16,8 @@ namespace WeightTracker.Api.Endpoints;
 /// A token without a usable subject, or whose user no longer exists, ends the request with
 /// <c>401</c> and the action never runs. Only then is <see cref="RequireRoleAttribute"/> checked
 /// against the stored role, so a caller that is not who the token says is never answered with <c>403</c>. Actions marked <c>[AllowAnonymous]</c> are not
-/// resolved and see a <c>null</c> <see cref="CurrentUser"/>.
+/// resolved and see a <c>null</c> <see cref="CurrentUser"/>, unless they also carry <see cref="OptionalCallerAttribute"/>
+/// and the request sends an <c>Authorization</c> header.
 /// </remarks>
 [Authorize]
 public abstract class AuthorizedController : ControllerBase, IAsyncActionFilter
@@ -40,16 +41,45 @@ public abstract class AuthorizedController : ControllerBase, IAsyncActionFilter
     [NonAction]
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        if (context.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
+        var metadata = context.ActionDescriptor.EndpointMetadata;
+
+        if (metadata.OfType<IAllowAnonymous>().Any())
         {
+            var optionalCaller = metadata.OfType<OptionalCallerAttribute>().Any()
+                && Request.Headers.ContainsKey("Authorization");
+
+            // A token that was sent but not accepted must not fall back to the anonymous result
+            if (optionalCaller && await ResolveCaller(context) == false)
+                return;
+
             await next();
             return;
         }
 
-        if (Id.TryFrom(User.FindFirst("sub")?.Value, out var callerId) == false)
+        if (await ResolveCaller(context) == false)
+            return;
+
+        var requiredRoles = metadata.OfType<RequireRoleAttribute>().FirstOrDefault()?.Roles;
+
+        if (requiredRoles is not null && requiredRoles.Contains(CurrentUser!.Role) == false)
+        {
+            context.Result = StatusCode(StatusCodes.Status403Forbidden);
+            return;
+        }
+
+        await next();
+    }
+
+    /// <summary>
+    /// Resolves <see cref="CurrentUser"/> from the token subject. Sets the result of the request and returns
+    /// <c>false</c> when the token has no usable subject or its user no longer exists.
+    /// </summary>
+    private async Task<bool> ResolveCaller(ActionExecutingContext context)
+    {
+        if (User.Identity?.IsAuthenticated != true || Id.TryFrom(User.FindFirst("sub")?.Value, out var callerId) == false)
         {
             context.Result = Unauthorized();
-            return;
+            return false;
         }
 
         try
@@ -59,17 +89,9 @@ public abstract class AuthorizedController : ControllerBase, IAsyncActionFilter
         catch (Exception exception)
         {
             context.Result = ExceptionMapper.Map(exception);
-            return;
+            return false;
         }
 
-        var requiredRoles = context.ActionDescriptor.EndpointMetadata.OfType<RequireRoleAttribute>().FirstOrDefault()?.Roles;
-
-        if (requiredRoles is not null && requiredRoles.Contains(CurrentUser.Role) == false)
-        {
-            context.Result = StatusCode(StatusCodes.Status403Forbidden);
-            return;
-        }
-
-        await next();
+        return true;
     }
 }

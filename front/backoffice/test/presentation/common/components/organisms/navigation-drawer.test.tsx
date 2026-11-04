@@ -122,6 +122,31 @@ describe("NavigationDrawer", () => {
     expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveClass("Mui-selected");
   });
 
+  it("links Catálogo de ejercicios to its screen, not selected elsewhere", async () => {
+    // Arrange & Act
+    await renderWithProviders(<NavigationDrawer />);
+
+    // Assert
+    const entry = screen.getByRole("link", { name: "Catálogo de ejercicios" });
+    expect(entry).toHaveAttribute("href", "/exercises");
+    expect(entry).not.toHaveClass("Mui-selected");
+  });
+
+  it("selects Catálogo de ejercicios and not Inicio on its screen", async () => {
+    // Arrange
+    navigation.pathname = "/exercises";
+
+    // Act
+    await renderWithProviders(<NavigationDrawer />);
+
+    // Assert
+    expect(screen.getByRole("link", { name: "Catálogo de ejercicios" })).toHaveClass(
+      "Mui-selected",
+    );
+    expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Planes asignados" })).not.toHaveClass("Mui-selected");
+  });
+
   it("keeps every other item without a link", async () => {
     // Arrange & Act
     await renderWithProviders(<NavigationDrawer />);
@@ -132,7 +157,13 @@ describe("NavigationDrawer", () => {
       within(nav)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Inicio", "Todos los atletas", "Invitaciones", "Planes asignados"]);
+    ).toEqual([
+      "Inicio",
+      "Todos los atletas",
+      "Invitaciones",
+      "Planes asignados",
+      "Catálogo de ejercicios",
+    ]);
   });
 
   it("shows an icon on every item", async () => {

@@ -101,19 +101,18 @@ public class OpenApiDocumentTests : IntegrationTest
     }
 
     [Theory]
-    [InlineData("/exercises")]
-    [InlineData("/exercises/{id}")]
-    public async Task ExercisePath_ShouldDocumentOnlyTheReadOperation(string path)
+    [InlineData("/exercises", new[] { "get", "post" })]
+    [InlineData("/exercises/{id}", new[] { "get", "put", "delete" })]
+    public async Task ExercisePath_ShouldDocumentTheReadAndWriteOperationsOnly(string path, string[] operations)
     {
         // Arrange & Act
         var document = await Document();
 
         // Assert
-        // Exercises are a read-only catalog: no write operation is served or documented
         document.GetProperty("paths").GetProperty(path).EnumerateObject()
             .Select(property => property.Name)
             .Where(name => name is "get" or "post" or "put" or "patch" or "delete")
-            .Should().Equal("get");
+            .Should().BeEquivalentTo(operations);
     }
 
     [Theory]
@@ -197,6 +196,72 @@ public class OpenApiDocumentTests : IntegrationTest
 
         // Assert
         var operation = Operation(document, "/users/me", method);
+
+        operation.GetProperty("security")[0].TryGetProperty("Bearer", out _).Should().BeTrue();
+        operation.GetProperty("responses").EnumerateObject().Select(property => property.Name)
+            .Should().Contain(statuses);
+    }
+
+    [Theory]
+    [InlineData("/exercises", "post", new[] { "201", "400", "401", "403" })]
+    [InlineData("/exercises/{id}", "put", new[] { "200", "400", "401", "403", "404", "409" })]
+    [InlineData("/exercises/{id}", "delete", new[] { "204", "401", "403", "404", "409" })]
+    public async Task ExerciseWrites_ShouldDocumentTheirSecurityAndResponses(string path, string method, string[] statuses)
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var operation = Operation(document, path, method);
+
+        operation.GetProperty("security")[0].TryGetProperty("Bearer", out _).Should().BeTrue();
+        operation.GetProperty("responses").EnumerateObject().Select(property => property.Name)
+            .Should().Contain(statuses);
+    }
+
+    [Theory]
+    [InlineData("/exercises", new[] { "200", "401" })]
+    [InlineData("/exercises/{id}", new[] { "200", "401", "404" })]
+    public async Task ExerciseReads_ShouldStayPublicAndDocumentTheInvalidTokenResponse(string path, string[] statuses)
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var operation = Operation(document, path, "get");
+
+        operation.TryGetProperty("security", out var security).Should().BeFalse(security.ToString());
+        operation.GetProperty("responses").EnumerateObject().Select(property => property.Name)
+            .Should().Contain(statuses);
+    }
+
+    [Fact]
+    public async Task Exercise_ShouldDocumentANullableOwnerAndArchiveDate()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var properties = document.GetProperty("components").GetProperty("schemas").GetProperty("ExerciseResponse").GetProperty("properties");
+
+        foreach (var name in new[] { "ownerId", "archivedAtUtc" })
+        {
+            var property = properties.GetProperty(name).GetRawText();
+            property.Should().Match(text => text.Contains("\"null\"") || text.Contains("\"nullable\": true") || text.Contains("\"nullable\":true"));
+        }
+    }
+
+    [Theory]
+    [InlineData("/exercise-favorites", "get", new[] { "200", "401" })]
+    [InlineData("/exercise-favorites/{exerciseId}", "put", new[] { "200", "401", "404", "409" })]
+    [InlineData("/exercise-favorites/{exerciseId}", "delete", new[] { "204", "401", "404" })]
+    public async Task ExerciseFavorites_ShouldDocumentTheirSecurityAndResponses(string path, string method, string[] statuses)
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var operation = Operation(document, path, method);
 
         operation.GetProperty("security")[0].TryGetProperty("Bearer", out _).Should().BeTrue();
         operation.GetProperty("responses").EnumerateObject().Select(property => property.Name)

@@ -5,8 +5,10 @@ import type {
   CreatedAthleteInvitation,
   CreatedUserResponse,
   CreateUserRequest,
+  CreateExerciseRequest,
   CreateWorkoutRequest,
   Exercise,
+  ExerciseFavorite,
   GetWorkoutByIdInput,
   InvitationResponseInput,
   InviteAthleteRequest,
@@ -32,6 +34,7 @@ import type {
 import type {
   AthleteInvitationRepositoryInterface,
   AuthRepositoryInterface,
+  ExerciseFavoriteRepositoryInterface,
   ExerciseRepositoryInterface,
   HttpClientInterface,
   KeyValueStoreInterface,
@@ -51,6 +54,7 @@ export default interface Dependencies {
   userRepository: UserRepositoryInterface;
   workoutRepository: WorkoutRepositoryInterface;
   exerciseRepository: ExerciseRepositoryInterface;
+  exerciseFavoriteRepository: ExerciseFavoriteRepositoryInterface;
   trainerAthleteRepository: TrainerAthleteRepositoryInterface;
   athleteInvitationRepository: AthleteInvitationRepositoryInterface;
   signupUseCase: UseCaseInterface<SignupCredentials, AuthResponse>;
@@ -77,6 +81,10 @@ export default interface Dependencies {
   removeExerciseFromWorkoutUseCase: UseCaseInterface<RemoveExerciseFromWorkoutInput, void>;
   reorderWorkoutExercisesUseCase: UseCaseInterface<ReorderWorkoutExercisesInput, WorkoutDetail>;
   getExercisesUseCase: UseCaseInterface<void, Exercise[]>;
+  createExerciseUseCase: UseCaseInterface<CreateExerciseRequest, Exercise>;
+  getExerciseFavoritesUseCase: UseCaseInterface<void, ExerciseFavorite[]>;
+  markExerciseFavoriteUseCase: UseCaseInterface<string, ExerciseFavorite>;
+  unmarkExerciseFavoriteUseCase: UseCaseInterface<string, void>;
   getMyAthletesUseCase: UseCaseInterface<void, TrainerAthlete[]>;
   getTrainerAthletesUseCase: UseCaseInterface<string, TrainerAthlete[]>;
   linkAthleteToTrainerUseCase: UseCaseInterface<TrainerAthleteInput, TrainerAthleteRelationship>;

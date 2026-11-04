@@ -20,6 +20,10 @@ public static class ExerciseMapper
             VideoUrl = exercise.VideoUrl?.Value,
             Muscle = (int)exercise.Muscle,
             Type = (int)exercise.Type,
+            OwnerId = exercise.OwnerId?.Value,
+            ArchivedAtUtc = exercise.ArchivedAtUtc is { } archivedAt
+                ? DateTime.SpecifyKind(archivedAt, DateTimeKind.Utc)
+                : null,
         };
 
         foreach (var translation in exercise.Translations)
@@ -55,7 +59,9 @@ public static class ExerciseMapper
                         Id.From(translation.Id),
                         LanguageCode.From(translation.LanguageCode),
                         ExerciseName.From(translation.Name)))
-                    .ToList());
+                    .ToList(),
+                entity.OwnerId is null ? null : Id.From(entity.OwnerId.Value),
+                entity.ArchivedAtUtc);
         }
         catch (DomainException exception)
         {

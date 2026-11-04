@@ -7,7 +7,7 @@ using Xunit;
 namespace WeightTracker.Unit.Domain.Exercises;
 
 /// <summary>
-/// Exercises are a read-only catalog, so restoring them is the only behaviour to cover.
+/// Covers restoring exercises, creating custom ones, and the actions that only custom exercises accept.
 /// </summary>
 public class ExerciseTests
 {
@@ -149,5 +149,187 @@ public class ExerciseTests
 
         // Assert
         exercise.Translations.Should().Equal(spanish);
+    }
+
+    private static readonly Id OwnerId = Id.New();
+
+    private static Exercise ACustomExercise(DateTime? archivedAtUtc = null)
+        => Exercise.Rehydrate(
+            Id.New(), null, null, Muscles.MIDDLE_BACK, ExerciseTypes.STRENGTH,
+            [ExerciseTranslation.Rehydrate(Id.New(), Spanish, PressDeBanca)], OwnerId, archivedAtUtc);
+
+    private static Exercise ASystemExercise()
+        => Exercise.Rehydrate(
+            Id.New(), BenchPress, Video, Muscles.CHEST, ExerciseTypes.STRENGTH,
+            [ExerciseTranslation.Rehydrate(Id.New(), Spanish, PressDeBanca)]);
+
+    [Fact]
+    public void Rehydrate_ShouldTreatAnExerciseWithoutOwnerAsASystemExercise()
+    {
+        // Arrange & Act
+        var exercise = ASystemExercise();
+
+        // Assert
+        exercise.IsSystem.Should().BeTrue();
+        exercise.OwnerId.Should().BeNull();
+        exercise.IsArchived.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Create_ShouldBuildANewCustomExerciseOwnedByTheCallerWithASingleTranslation()
+    {
+        // Arrange
+        var translation = ExerciseTranslation.Create(Spanish, PressDeBanca);
+
+        // Act
+        var exercise = Exercise.Create(OwnerId, translation, Muscles.MIDDLE_BACK, ExerciseTypes.STRENGTH, Video);
+
+        // Assert
+        exercise.IsNew.Should().BeTrue();
+        exercise.IsSystem.Should().BeFalse();
+        exercise.OwnerId.Should().Be(OwnerId);
+        exercise.FreeExerciseDbId.Should().BeNull();
+        exercise.IsArchived.Should().BeFalse();
+        exercise.BodyPart.Should().Be(BodyParts.BACK);
+        exercise.VideoUrl.Should().Be(Video);
+        exercise.Translations.Should().Equal(translation);
+    }
+
+    [Fact]
+    public void Create_ShouldRejectAnUndefinedMuscle()
+    {
+        // Arrange
+        var translation = ExerciseTranslation.Create(Spanish, PressDeBanca);
+
+        // Act
+        var act = () => Exercise.Create(OwnerId, translation, (Muscles)999, ExerciseTypes.STRENGTH, null);
+
+        // Assert
+        act.Should().Throw<InvalidMuscleException>();
+    }
+
+    [Fact]
+    public void UpdateDetails_ShouldReplaceTheTranslationOfTheSameLanguage()
+    {
+        // Arrange
+        var exercise = ACustomExercise();
+        var renamed = ExerciseTranslation.Create(Spanish, ExerciseName.From("Remo con goma"));
+
+        // Act
+        exercise.UpdateDetails(renamed, Muscles.LATS, ExerciseTypes.CARDIO, Video);
+
+        // Assert
+        exercise.Translations.Should().Equal(renamed);
+        exercise.Muscle.Should().Be(Muscles.LATS);
+        exercise.Type.Should().Be(ExerciseTypes.CARDIO);
+        exercise.VideoUrl.Should().Be(Video);
+    }
+
+    [Fact]
+    public void UpdateDetails_ShouldAddANewLanguageAndKeepTheOthers()
+    {
+        // Arrange
+        var exercise = ACustomExercise();
+        var original = exercise.Translations.Single();
+        var english = ExerciseTranslation.Create(English, BenchPressName);
+
+        // Act
+        exercise.UpdateDetails(english, Muscles.MIDDLE_BACK, ExerciseTypes.STRENGTH, null);
+
+        // Assert
+        exercise.Translations.Should().BeEquivalentTo([original, english]);
+    }
+
+    [Fact]
+    public void UpdateDetails_ShouldChangeNothingWhenTheMuscleIsInvalid()
+    {
+        // Arrange
+        var exercise = ACustomExercise();
+        var original = exercise.Translations.Single();
+
+        // Act
+        var act = () => exercise.UpdateDetails(
+            ExerciseTranslation.Create(Spanish, BenchPressName), (Muscles)999, ExerciseTypes.CARDIO, Video);
+
+        // Assert
+        act.Should().Throw<InvalidMuscleException>();
+        exercise.Translations.Should().Equal(original);
+        exercise.Muscle.Should().Be(Muscles.MIDDLE_BACK);
+        exercise.Type.Should().Be(ExerciseTypes.STRENGTH);
+        exercise.VideoUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public void UpdateDetails_ShouldRejectASystemExercise()
+    {
+        // Arrange
+        var exercise = ASystemExercise();
+
+        // Act
+        var act = () => exercise.UpdateDetails(
+            ExerciseTranslation.Create(Spanish, BenchPressName), Muscles.LATS, ExerciseTypes.CARDIO, null);
+
+        // Assert
+        act.Should().Throw<SystemExerciseNotEditableException>();
+        exercise.Muscle.Should().Be(Muscles.CHEST);
+    }
+
+    [Fact]
+    public void UpdateDetails_ShouldRejectAnArchivedExercise()
+    {
+        // Arrange
+        var exercise = ACustomExercise(archivedAtUtc: new DateTime(2026, 11, 1));
+
+        // Act
+        var act = () => exercise.UpdateDetails(
+            ExerciseTranslation.Create(Spanish, BenchPressName), Muscles.LATS, ExerciseTypes.CARDIO, null);
+
+        // Assert
+        act.Should().Throw<ExerciseArchivedException>();
+        exercise.Muscle.Should().Be(Muscles.MIDDLE_BACK);
+    }
+
+    [Fact]
+    public void Archive_ShouldRecordWhenTheExerciseWasArchived()
+    {
+        // Arrange
+        var exercise = ACustomExercise();
+        var now = new DateTime(2026, 11, 3, 10, 0, 0, DateTimeKind.Utc);
+
+        // Act
+        exercise.Archive(now);
+
+        // Assert
+        exercise.IsArchived.Should().BeTrue();
+        exercise.ArchivedAtUtc.Should().Be(now);
+    }
+
+    [Fact]
+    public void Archive_ShouldRejectASystemExercise()
+    {
+        // Arrange
+        var exercise = ASystemExercise();
+
+        // Act
+        var act = () => exercise.Archive(new DateTime(2026, 11, 3));
+
+        // Assert
+        act.Should().Throw<SystemExerciseNotEditableException>();
+        exercise.IsArchived.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Archive_ShouldRejectAnAlreadyArchivedExerciseAndKeepTheFirstDate()
+    {
+        // Arrange
+        var first = new DateTime(2026, 11, 1);
+        var exercise = ACustomExercise(archivedAtUtc: first);
+
+        // Act
+        var act = () => exercise.Archive(new DateTime(2026, 11, 3));
+
+        // Assert
+        act.Should().Throw<ExerciseArchivedException>();
+        exercise.ArchivedAtUtc.Should().Be(first);
     }
 }

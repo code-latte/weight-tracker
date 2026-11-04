@@ -35,6 +35,8 @@ public class WeightTrackerDbContext : DbContext
 
     public DbSet<TrainerInvitationEntity> TrainerInvitations => Set<TrainerInvitationEntity>();
 
+    public DbSet<ExerciseFavoriteEntity> FavoriteExercises => Set<ExerciseFavoriteEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserEntity>(entity =>
@@ -63,8 +65,11 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(exercise => exercise.VideoUrl).HasColumnName("VideoUrl").HasMaxLength(Url.MaxLength);
             entity.Property(exercise => exercise.Muscle).HasColumnName("Muscle");
             entity.Property(exercise => exercise.Type).HasColumnName("Type");
+            entity.Property(exercise => exercise.OwnerId).HasColumnName("OwnerId");
+            entity.Property(exercise => exercise.ArchivedAtUtc).HasColumnName("ArchivedAtUtc").HasColumnType("timestamptz");
 
             entity.HasIndex(exercise => exercise.FreeExerciseDbId).IsUnique();
+            entity.HasIndex(exercise => exercise.OwnerId);
 
             entity.HasMany(exercise => exercise.Translations)
                 .WithOne()
@@ -202,6 +207,27 @@ public class WeightTrackerDbContext : DbContext
             entity.HasOne<UserEntity>()
                 .WithMany()
                 .HasForeignKey(relationship => relationship.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExerciseFavoriteEntity>(entity =>
+        {
+            entity.ToTable("FavoriteExercises");
+            entity.HasKey(favorite => favorite.Id);
+            entity.Property(favorite => favorite.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(favorite => favorite.UserId).HasColumnName("UserId");
+            entity.Property(favorite => favorite.ExerciseId).HasColumnName("ExerciseId");
+            entity.Property(favorite => favorite.CreatedAtUtc).HasColumnName("CreatedAtUtc").HasColumnType("timestamptz");
+            entity.HasIndex(favorite => new { favorite.UserId, favorite.ExerciseId }).IsUnique();
+
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(favorite => favorite.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<ExerciseEntity>()
+                .WithMany()
+                .HasForeignKey(favorite => favorite.ExerciseId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

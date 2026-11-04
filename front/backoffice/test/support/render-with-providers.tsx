@@ -48,7 +48,15 @@ const unusedDependencies: Registrations<Dependencies> = {
     removeExercise: async () => undefined as never,
     reorderExercises: async () => undefined as never,
   }),
-  exerciseRepository: () => ({ getAll: async () => undefined as never }),
+  exerciseRepository: () => ({
+    getAll: async () => undefined as never,
+    create: async () => undefined as never,
+  }),
+  exerciseFavoriteRepository: () => ({
+    getAll: async () => undefined as never,
+    mark: async () => undefined as never,
+    unmark: async () => undefined as never,
+  }),
   trainerAthleteRepository: () => ({
     getMine: async () => undefined as never,
     getByTrainer: async () => undefined as never,
@@ -86,6 +94,10 @@ const unusedDependencies: Registrations<Dependencies> = {
   removeExerciseFromWorkoutUseCase: () => ({ execute: async () => undefined as never }),
   reorderWorkoutExercisesUseCase: () => ({ execute: async () => undefined as never }),
   getExercisesUseCase: () => ({ execute: async () => undefined as never }),
+  createExerciseUseCase: () => ({ execute: async () => undefined as never }),
+  getExerciseFavoritesUseCase: () => ({ execute: async () => undefined as never }),
+  markExerciseFavoriteUseCase: () => ({ execute: async () => undefined as never }),
+  unmarkExerciseFavoriteUseCase: () => ({ execute: async () => undefined as never }),
   getMyAthletesUseCase: () => ({ execute: async () => undefined as never }),
   getTrainerAthletesUseCase: () => ({ execute: async () => undefined as never }),
   linkAthleteToTrainerUseCase: () => ({ execute: async () => undefined as never }),

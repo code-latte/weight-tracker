@@ -2,6 +2,7 @@ using FluentAssertions;
 using WeightTracker.Domain.AthleteInvitations;
 using WeightTracker.Domain.Auth;
 using WeightTracker.Domain.Common;
+using WeightTracker.Domain.ExerciseFavorites;
 using WeightTracker.Domain.Exercises;
 using WeightTracker.Domain.TrainerAthletes;
 using WeightTracker.Domain.Users;
@@ -247,6 +248,57 @@ public class AggregateMapperTests
                 ExerciseTranslation.Rehydrate(Id.New(), LanguageCode.From("es"), ExerciseName.From("Plancha")),
                 ExerciseTranslation.Rehydrate(Id.New(), LanguageCode.From("en"), ExerciseName.From("Plank")),
             ]);
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveTheOwnerAndTheArchiveDateOfACustomExercise()
+        {
+            // Arrange
+            var ownerId = Id.New();
+            var archivedAt = new DateTime(2026, 11, 3, 9, 30, 0, DateTimeKind.Utc);
+            var original = Exercise.Rehydrate(
+                Id.New(), null, null, Muscles.MIDDLE_BACK, ExerciseTypes.STRENGTH,
+                [ExerciseTranslation.Rehydrate(Id.New(), LanguageCode.From("es"), ExerciseName.From("Remo con banda"))],
+                ownerId, archivedAt);
+
+            // Act
+            var restored = ExerciseMapper.MapToDomain(ExerciseMapper.MapToEntity(original));
+
+            // Assert
+            restored.OwnerId.Should().Be(ownerId);
+            restored.IsSystem.Should().BeFalse();
+            restored.ArchivedAtUtc.Should().Be(archivedAt);
+            restored.IsArchived.Should().BeTrue();
+        }
+
+        [Fact]
+        public void RoundTrip_ShouldRestoreASystemExerciseWithoutOwnerOrArchiveDate()
+        {
+            // Arrange
+            var original = AStoredExercise();
+
+            // Act
+            var restored = ExerciseMapper.MapToDomain(ExerciseMapper.MapToEntity(original));
+
+            // Assert
+            restored.OwnerId.Should().BeNull();
+            restored.IsSystem.Should().BeTrue();
+            restored.ArchivedAtUtc.Should().BeNull();
+        }
+
+        [Fact]
+        public void MapToEntity_ShouldStoreTheArchiveDateAsUtc()
+        {
+            // Arrange
+            var exercise = Exercise.Rehydrate(
+                Id.New(), null, null, Muscles.MIDDLE_BACK, ExerciseTypes.STRENGTH, [],
+                Id.New(), new DateTime(2026, 11, 3, 9, 30, 0, DateTimeKind.Unspecified));
+
+            // Act
+            var entity = ExerciseMapper.MapToEntity(exercise);
+
+            // Assert
+            entity.ArchivedAtUtc!.Value.Kind.Should().Be(DateTimeKind.Utc);
+        }
 
         [Fact]
         public void RoundTrip_ShouldPreserveEveryFieldAndEveryTranslation()
@@ -567,6 +619,57 @@ public class AggregateMapperTests
 
             // Act
             var act = () => TrainerAthleteMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+    }
+
+    public class ExerciseFavorites
+    {
+        private static readonly DateTime Added = new(2026, 11, 3, 10, 0, 0, DateTimeKind.Utc);
+
+        private static ExerciseFavorite AFavorite() => ExerciseFavorite.Create(Id.New(), Id.New(), Added);
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveEveryField()
+        {
+            // Arrange
+            var original = AFavorite();
+
+            // Act
+            var restored = ExerciseFavoriteMapper.MapToDomain(ExerciseFavoriteMapper.MapToEntity(original));
+
+            // Assert
+            restored.Id.Should().Be(original.Id);
+            restored.UserId.Should().Be(original.UserId);
+            restored.ExerciseId.Should().Be(original.ExerciseId);
+            restored.CreatedAtUtc.Should().Be(Added);
+            restored.IsNew.Should().BeFalse();
+        }
+
+        [Fact]
+        public void MapToEntity_ShouldStoreTheDateAsUtc()
+        {
+            // Arrange
+            var favorite = ExerciseFavorite.Rehydrate(Id.New(), Id.New(), Id.New(), new DateTime(2026, 11, 3, 10, 0, 0, DateTimeKind.Unspecified));
+
+            // Act
+            var entity = ExerciseFavoriteMapper.MapToEntity(favorite);
+
+            // Assert
+            entity.CreatedAtUtc.Kind.Should().Be(DateTimeKind.Utc);
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAnEmptyExerciseIdentifier()
+        {
+            // Arrange
+            var entity = ExerciseFavoriteMapper.MapToEntity(AFavorite());
+            entity.ExerciseId = Guid.Empty;
+
+            // Act
+            var act = () => ExerciseFavoriteMapper.MapToDomain(entity);
 
             // Assert
             act.Should().Throw<PersistenceMappingException>();

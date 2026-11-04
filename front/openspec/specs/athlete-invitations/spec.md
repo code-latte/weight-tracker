@@ -1,6 +1,7 @@
 # athlete-invitations Specification
 
 ## Purpose
+
 Lets both fronts list, send, revoke, accept and reject athlete invitations through the API, with the invite form's
 structural rules shared in one place and every failure returned as a `DomainError` code.
 

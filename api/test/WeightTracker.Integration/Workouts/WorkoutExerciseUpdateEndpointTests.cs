@@ -455,4 +455,24 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
         stored.GetProperty("restMinutes").GetDecimal().Should().Be(2m);
         SetsOf(stored).Should().Equal((2, "Reps", (int?)12));
     }
+
+    [Fact]
+    public async Task Put_ShouldKeepAnEntryEditableAfterItsExerciseIsArchived()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var created = await trainer.PostAsJsonAsync("/exercises", new { languageCode = "es", name = "Remo con banda", muscle = "MIDDLE_BACK", type = "STRENGTH" });
+        var custom = (await created.Content.ReadFromJsonAsync<JsonElement>(JsonOptions)).GetProperty("id").GetGuid();
+        (await trainer.PostAsJsonAsync(ExercisesRoute(SeedData.TrainedWorkoutId), Body(custom, "MID", Reps(3, 10)))).EnsureSuccessStatusCode();
+        (await trainer.DeleteAsync($"/exercises/{custom}")).EnsureSuccessStatusCode();
+
+        // Act
+        var response = await trainer.PutAsJsonAsync(ExerciseRoute(SeedData.TrainedWorkoutId, custom), Body(custom, "HIGH", Reps(4, 8)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stored = (await EntriesOf(SeedData.TrainedWorkoutId)).Single(entry => entry.GetProperty("exerciseId").GetGuid() == custom);
+        stored.GetProperty("effort").GetString().Should().Be("HIGH");
+        SetsOf(stored).Should().Equal((4, "Reps", (int?)8));
+    }
 }

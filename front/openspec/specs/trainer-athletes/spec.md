@@ -1,6 +1,7 @@
 # trainer-athletes Specification
 
 ## Purpose
+
 Lets both fronts read and change the relationship between a trainer and their athletes through the API, returning
 what the API answers unchanged and every failure as a `DomainError` code.
 

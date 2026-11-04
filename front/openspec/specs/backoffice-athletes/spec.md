@@ -1,6 +1,7 @@
 # backoffice-athletes Specification
 
 ## Purpose
+
 Gives a trainer one searchable table of their current athletes in the backoffice, so they can find any of them by
 name or email.
 

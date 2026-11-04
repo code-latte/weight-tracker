@@ -38,6 +38,30 @@
     "noTrainers": "No trainers match.",
     "retry": "Retry"
   },
+  "exerciseCatalog": {
+    "title": "Exercise catalog",
+    "add": "Add exercise",
+    "create": {
+      "title": "New exercise",
+      "fields": {
+        "name": "Name",
+        "muscle": "Muscle",
+        "type": "Type",
+        "videoUrl": "Video link"
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "create": "Create"
+      },
+      "validation": {
+        "required": "This field is required.",
+        "minLength": "Must be at least {{min}} characters.",
+        "maxLength": "It cannot be longer than {{max}} characters.",
+        "url": "Enter a valid web address (http or https)."
+      }
+    },
+    "watchVideo": "Watch video"
+  },
   "workout": {
     "catalog": {
       "filter": "Search exercise",
@@ -47,7 +71,18 @@
       "close": "Close",
       "bodyParts": "Body parts",
       "muscles": "Muscles",
-      "types": "Type"
+      "types": "Type",
+      "sections": {
+        "label": "Sections",
+        "ALL": "All",
+        "MINE": "My exercises",
+        "FAVORITES": "Favorites"
+      },
+      "favorite": {
+        "add": "Add to favorites",
+        "remove": "Remove from favorites",
+        "loadError": "Favorites could not be loaded"
+      }
     },
     "details": {
       "save": "Save",

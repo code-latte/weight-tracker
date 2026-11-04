@@ -2,6 +2,7 @@ using FluentAssertions;
 using Moq;
 using WeightTracker.Application.Exceptions;
 using WeightTracker.Application.Interfaces;
+using WeightTracker.Application.Services;
 using WeightTracker.Application.UseCases.Workouts;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exercises;
@@ -21,7 +22,7 @@ public class GetAllWorkoutsUseCaseTests
 
     private readonly Mock<IUserRepository> _users = new(MockBehavior.Strict);
 
-    private GetAllWorkoutsUseCase AUseCase() => new(_workouts.Object, _exercises.Object, _users.Object);
+    private GetAllWorkoutsUseCase AUseCase() => new(new WorkoutVisibility(_workouts.Object), _exercises.Object, _users.Object);
 
     private static Workout AWorkout(Id ownerId, params Id[] exerciseIds) =>
         Workout.Rehydrate(

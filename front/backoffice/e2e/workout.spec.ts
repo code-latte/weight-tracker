@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { mockUsersMe } from "./support/users-me";
+import { completeProfile, mockUsersMe } from "./support/users-me";
 
 const api = "http://localhost:5199";
 const cors = {
@@ -53,6 +53,8 @@ const catalog = [
       { languageCode: "es", name: "Sentadilla" },
       { languageCode: "en", name: "Squat" },
     ],
+    ownerId: null,
+    archivedAtUtc: null,
   },
 ];
 
@@ -67,6 +69,8 @@ const benchPress = {
     { languageCode: "es", name: "Press de banca" },
     { languageCode: "en", name: "Bench press" },
   ],
+  ownerId: null,
+  archivedAtUtc: null,
 };
 
 function entryFor(id: string, exerciseId: string) {
@@ -124,6 +128,8 @@ interface MockOptions {
   exercises?: unknown[];
   /** The status `PUT /workouts/{id}/exercises/order` answers with; on 200 it stores the new order. */
   orderStatus?: number;
+  /** The exercises that are already the user's favorites. */
+  favoriteIds?: string[];
 }
 
 /** The bodies of the exercise requests the screen sent, in the order they were sent. */
@@ -131,6 +137,19 @@ interface SentRequests {
   additions: unknown[];
   updates: unknown[];
   reorders: unknown[];
+  /** The exercise ids marked and unmarked as favorites. */
+  marks: string[];
+  unmarks: string[];
+  /** The bodies of the `POST /exercises` requests. */
+  creations: SentNewExercise[];
+}
+
+interface SentNewExercise {
+  languageCode: string;
+  name: string;
+  muscle: string;
+  type: string;
+  videoUrl?: string;
 }
 
 interface SentSet {
@@ -180,14 +199,24 @@ function entryOf(
  */
 async function mockWorkoutsApi(
   page: Page,
-  { exercises = catalog, orderStatus = 200 }: MockOptions,
+  { exercises = catalog, orderStatus = 200, favoriteIds = [] }: MockOptions,
 ) {
   const workouts = new Map<string, StoredWorkout>([
     [existing.id, existing],
     [reorderable.id, reorderable],
     [crowded.id, crowded],
   ]);
-  const sent: SentRequests = { additions: [], updates: [], reorders: [] };
+  const sent: SentRequests = {
+    additions: [],
+    updates: [],
+    reorders: [],
+    marks: [],
+    unmarks: [],
+    creations: [],
+  };
+  // The catalog the API holds: creating an exercise adds one, owned by the signed-in user.
+  const stored = [...exercises];
+  const favorites = new Map<string, string>(favoriteIds.map((id) => [id, "2026-11-01T09:00:00Z"]));
 
   await page.route(`${api}/trainer-athletes`, (route) =>
     route.request().method() === "OPTIONS"
@@ -315,11 +344,54 @@ async function mockWorkoutsApi(
     workouts.set(workoutId, reordered);
     return route.fulfill(json(reordered));
   });
-  await page.route(`${api}/exercises`, (route) =>
+  await page.route(`${api}/exercises`, (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    if (request.method() === "POST") {
+      const body = request.postDataJSON() as SentNewExercise;
+      sent.creations.push(body);
+      const created = {
+        id: `9e8d7c6b-5a49-4837-9625-14033f2e1d0c`,
+        freeExerciseDbId: null,
+        videoUrl: body.videoUrl ?? null,
+        muscle: body.muscle,
+        bodyPart: "BACK",
+        type: body.type,
+        translations: [{ languageCode: body.languageCode, name: body.name }],
+        ownerId: completeProfile.id,
+        archivedAtUtc: null,
+      };
+      stored.push(created);
+      return route.fulfill(json(created, 201));
+    }
+    return route.fulfill(json(stored));
+  });
+  await page.route(`${api}/exercise-favorites`, (route) =>
     route.request().method() === "OPTIONS"
       ? route.fulfill({ status: 204, headers: cors })
-      : route.fulfill(json(exercises)),
+      : route.fulfill(
+          json([...favorites].map(([exerciseId, createdAtUtc]) => ({ exerciseId, createdAtUtc }))),
+        ),
   );
+  // Marking keeps the first date and unmarking what is not a favorite succeeds too, as the API does.
+  await page.route(`${api}/exercise-favorites/*`, (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    const exerciseId = new URL(request.url()).pathname.split("/").pop() ?? "";
+    if (request.method() === "PUT") {
+      sent.marks.push(exerciseId);
+      const createdAtUtc = favorites.get(exerciseId) ?? "2026-11-03T09:30:00Z";
+      favorites.set(exerciseId, createdAtUtc);
+      return route.fulfill(json({ exerciseId, createdAtUtc }));
+    }
+    sent.unmarks.push(exerciseId);
+    favorites.delete(exerciseId);
+    return route.fulfill({ status: 204, headers: cors });
+  });
   return sent;
 }
 
@@ -705,7 +777,10 @@ test("shows the catalog's exercises as cards in rows of at most three", async ({
   await page.getByRole("button", { name: "Añadir ejercicio" }).click();
 
   // Assert
-  const items = page.getByRole("dialog", { name: "Catálogo de ejercicios" }).getByRole("listitem");
+  const items = page
+    .getByRole("dialog", { name: "Catálogo de ejercicios" })
+    .getByRole("list", { name: "Catálogo de ejercicios" })
+    .getByRole("listitem");
   await expect(items).toHaveCount(5);
   const boxes = await Promise.all(
     [0, 1, 2, 3].map(async (index) => (await items.nth(index).boundingBox())!),
@@ -765,4 +840,259 @@ test("puts the previous order back and shows the error when the reorder is refus
   await expect(items.nth(0)).toContainText("Sentadilla");
   await expect(items.nth(1)).toContainText("Press de banca");
   expect(reorders).toHaveLength(1);
+});
+
+/** Opens the catalog dialog from the exercises card and resolves to it. */
+async function openCatalog(page: Page) {
+  await page.getByRole("button", { name: "Añadir ejercicio" }).click();
+  return page.getByRole("dialog", { name: "Catálogo de ejercicios" });
+}
+
+test("marks an exercise as a favorite, finds it under Favoritos and adds it to the workout", async ({
+  page,
+}) => {
+  // Arrange
+  const sent = await signIn(page, { exercises: [...catalog, benchPress] });
+  await page.goto(`/workout?id=${existing.id}`);
+  const catalogDialog = await openCatalog(page);
+  const card = catalogDialog.getByRole("listitem").filter({ hasText: "Press de banca" });
+  await card.getByRole("button", { name: "Añadir a favoritos" }).click();
+  await expect(card.getByRole("button", { name: "Quitar de favoritos" })).toBeVisible();
+  await catalogDialog.getByRole("button", { name: "Favoritos", exact: true }).click();
+  await expect(
+    catalogDialog.getByRole("list", { name: "Catálogo de ejercicios" }).getByRole("listitem"),
+  ).toHaveCount(1);
+  await card.getByRole("button", { name: "Elegir ejercicio" }).click();
+  const dialog = page.getByRole("dialog", { name: "Configuración del ejercicio" });
+  await dialog.getByRole("combobox", { name: "Esfuerzo" }).click();
+  await page.getByRole("option", { name: "RIR 0", exact: true }).click();
+  const form = dialog.getByRole("group", { name: "Añadir serie" });
+  await form.getByRole("spinbutton", { name: "Series" }).fill("2");
+  await form.getByRole("spinbutton", { name: "Valor" }).fill("15");
+  await dialog.getByRole("button", { name: "Añadir serie" }).click();
+
+  // Act
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+
+  // Assert
+  await expect(dialog).toBeHidden();
+  expect(sent.marks).toEqual([benchPress.id]);
+  expect(sent.additions).toEqual([
+    {
+      exerciseId: benchPress.id,
+      effort: "HIGH",
+      sets: [{ count: 2, targetType: "Reps", target: 15 }],
+      perSide: false,
+    },
+  ]);
+  await expect(
+    page.getByRole("region", { name: "Ejercicios" }).getByText("Press de banca"),
+  ).toBeVisible();
+});
+
+test("keeps a favorite after a reload and lists it under Favoritos", async ({ page }) => {
+  // Arrange
+  await signIn(page, { exercises: [...catalog, benchPress] });
+  await page.goto(`/workout?id=${existing.id}`);
+  const before = await openCatalog(page);
+  await before
+    .getByRole("listitem")
+    .filter({ hasText: "Press de banca" })
+    .getByRole("button", { name: "Añadir a favoritos" })
+    .click();
+  await expect(before.getByRole("button", { name: "Quitar de favoritos" })).toBeVisible();
+
+  // Act
+  await page.reload();
+
+  // Assert
+  const catalogDialog = await openCatalog(page);
+  await catalogDialog.getByRole("button", { name: "Favoritos", exact: true }).click();
+  const cards = catalogDialog
+    .getByRole("list", { name: "Catálogo de ejercicios" })
+    .getByRole("listitem");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText("Press de banca");
+  await expect(cards.first().getByRole("button", { name: "Quitar de favoritos" })).toBeVisible();
+});
+
+test("unmarks a favorite and leaves it out of Favoritos", async ({ page }) => {
+  // Arrange
+  const sent = await signIn(page, {
+    exercises: [...catalog, benchPress],
+    favoriteIds: [benchPress.id],
+  });
+  await page.goto(`/workout?id=${existing.id}`);
+  const catalogDialog = await openCatalog(page);
+  await catalogDialog.getByRole("button", { name: "Favoritos", exact: true }).click();
+  const card = catalogDialog.getByRole("listitem").filter({ hasText: "Press de banca" });
+
+  // Act
+  await card.getByRole("button", { name: "Quitar de favoritos" }).click();
+
+  // Assert
+  await expect(catalogDialog.getByText("Ningún ejercicio coincide con el filtro.")).toBeVisible();
+  expect(sent.unmarks).toEqual([benchPress.id]);
+  expect(sent.marks).toHaveLength(0);
+});
+
+test("opens the catalog at 90% of a wide viewport, with the sections beside the filters", async ({
+  page,
+}) => {
+  // Arrange
+  await signIn(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/workout?id=${existing.id}`);
+
+  // Act
+  const catalogDialog = await openCatalog(page);
+
+  // Assert
+  const dialogBox = (await catalogDialog.boundingBox())!;
+  expect(dialogBox.width).toBeGreaterThanOrEqual(1440 * 0.9 - 1);
+  const sections = (await catalogDialog.getByRole("list", { name: "Secciones" }).boundingBox())!;
+  const filter = (await catalogDialog
+    .getByRole("searchbox", { name: "Buscar ejercicio" })
+    .boundingBox())!;
+  expect(sections.x + sections.width).toBeLessThanOrEqual(filter.x);
+});
+
+test("keeps the catalog dialog the same height whatever the filters leave", async ({ page }) => {
+  // Arrange
+  await signIn(page, { exercises: [...catalog, benchPress] });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/workout?id=${existing.id}`);
+  const catalogDialog = await openCatalog(page);
+  const initial = (await catalogDialog.boundingBox())!.height;
+
+  // Act
+  await catalogDialog.getByRole("button", { name: "Mis ejercicios", exact: true }).click();
+  await expect(catalogDialog.getByText("Ningún ejercicio coincide con el filtro.")).toBeVisible();
+
+  // Assert
+  expect((await catalogDialog.boundingBox())!.height).toBe(initial);
+});
+
+test("opens the catalog page from the menu, creates an exercise and finds it under Mis ejercicios", async ({
+  page,
+}) => {
+  // Arrange
+  const sent = await signIn(page, { exercises: [...catalog, benchPress] });
+  await page.goto("/");
+  await page.getByRole("link", { name: "Catálogo de ejercicios" }).click();
+  await expect(page).toHaveURL(/\/exercises\/?$/);
+  await expect(
+    page.getByRole("heading", { name: "Catálogo de ejercicios", level: 1 }),
+  ).toBeVisible();
+  const cards = page.getByRole("list", { name: "Catálogo de ejercicios" }).getByRole("listitem");
+  await expect(cards).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Elegir ejercicio" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Añadir ejercicio" }).click();
+  const dialog = page.getByRole("dialog", { name: "Nuevo ejercicio" });
+  await dialog.getByRole("textbox", { name: "Nombre" }).fill("Remo con banda");
+  await dialog.getByRole("combobox", { name: "Músculo" }).click();
+  await page.getByRole("option", { name: "Espalda media" }).click();
+  await dialog.getByRole("combobox", { name: "Tipo" }).click();
+  await page.getByRole("option", { name: "Fuerza", exact: true }).click();
+
+  // Act
+  await dialog.getByRole("button", { name: "Crear" }).click();
+
+  // Assert
+  await expect(dialog).toBeHidden();
+  await expect(cards).toHaveCount(3);
+  await page.getByRole("button", { name: "Mis ejercicios", exact: true }).click();
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText("Remo con banda");
+  expect(sent.creations).toEqual([
+    { languageCode: "es", name: "Remo con banda", muscle: "MIDDLE_BACK", type: "STRENGTH" },
+  ]);
+});
+
+test("marks a favorite from the catalog page and finds it under Favoritos", async ({ page }) => {
+  // Arrange
+  const sent = await signIn(page, { exercises: [...catalog, benchPress] });
+  await page.goto("/exercises");
+  const cards = page.getByRole("list", { name: "Catálogo de ejercicios" }).getByRole("listitem");
+  const card = cards.filter({ hasText: "Press de banca" });
+  await expect(cards).toHaveCount(2);
+
+  // Act
+  await card.getByRole("button", { name: "Añadir a favoritos" }).click();
+
+  // Assert
+  await expect(card.getByRole("button", { name: "Quitar de favoritos" })).toBeVisible();
+  expect(sent.marks).toEqual([benchPress.id]);
+  await page.getByRole("button", { name: "Favoritos", exact: true }).click();
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText("Press de banca");
+});
+
+test("keeps the finder, the pills and the sections fixed on the catalog page, and scrolls only the list", async ({
+  page,
+}) => {
+  // Arrange
+  const many = Array.from({ length: 30 }, (_, index) => ({
+    ...benchPress,
+    id: `4d5e6f7a-8b9c-4d0e-8f1a-2b3c4d5e6f${String(index).padStart(2, "0")}`,
+    translations: [
+      { languageCode: "es", name: `Ejercicio ${index}` },
+      { languageCode: "en", name: `Exercise ${index}` },
+    ],
+  }));
+  await signIn(page, { exercises: many });
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await page.goto("/exercises");
+  const list = page.getByRole("list", { name: "Catálogo de ejercicios" });
+  await expect(list.getByRole("listitem")).toHaveCount(30);
+  const finder = page.getByRole("searchbox", { name: "Buscar ejercicio" });
+  const sections = page.getByRole("list", { name: "Secciones" });
+  const before = {
+    finder: (await finder.boundingBox())!.y,
+    sections: (await sections.boundingBox())!.y,
+  };
+
+  // Act
+  await list.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+
+  // Assert
+  expect(await list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect((await finder.boundingBox())!.y).toBe(before.finder);
+  expect((await sections.boundingBox())!.y).toBe(before.sections);
+  await expect(finder).toBeInViewport();
+});
+
+test("shows the English name and plays the video from the catalog page, and neither video nor page-only button in the selector", async ({
+  page,
+}) => {
+  // Arrange
+  const withVideo = {
+    ...catalog[0]!,
+    videoUrl: "https://www.youtube.com/watch?v=h_yZV27H684",
+  };
+  await signIn(page, { exercises: [withVideo, benchPress] });
+  await page.goto("/exercises");
+  const cards = page.getByRole("list", { name: "Catálogo de ejercicios" }).getByRole("listitem");
+  const card = cards.filter({ hasText: "Sentadilla" });
+  await expect(card.getByText("Squat")).toBeVisible();
+  await expect(
+    cards.filter({ hasText: "Press de banca" }).getByRole("button", { name: "Ver vídeo" }),
+  ).toHaveCount(0);
+
+  // Act
+  await card.getByRole("button", { name: "Ver vídeo" }).click();
+
+  // Assert
+  const dialog = page.getByRole("dialog", { name: "Sentadilla" });
+  await expect(dialog.locator("iframe")).toHaveAttribute(
+    "src",
+    "https://www.youtube-nocookie.com/embed/h_yZV27H684",
+  );
+  await dialog.getByRole("button", { name: "Cerrar" }).click();
+  await expect(dialog).toBeHidden();
+  await page.goto(`/workout?id=${existing.id}`);
+  const selector = await openCatalog(page);
+  await expect(selector.getByText("Squat")).toBeVisible();
+  await expect(selector.getByRole("button", { name: "Ver vídeo" })).toHaveCount(0);
 });

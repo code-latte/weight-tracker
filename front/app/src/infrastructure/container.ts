@@ -2,12 +2,14 @@ import {
   AcceptAthleteInvitationUseCase,
   ActivateUserUseCase,
   AddExerciseToWorkoutUseCase,
+  CreateExerciseUseCase,
   CreateUserUseCase,
   CreateWorkoutUseCase,
   DeactivateUserUseCase,
   type Dependencies,
   EndTrainerAthleteUseCase,
   GetAthleteInvitationsUseCase,
+  GetExerciseFavoritesUseCase,
   GetExercisesUseCase,
   GetMyAthletesUseCase,
   GetMyProfileUseCase,
@@ -22,6 +24,7 @@ import {
   LinkAthleteToTrainerUseCase,
   LoginUseCase,
   LogoutUseCase,
+  MarkExerciseFavoriteUseCase,
   RefreshSessionUseCase,
   RejectAthleteInvitationUseCase,
   RemoveExerciseFromWorkoutUseCase,
@@ -30,6 +33,7 @@ import {
   SetPreferredLanguageUseCase,
   SetPreferredThemeModeUseCase,
   SignupUseCase,
+  UnmarkExerciseFavoriteUseCase,
   UpdateMyProfileUseCase,
   UpdateWorkoutExerciseUseCase,
   UpdateWorkoutUseCase,
@@ -38,6 +42,7 @@ import {
   AthleteInvitationRepository,
   AuthRepository,
   Container,
+  ExerciseFavoriteRepository,
   ExerciseRepository,
   FetchHttpClient,
   TrainerAthleteRepository,
@@ -63,6 +68,7 @@ const container = new Container<Dependencies>({
   userRepository: (c) => new UserRepository(c.resolve("httpClient")),
   workoutRepository: (c) => new WorkoutRepository(c.resolve("httpClient")),
   exerciseRepository: (c) => new ExerciseRepository(c.resolve("httpClient")),
+  exerciseFavoriteRepository: (c) => new ExerciseFavoriteRepository(c.resolve("httpClient")),
   trainerAthleteRepository: (c) => new TrainerAthleteRepository(c.resolve("httpClient")),
   athleteInvitationRepository: (c) => new AthleteInvitationRepository(c.resolve("httpClient")),
   signupUseCase: (c) =>
@@ -95,6 +101,13 @@ const container = new Container<Dependencies>({
   reorderWorkoutExercisesUseCase: (c) =>
     new ReorderWorkoutExercisesUseCase(c.resolve("workoutRepository")),
   getExercisesUseCase: (c) => new GetExercisesUseCase(c.resolve("exerciseRepository")),
+  createExerciseUseCase: (c) => new CreateExerciseUseCase(c.resolve("exerciseRepository")),
+  getExerciseFavoritesUseCase: (c) =>
+    new GetExerciseFavoritesUseCase(c.resolve("exerciseFavoriteRepository")),
+  markExerciseFavoriteUseCase: (c) =>
+    new MarkExerciseFavoriteUseCase(c.resolve("exerciseFavoriteRepository")),
+  unmarkExerciseFavoriteUseCase: (c) =>
+    new UnmarkExerciseFavoriteUseCase(c.resolve("exerciseFavoriteRepository")),
   getMyAthletesUseCase: (c) => new GetMyAthletesUseCase(c.resolve("trainerAthleteRepository")),
   getTrainerAthletesUseCase: (c) =>
     new GetTrainerAthletesUseCase(c.resolve("trainerAthleteRepository")),

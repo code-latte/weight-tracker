@@ -10,6 +10,8 @@ interface ExercisesState {
   exercises: Exercise[];
   errorCode: DomainErrorCode | null;
   reload: () => void;
+  /** Appends an exercise created on this screen, so it is listed without reading the catalog again. */
+  add: (exercise: Exercise) => void;
 }
 
 /** Reads the exercise catalog when the screen opens. Held by the screen only, so it resets on exit. */
@@ -46,6 +48,10 @@ export default function useExercises(): ExercisesState {
     request();
   }, [request]);
 
+  const add = useCallback((exercise: Exercise) => {
+    setExercises((current) => [...current, exercise]);
+  }, []);
+
   useEffect(() => {
     request();
     return () => {
@@ -53,5 +59,5 @@ export default function useExercises(): ExercisesState {
     };
   }, [request]);
 
-  return { status, exercises, errorCode, reload };
+  return { status, exercises, errorCode, reload, add };
 }

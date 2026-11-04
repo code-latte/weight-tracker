@@ -35,7 +35,8 @@ export type {
   WorkoutExerciseDetail,
   WorkoutListItem,
 } from "./workouts/workout";
-export type { Exercise } from "./exercises/exercise";
+export type { CreateExerciseRequest, Exercise } from "./exercises/exercise";
+export type { ExerciseFavorite } from "./exercise-favorites/exercise-favorite";
 export type {
   TrainerAthlete,
   TrainerAthleteInput,

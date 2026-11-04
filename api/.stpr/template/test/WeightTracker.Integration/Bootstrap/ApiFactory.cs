@@ -112,6 +112,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await context.Database.ExecuteSqlRawAsync(
             """
             TRUNCATE TABLE
+                "FavoriteExercises",
                 "TrainerInvitations",
                 "TrainerAthletes",
                 "RefreshTokens",
@@ -127,8 +128,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>
-    /// Deletes a seeded user, and the workouts, trainer–athlete relationships and trainer invitations they take
-    /// part in, so a test can exercise a
+    /// Deletes a seeded user, and the workouts, trainer–athlete relationships, trainer invitations and favorite
+    /// exercises they take part in, so a test can exercise a
     /// token whose user no longer exists. No endpoint removes users. The next
     /// <see cref="ResetDatabase"/> restores the baseline.
     /// </summary>
@@ -137,6 +138,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         using var scope = Services.CreateScope();
 
         var context = scope.ServiceProvider.GetRequiredService<WeightTrackerDbContext>();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            DELETE FROM "FavoriteExercises"
+            WHERE "UserId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
+            """);
 
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"""

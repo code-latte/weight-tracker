@@ -8,9 +8,6 @@ import ListItem from "@/presentation/common/components/atoms/list-item";
 import Typography from "@/presentation/common/components/atoms/typography";
 import type { LabelColor } from "@/presentation/workouts/hooks/use-exercise-labels";
 
-/** Lists of exercises that scroll inside their container past this height instead of lengthening the page. */
-export const EXERCISE_LIST_MAX_HEIGHT = "min(60vh, 640px)";
-
 /** Lists of exercise cards flow left to right in rows of at most three; fewer as the screen narrows. */
 export const EXERCISE_GRID_COLUMNS = {
   xs: "minmax(0, 1fr)",
@@ -27,6 +24,8 @@ export interface ExerciseLabel {
 
 interface ExerciseListItemProps {
   name: string;
+  /** A softer line under the name, such as the English name beside a translated one. */
+  subtitle?: string;
   /** Shown as small labels under the name, in this order. */
   labels: ExerciseLabel[];
   /** A short status shown beside the name, such as "Pendiente". */
@@ -40,6 +39,8 @@ interface ExerciseListItemProps {
   leading?: ReactNode;
   /** Icon buttons shown on the right. */
   actions: ReactNode;
+  /** Shown at the bottom of the card, under the labels and the lines, such as a button. */
+  footer?: ReactNode;
   /** The item's node and inline style, for a wrapper that moves it, such as a sortable list. */
   ref?: Ref<HTMLLIElement>;
   style?: CSSProperties;
@@ -60,6 +61,7 @@ interface ExerciseListItemProps {
  */
 export default function ExerciseListItem({
   name,
+  subtitle,
   labels,
   note,
   lines = [],
@@ -67,6 +69,7 @@ export default function ExerciseListItem({
   selected = false,
   leading,
   actions,
+  footer,
   ref,
   style,
   watermark,
@@ -107,6 +110,15 @@ export default function ExerciseListItem({
           {note}
         </Typography>
       )}
+    </Typography>
+  );
+  const subtitleText = subtitle && (
+    <Typography
+      variant="body2"
+      color="text.secondary"
+      sx={{ overflowWrap: "anywhere", opacity: 0.75 }}
+    >
+      {subtitle}
     </Typography>
   );
   const labelChips = labels.length > 0 && (
@@ -169,11 +181,15 @@ export default function ExerciseListItem({
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {leadingSlot}
             {positionBadge}
-            <Box sx={{ minWidth: 0, flex: 1 }}>{title}</Box>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              {title}
+              {subtitleText}
+            </Box>
             {actionButtons}
           </Box>
           {labelChips}
           {lineTexts}
+          {footer && <Box sx={{ mt: 0.5 }}>{footer}</Box>}
         </Box>
       </Card>
     </ListItem>

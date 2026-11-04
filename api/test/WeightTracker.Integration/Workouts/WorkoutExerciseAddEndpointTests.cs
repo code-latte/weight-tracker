@@ -558,4 +558,108 @@ public class WorkoutExerciseAddEndpointTests : WorkoutExerciseEndpointTest
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         ExerciseIds(await EntriesOf(SeedData.OwnedWorkoutId)).Should().Equal(SeedData.PressBancaId);
     }
+
+    private static object AnExercise(string name = "Remo con banda")
+        => new { languageCode = "es", name, muscle = "MIDDLE_BACK", type = "STRENGTH" };
+
+    private async Task<Guid> CreateCustomExercise(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/exercises", AnExercise());
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions)).GetProperty("id").GetGuid();
+    }
+
+    [Fact]
+    public async Task Post_ShouldAcceptACustomExerciseOwnedByThePrescribingTrainer()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var custom = await CreateCustomExercise(trainer);
+
+        // Act
+        var response = await trainer.PostAsJsonAsync(ExercisesRoute(SeedData.TrainedWorkoutId), Body(custom, "MID", Reps(3, 10)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        ExerciseIds(await EntriesOf(SeedData.TrainedWorkoutId)).Should().Contain(custom);
+    }
+
+    [Fact]
+    public async Task Post_ShouldAcceptACustomExerciseOwnedByTheOwnerOfASelfPlannedWorkout()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var custom = await CreateCustomExercise(user);
+
+        // Act
+        var response = await user.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), Body(custom, "MID", Reps(3, 10)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Post_ShouldRefuseAnAdminAddingAnAthletesExerciseToAWorkoutPrescribedByATrainer()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var custom = await CreateCustomExercise(user);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.PostAsJsonAsync(ExercisesRoute(SeedData.TrainedWorkoutId), Body(custom, "MID", Reps(3, 10)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        ExerciseIds(await EntriesOf(SeedData.TrainedWorkoutId)).Should().NotContain(custom);
+    }
+
+    [Fact]
+    public async Task Post_ShouldRefuseAnAdminAddingATrainersExerciseToASelfPlannedWorkout()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var custom = await CreateCustomExercise(trainer);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), Body(custom, "MID", Reps(3, 10)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        ExerciseIds(await EntriesOf(SeedData.OwnedWorkoutId)).Should().NotContain(custom);
+    }
+
+    [Fact]
+    public async Task Post_ShouldRefuseAnArchivedExercise()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var custom = await CreateCustomExercise(user);
+        (await user.DeleteAsync($"/exercises/{custom}")).EnsureSuccessStatusCode();
+
+        // Act
+        var response = await user.PostAsJsonAsync(ExercisesRoute(SeedData.OwnedWorkoutId), Body(custom, "MID", Reps(3, 10)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        ExerciseIds(await EntriesOf(SeedData.OwnedWorkoutId)).Should().NotContain(custom);
+    }
+
+    [Fact]
+    public async Task Post_ShouldTreatAnotherUsersInvisibleExerciseAsMissing()
+    {
+        // Arrange
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+        var custom = await CreateCustomExercise(user);
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+
+        // Act
+        var response = await trainer.PostAsJsonAsync(ExercisesRoute(SeedData.TrainerOwnWorkoutId), Body(custom, "MID", Reps(3, 10)));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        ExerciseIds(await EntriesOf(SeedData.TrainerOwnWorkoutId)).Should().NotContain(custom);
+    }
 }

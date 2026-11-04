@@ -5,12 +5,14 @@ import { DomainError, fail, ok } from "@weight-tracker/core/domain";
 import type {
   AddExerciseToWorkoutInput,
   Exercise,
+  ExerciseFavorite,
   RemoveExerciseFromWorkoutInput,
   ReorderWorkoutExercisesInput,
   Result,
   Session,
   UpdateWorkoutExerciseInput,
   UpdateWorkoutInput,
+  UserProfile,
   Workout,
   WorkoutDetail,
   WorkoutExerciseDetail,
@@ -18,7 +20,7 @@ import type {
 import i18n from "@/infrastructure/i18n";
 import theme from "@/presentation/common/theme";
 import WorkoutView from "@/presentation/workouts/views/workout-view";
-import renderWithProviders from "../../../support/render-with-providers";
+import renderWithProviders, { completeProfile } from "../../../support/render-with-providers";
 
 const replace = vi.fn();
 const push = vi.fn();
@@ -37,6 +39,7 @@ function catalogExercise(
   [es, en]: [string, string],
   videoUrl: string | null,
   type = "STRENGTH",
+  ownerId: string | null = null,
 ): Exercise {
   return {
     id,
@@ -49,6 +52,8 @@ function catalogExercise(
       { languageCode: "es", name: es },
       { languageCode: "en", name: en },
     ],
+    ownerId,
+    archivedAtUtc: null,
   };
 }
 
@@ -225,6 +230,10 @@ const setSummaries = () =>
 const emptyWorkout: WorkoutDetail = { ...workout, exercises: [] };
 const withoutExercises = async () => ok(emptyWorkout);
 
+function favoriteOf(exerciseId: string): ExerciseFavorite {
+  return { exerciseId, createdAtUtc: "2026-11-03T09:30:00Z" };
+}
+
 function renderWorkout({
   getWorkout = async () => ok(workout),
   getExercises = async () => ok(catalog),
@@ -234,9 +243,17 @@ function renderWorkout({
   updateExercise = async (input) => ok(entryOf(input, "we-1")),
   removeExercise = async () => ok(undefined),
   reorderExercises = async () => ok(workout),
+  getFavorites = async () => ok([]),
+  markFavorite = async (exerciseId) => ok(favoriteOf(exerciseId)),
+  unmarkFavorite = async () => ok(undefined),
+  profile = completeProfile,
 }: {
   getWorkout?: () => Promise<Result<WorkoutDetail, DomainError>>;
   getExercises?: () => Promise<Result<Exercise[], DomainError>>;
+  getFavorites?: () => Promise<Result<ExerciseFavorite[], DomainError>>;
+  markFavorite?: (exerciseId: string) => Promise<Result<ExerciseFavorite, DomainError>>;
+  unmarkFavorite?: (exerciseId: string) => Promise<Result<void, DomainError>>;
+  profile?: UserProfile;
   session?: () => Promise<Result<Session | null, DomainError>>;
   updateWorkout?: (input: UpdateWorkoutInput) => Promise<Result<Workout, DomainError>>;
   addExercise?: (
@@ -252,6 +269,11 @@ function renderWorkout({
 } = {}) {
   const readWorkout = vi.fn(getWorkout);
   const readCatalog = vi.fn(getExercises);
+  const favorites = {
+    read: vi.fn(getFavorites),
+    mark: vi.fn(markFavorite),
+    unmark: vi.fn(unmarkFavorite),
+  };
   const mutations = {
     create: vi.fn(async () => fail(new DomainError("UNEXPECTED", ""))),
     update: vi.fn(updateWorkout),
@@ -264,11 +286,16 @@ function renderWorkout({
   return {
     readWorkout,
     readCatalog,
+    favorites,
     mutations,
     rendered: renderWithProviders(<WorkoutView />, {
       getSessionUseCase: () => ({ execute: session }),
+      getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
       getWorkoutByIdUseCase: () => ({ execute: readWorkout }),
       getExercisesUseCase: () => ({ execute: readCatalog }),
+      getExerciseFavoritesUseCase: () => ({ execute: favorites.read }),
+      markExerciseFavoriteUseCase: () => ({ execute: favorites.mark }),
+      unmarkExerciseFavoriteUseCase: () => ({ execute: favorites.unmark }),
       createWorkoutUseCase: () => ({ execute: mutations.create }),
       updateWorkoutUseCase: () => ({ execute: mutations.update }),
       addExerciseToWorkoutUseCase: () => ({ execute: mutations.addExercise }),
@@ -288,10 +315,15 @@ const catalogDialog = () => screen.getByRole("dialog", { name: "Catálogo de eje
 const configurationDialog = () =>
   screen.getByRole("dialog", { name: "Configuración del ejercicio" });
 
+/** The exercise cards of the catalog, without the items of its section sidebar; none while the list is empty. */
+function catalogItems() {
+  const list = within(catalogDialog()).queryByRole("list", { name: "Catálogo de ejercicios" });
+
+  return list ? within(list).queryAllByRole("listitem") : [];
+}
+
 function catalogNames() {
-  return within(catalogDialog())
-    .queryAllByRole("listitem")
-    .map((item) => within(item).getAllByText(/./)[0]?.textContent);
+  return catalogItems().map((item) => within(item).getAllByText(/./)[0]?.textContent);
 }
 
 async function loaded() {
@@ -306,9 +338,7 @@ async function openCatalog(user: ReturnType<typeof userEvent.setup>) {
 /** Opens the catalog and chooses the exercise named `name`, which opens its configuration. */
 async function chooseFromCatalog(user: ReturnType<typeof userEvent.setup>, name: string) {
   await openCatalog(user);
-  const item = within(catalogDialog())
-    .getAllByRole("listitem")
-    .find((candidate) => within(candidate).queryByText(name) !== null);
+  const item = catalogItems().find((candidate) => within(candidate).queryByText(name) !== null);
   await user.click(within(item!).getByRole("button", { name: "Elegir ejercicio" }));
   await screen.findByRole("dialog", { name: "Configuración del ejercicio" });
 }
@@ -506,6 +536,21 @@ describe("WorkoutView", () => {
     expect(catalogNames()).toEqual(["Sentadilla", "Prensa de piernas", "Press de banca"]);
   });
 
+  it("shows the English name under the name in the selector, and never offers the video", async () => {
+    // Arrange
+    await renderWorkout({ getWorkout: withoutExercises }).rendered;
+    await loaded();
+    const user = userEvent.setup();
+
+    // Act
+    await openCatalog(user);
+
+    // Assert
+    const item = catalogItems().find((candidate) => within(candidate).queryByText("Sentadilla"))!;
+    expect(within(item).getByText("Squat")).toBeInTheDocument();
+    expect(within(catalogDialog()).queryByRole("button", { name: "Ver vídeo" })).toBeNull();
+  });
+
   it("filters the catalog by name, ignoring case and accents", async () => {
     // Arrange
     await renderWorkout({ getWorkout: withoutExercises }).rendered;
@@ -612,7 +657,7 @@ describe("WorkoutView", () => {
     await openCatalog(user);
 
     // Assert
-    const items = within(catalogDialog()).getAllByRole("listitem");
+    const items = catalogItems();
     expect(items).toHaveLength(3);
     for (const item of items) {
       expect(item.querySelectorAll(".MuiCard-root.MuiPaper-outlined")).toHaveLength(1);
@@ -630,7 +675,7 @@ describe("WorkoutView", () => {
     await openCatalog(user);
 
     // Assert
-    const [squatItem] = within(catalogDialog()).getAllByRole("listitem");
+    const [squatItem] = catalogItems();
     expect(within(squatItem!).getByText("Piernas")).toBeInTheDocument();
     expect(within(squatItem!).getByText("Cuádriceps")).toBeInTheDocument();
   });
@@ -931,7 +976,7 @@ describe("WorkoutView", () => {
     // Assert
     expect(
       within(catalogDialog()).getByRole("list", { name: "Catálogo de ejercicios" }),
-    ).toHaveStyle({ maxHeight: "min(60vh, 640px)", overflowY: "auto" });
+    ).toHaveStyle({ overflowY: "auto" });
   });
 
   it("lets the exercises card grow with its list instead of scrolling it", async () => {
@@ -955,7 +1000,7 @@ describe("WorkoutView", () => {
     await openCatalog(user);
 
     // Assert
-    const [squatItem, , benchItem] = within(catalogDialog()).getAllByRole("listitem");
+    const [squatItem, , benchItem] = catalogItems();
     const chip = (item: HTMLElement, text: string) =>
       within(item).getByText(text).closest(".MuiChip-root");
     const benchLabels = within(benchItem!).getAllByText("Pecho");
@@ -2198,9 +2243,7 @@ describe("WorkoutView", () => {
     const watermarkOf = (item: HTMLElement) =>
       item.querySelector<HTMLElement>("[data-watermark]")?.querySelector<SVGElement>("svg") ?? null;
     const catalogItem = (name: string) =>
-      within(catalogDialog())
-        .getAllByRole("listitem")
-        .find((item) => within(item).queryByText(name) !== null)!;
+      catalogItems().find((item) => within(item).queryByText(name) !== null)!;
 
     it("draws each catalog card's type icon in its pastel tone and none for an unknown type", async () => {
       // Arrange
@@ -2237,10 +2280,10 @@ describe("WorkoutView", () => {
       // Assert
       const holder = catalogItem("Sentadilla").querySelector<HTMLElement>("[data-watermark]")!;
       expect(holder).toHaveAttribute("aria-hidden", "true");
-      // Inset by half the width of the "Elegir ejercicio" button, so the plus does not sit over the icon.
+      // Inset by half the width of the two buttons (star and "Elegir ejercicio"), so they do not sit over the icon.
       expect(holder).toHaveStyle({
         position: "absolute",
-        right: "20px",
+        right: "40px",
         bottom: "0px",
         height: "75%",
         pointerEvents: "none",
@@ -2378,6 +2421,578 @@ describe("WorkoutView", () => {
         "Intense",
         "Very intense",
       ]);
+    });
+  });
+
+  describe("sections and favorites", () => {
+    const otherUserId = "6a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d";
+    const mine = catalogExercise(
+      "ex-mine",
+      "BICEPS",
+      "ARMS",
+      ["Mi curl", "My curl"],
+      null,
+      "STRENGTH",
+      completeProfile.id,
+    );
+    const theirs = catalogExercise(
+      "ex-theirs",
+      "TRICEPS",
+      "ARMS",
+      ["Fondos de otro", "Their dips"],
+      null,
+      "STRENGTH",
+      otherUserId,
+    );
+    const ownedCatalog = async () => ok([...catalog, mine, theirs]);
+    const favoritesOf =
+      (...ids: string[]) =>
+      async () =>
+        ok(ids.map(favoriteOf));
+
+    const sectionList = () => within(catalogDialog()).getByRole("list", { name: "Secciones" });
+    const section = (name: string) => within(sectionList()).getByRole("button", { name });
+    const sectionNames = () =>
+      within(sectionList())
+        .getAllByRole("button")
+        .map((button) => button.textContent);
+    const card = (name: string) =>
+      catalogItems().find((item) => within(item).queryByText(name) !== null)!;
+    const star = (name: string, label = "Añadir a favoritos") =>
+      within(card(name)).getByRole("button", { name: label });
+    const stars = () =>
+      within(catalogDialog()).getAllByRole("button", { name: /a favoritos|de favoritos/ });
+
+    it("reads the favorites once, beside the workout and the catalog", async () => {
+      // Arrange & Act
+      const { favorites, rendered } = renderWorkout();
+      await rendered;
+
+      // Assert
+      await loaded();
+      expect(favorites.read).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the sections with their icons and Todos selected, listing the whole catalog", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await openCatalog(user);
+
+      // Assert
+      expect(sectionNames()).toEqual(["Todos", "Mis ejercicios", "Favoritos"]);
+      for (const name of ["Todos", "Mis ejercicios", "Favoritos"]) {
+        expect(section(name).querySelector("svg")).not.toBeNull();
+      }
+      expect(section("Todos")).toHaveAttribute("aria-current", "true");
+      expect(section("Mis ejercicios")).not.toHaveAttribute("aria-current");
+      expect(section("Favoritos")).not.toHaveAttribute("aria-current");
+      expect(catalogNames()).toEqual(["Sentadilla", "Prensa de piernas", "Press de banca"]);
+    });
+
+    it("selects the clicked section and deselects the previous one", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(section("Favoritos"));
+
+      // Assert
+      expect(section("Favoritos")).toHaveAttribute("aria-current", "true");
+      expect(section("Todos")).not.toHaveAttribute("aria-current");
+    });
+
+    it("lists only the exercises the user owns under Mis ejercicios", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises, getExercises: ownedCatalog }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(section("Mis ejercicios"));
+
+      // Assert
+      expect(catalogNames()).toEqual(["Mi curl"]);
+    });
+
+    it("keeps another user's exercise, and the system ones, under Todos only", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises, getExercises: ownedCatalog }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await openCatalog(user);
+
+      // Assert
+      expect(catalogNames()).toEqual([
+        "Sentadilla",
+        "Prensa de piernas",
+        "Press de banca",
+        "Mi curl",
+        "Fondos de otro",
+      ]);
+    });
+
+    it("lists the exercises of an ADMIN's own under Mis ejercicios", async () => {
+      // Arrange
+      const admin: UserProfile = { ...completeProfile, id: "admin-1", role: "ADMIN" };
+      const adminCurl = catalogExercise(
+        "ex-admin-curl",
+        "BICEPS",
+        "ARMS",
+        ["Curl del admin", "Admin curl"],
+        null,
+        "STRENGTH",
+        "admin-1",
+      );
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getExercises: async () => ok([...catalog, mine, adminCurl]),
+        profile: admin,
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(section("Mis ejercicios"));
+
+      // Assert
+      expect(catalogNames()).toEqual(["Curl del admin"]);
+    });
+
+    it("says so when the user owns no exercise", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(section("Mis ejercicios"));
+
+      // Assert
+      expect(
+        within(catalogDialog()).getByText("Ningún ejercicio coincide con el filtro."),
+      ).toBeInTheDocument();
+    });
+
+    it("lists only the favorites under Favoritos", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: favoritesOf("ex-squat", "ex-bench"),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(section("Favoritos"));
+
+      // Assert
+      expect(catalogNames()).toEqual(["Sentadilla", "Press de banca"]);
+    });
+
+    it("ignores a favorite whose exercise is not in the catalog, without an error", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: favoritesOf("ex-gone", "ex-squat"),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(section("Favoritos"));
+
+      // Assert
+      expect(catalogNames()).toEqual(["Sentadilla"]);
+      expect(within(catalogDialog()).queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("takes an unmarked exercise out of Favoritos at once, without reading the favorites again", async () => {
+      // Arrange
+      const { favorites, rendered } = renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: favoritesOf("ex-squat"),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+      await user.click(section("Favoritos"));
+
+      // Act
+      await user.click(star("Sentadilla", "Quitar de favoritos"));
+
+      // Assert
+      await waitFor(() => expect(catalogNames()).toEqual([]));
+      expect(
+        within(catalogDialog()).getByText("Ningún ejercicio coincide con el filtro."),
+      ).toBeInTheDocument();
+      expect(favorites.read).toHaveBeenCalledTimes(1);
+    });
+
+    it("narrows a section with a pill and sends no request", async () => {
+      // Arrange
+      const { favorites, mutations, rendered } = renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: favoritesOf("ex-squat", "ex-bench"),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+      await user.click(section("Favoritos"));
+
+      // Act
+      await user.click(within(catalogDialog()).getByRole("button", { name: "Piernas" }));
+
+      // Assert
+      expect(catalogNames()).toEqual(["Sentadilla"]);
+      expect(favorites.read).toHaveBeenCalledTimes(1);
+      expect(favorites.mark).not.toHaveBeenCalled();
+      expect(favorites.unmark).not.toHaveBeenCalled();
+      expect(mutationCalls(mutations)).toBe(0);
+    });
+
+    it("narrows a section with the text", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: favoritesOf("ex-squat", "ex-bench"),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+      await user.click(section("Favoritos"));
+
+      // Act
+      await user.type(
+        within(catalogDialog()).getByRole("searchbox", { name: "Buscar ejercicio" }),
+        "banca",
+      );
+
+      // Assert
+      expect(catalogNames()).toEqual(["Press de banca"]);
+    });
+
+    it("keeps the section when the catalog is opened again", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises, getExercises: ownedCatalog }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+      await user.click(section("Mis ejercicios"));
+
+      // Act
+      await user.click(within(catalogDialog()).getByRole("button", { name: "Cerrar" }));
+      await dialogsClosed();
+      await openCatalog(user);
+
+      // Assert
+      expect(section("Mis ejercicios")).toHaveAttribute("aria-current", "true");
+      expect(catalogNames()).toEqual(["Mi curl"]);
+    });
+
+    it("shows the star before Elegir ejercicio on each card", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await openCatalog(user);
+
+      // Assert
+      for (const item of catalogItems()) {
+        expect(
+          within(item)
+            .getAllByRole("button")
+            .map((button) => button.getAttribute("aria-label")),
+        ).toEqual(["Añadir a favoritos", "Elegir ejercicio"]);
+      }
+    });
+
+    it("marks an exercise as a favorite and fills its star", async () => {
+      // Arrange
+      const { favorites, rendered } = renderWorkout({ getWorkout: withoutExercises });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(star("Sentadilla"));
+
+      // Assert
+      await waitFor(() => expect(star("Sentadilla", "Quitar de favoritos")).toBeInTheDocument());
+      expect(favorites.mark).toHaveBeenCalledTimes(1);
+      expect(favorites.mark).toHaveBeenCalledWith("ex-squat");
+      expect(favorites.unmark).not.toHaveBeenCalled();
+      expect(star("Prensa de piernas")).toBeInTheDocument();
+    });
+
+    it("unmarks a favorite and outlines its star", async () => {
+      // Arrange
+      const { favorites, rendered } = renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: favoritesOf("ex-squat"),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(star("Sentadilla", "Quitar de favoritos"));
+
+      // Assert
+      await waitFor(() => expect(star("Sentadilla")).toBeInTheDocument());
+      expect(favorites.unmark).toHaveBeenCalledTimes(1);
+      expect(favorites.unmark).toHaveBeenCalledWith("ex-squat");
+      expect(favorites.mark).not.toHaveBeenCalled();
+    });
+
+    it("shows a favorite from the first moment the catalog opens", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: favoritesOf("ex-bench"),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await openCatalog(user);
+
+      // Assert
+      await waitFor(() => expect(star("Press de banca", "Quitar de favoritos")).toBeEnabled());
+      expect(star("Sentadilla")).toBeInTheDocument();
+    });
+
+    it("disables the stars while the favorites load", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: () => new Promise(() => {}),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await openCatalog(user);
+
+      // Assert
+      expect(stars()).toHaveLength(3);
+      for (const button of stars()) {
+        expect(button).toBeDisabled();
+      }
+    });
+
+    it("disables only the star whose request is in progress", async () => {
+      // Arrange
+      let answer: (result: Result<ExerciseFavorite, DomainError>) => void = () => {};
+      const { rendered } = renderWorkout({
+        getWorkout: withoutExercises,
+        markFavorite: () => new Promise((resolve) => (answer = resolve)),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(star("Sentadilla"));
+
+      // Assert
+      expect(star("Sentadilla")).toBeDisabled();
+      expect(star("Prensa de piernas")).toBeEnabled();
+      await act(async () => answer(ok(favoriteOf("ex-squat"))));
+      await waitFor(() => expect(star("Sentadilla", "Quitar de favoritos")).toBeEnabled());
+    });
+
+    it.each([
+      ["CONFLICT", "La operación entra en conflicto con el estado actual."],
+      ["NOT_FOUND", "No hemos encontrado lo que buscas."],
+      ["NETWORK", "No hay conexión con el servidor."],
+    ])(
+      "keeps the star outlined and shows the %s message when marking is refused",
+      async (code, message) => {
+        // Arrange
+        await renderWorkout({
+          getWorkout: withoutExercises,
+          markFavorite: async () => fail(new DomainError(code as DomainError["code"], "")),
+        }).rendered;
+        await loaded();
+        const user = userEvent.setup();
+        await openCatalog(user);
+
+        // Act
+        await user.click(star("Sentadilla"));
+
+        // Assert
+        expect(await within(catalogDialog()).findByRole("alert")).toHaveTextContent(message);
+        expect(star("Sentadilla")).toBeEnabled();
+      },
+    );
+
+    it("keeps the star filled and shows the NETWORK message when unmarking gets no response", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: favoritesOf("ex-squat"),
+        unmarkFavorite: async () => fail(new DomainError("NETWORK", "")),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(star("Sentadilla", "Quitar de favoritos"));
+
+      // Assert
+      expect(await within(catalogDialog()).findByRole("alert")).toHaveTextContent(
+        "No hay conexión con el servidor.",
+      );
+      expect(star("Sentadilla", "Quitar de favoritos")).toBeEnabled();
+    });
+
+    it("clears the star error when another star is used", async () => {
+      // Arrange
+      let refuse = true;
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        markFavorite: async (exerciseId) =>
+          refuse ? fail(new DomainError("CONFLICT", "")) : ok(favoriteOf(exerciseId)),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+      await user.click(star("Sentadilla"));
+      await within(catalogDialog()).findByRole("alert");
+      refuse = false;
+
+      // Act
+      await user.click(star("Prensa de piernas"));
+
+      // Assert
+      await waitFor(() =>
+        expect(star("Prensa de piernas", "Quitar de favoritos")).toBeInTheDocument(),
+      );
+      expect(within(catalogDialog()).queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("keeps the catalog usable and disables the stars and Favoritos when the favorites fail to load", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: async () => fail(new DomainError("NETWORK", "")),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await openCatalog(user);
+
+      // Assert
+      expect(
+        await within(catalogDialog()).findByText("No se pudieron cargar los favoritos"),
+      ).toBeInTheDocument();
+      expect(section("Favoritos")).toHaveAttribute("aria-disabled", "true");
+      for (const button of stars()) {
+        expect(button).toBeDisabled();
+      }
+      expect(catalogNames()).toEqual(["Sentadilla", "Prensa de piernas", "Press de banca"]);
+    });
+
+    it("still opens an exercise's configuration when the favorites fail to load", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: async () => fail(new DomainError("NETWORK", "")),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await user.click(
+        within(card("Sentadilla")).getByRole("button", { name: "Elegir ejercicio" }),
+      );
+
+      // Assert
+      expect(
+        await screen.findByRole("dialog", { name: "Configuración del ejercicio" }),
+      ).toBeInTheDocument();
+    });
+
+    it("shows no star on the workout's exercises or in the configuration dialog", async () => {
+      // Arrange
+      await renderWorkout({ getFavorites: favoritesOf("ex-squat") }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await editExercise(user, 0);
+
+      // Assert
+      expect(
+        screen.queryByRole("button", { name: /favoritos/i, hidden: true }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("follows the active language for the sections and the star", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withoutExercises }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+
+      // Act
+      await act(() => i18n.changeLanguage("en"));
+
+      // Assert
+      const dialog = screen.getByRole("dialog", { name: "Exercise catalog" });
+      const sections = within(dialog).getByRole("list", { name: "Sections" });
+      expect(
+        within(sections)
+          .getAllByRole("button")
+          .map((button) => button.textContent),
+      ).toEqual(["All", "My exercises", "Favorites"]);
+      expect(within(dialog).getAllByRole("button", { name: "Add to favorites" })).toHaveLength(3);
+    });
+
+    it("shows the favorites load error in English", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withoutExercises,
+        getFavorites: async () => fail(new DomainError("NETWORK", "")),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCatalog(user);
+      await within(catalogDialog()).findByText("No se pudieron cargar los favoritos");
+
+      // Act
+      await act(() => i18n.changeLanguage("en"));
+
+      // Assert
+      expect(
+        within(screen.getByRole("dialog", { name: "Exercise catalog" })).getByText(
+          "Favorites could not be loaded",
+        ),
+      ).toBeInTheDocument();
     });
   });
 

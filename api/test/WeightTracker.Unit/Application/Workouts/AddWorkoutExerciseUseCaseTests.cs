@@ -51,11 +51,17 @@ public class AddWorkoutExerciseUseCaseTests
     private readonly Mock<IExerciseRepository> _exercises = new(MockBehavior.Strict);
 
     private AddWorkoutExerciseUseCase AUseCase()
-        => new(_workouts.Object, _exercises.Object, new WorkoutEditAuthorizer(), _unitOfWork.Object);
+        => new(_workouts.Object, _exercises.Object, new WorkoutEditAuthorizer(), new ExerciseVisibility(new WorkoutVisibility(_workouts.Object)), _unitOfWork.Object);
 
     private void GivenInCatalog(Id exerciseId)
         => _exercises.Setup(repository => repository.GetById(exerciseId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Exercise.Rehydrate(exerciseId, null, null, Muscles.CHEST, ExerciseTypes.STRENGTH, []));
+
+    private void GivenCustomInCatalog(Exercise exercise)
+        => _exercises.Setup(repository => repository.GetById(exercise.Id, It.IsAny<CancellationToken>())).ReturnsAsync(exercise);
+
+    private static Exercise ACustomExercise(Id ownerId, DateTime? archivedAtUtc = null)
+        => Exercise.Rehydrate(Id.New(), null, null, Muscles.CHEST, ExerciseTypes.STRENGTH, [], ownerId, archivedAtUtc);
 
     [Fact]
     public async Task Execute_ShouldAppendTheExerciseAndCommitOnce()
@@ -177,5 +183,108 @@ public class AddWorkoutExerciseUseCaseTests
         // Assert
         entry.PerSide.Should().BeTrue();
         entry.Rest.Should().Be(rest);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldAcceptACustomExerciseOwnedByThePrescribingTrainer()
+    {
+        // Arrange
+        var workout = AStoredWorkout(Id.New());
+        var custom = ACustomExercise(TrainerId);
+        GivenStored(workout);
+        GivenCustomInCatalog(custom);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var entry = await AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, custom.Id, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
+
+        // Assert
+        entry.ExerciseId.Should().Be(custom.Id);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldAcceptACustomExerciseOwnedByTheOwnerOfASelfPlannedWorkout()
+    {
+        // Arrange
+        var workout = Workout.Rehydrate(Id.New(), OwnerId, null, Name, null, WorkoutDate, WorkoutStatus.DRAFT, []);
+        var custom = ACustomExercise(OwnerId);
+        GivenStored(workout);
+        GivenCustomInCatalog(custom);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var entry = await AUseCase().Execute(OwnerId, Role.USER, workout.Id, custom.Id, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
+
+        // Assert
+        entry.ExerciseId.Should().Be(custom.Id);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectACustomExerciseOfSomeoneElseThatTheCallerCanSee()
+    {
+        // Arrange
+        var workout = AStoredWorkout(Id.New());
+        var custom = ACustomExercise(Id.New());
+        GivenStored(workout);
+        GivenCustomInCatalog(custom);
+
+        // Act
+        var act = () => AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, custom.Id, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<ExerciseNotUsableInWorkoutException>();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectTheOwnersExerciseInAWorkoutPrescribedByATrainer()
+    {
+        // Arrange
+        var workout = AStoredWorkout(Id.New());
+        var custom = ACustomExercise(OwnerId);
+        GivenStored(workout);
+        GivenCustomInCatalog(custom);
+
+        // Act
+        var act = () => AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, custom.Id, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<ExerciseNotUsableInWorkoutException>();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectAnArchivedCustomExercise()
+    {
+        // Arrange
+        var workout = AStoredWorkout(Id.New());
+        var custom = ACustomExercise(TrainerId, archivedAtUtc: new DateTime(2026, 11, 1));
+        GivenStored(workout);
+        GivenCustomInCatalog(custom);
+
+        // Act
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, custom.Id, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<ExerciseArchivedException>();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldTreatACustomExerciseTheCallerCannotSeeAsMissing()
+    {
+        // Arrange
+        var workout = AStoredWorkout(Id.New());
+        var custom = ACustomExercise(Id.New());
+        GivenStored(workout);
+        GivenCustomInCatalog(custom);
+        _workouts.Setup(repository => repository.GetAllByUserOrTrainerId(TrainerId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        // Act
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, custom.Id, Effort.MID, [ThreeByTen], false, null, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<ExerciseNotFoundException>();
+        VerifyNothingSavedOrCommitted();
     }
 }

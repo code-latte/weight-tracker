@@ -2,6 +2,8 @@ using WeightTracker.Domain.Exercises;
 
 namespace WeightTracker.Api.Endpoints.Exercises.Dtos;
 
+/// <param name="OwnerId">User who created the exercise, <c>null</c> for a system exercise.</param>
+/// <param name="ArchivedAtUtc">When the owner archived the exercise, <c>null</c> while it can still be added to workouts.</param>
 public sealed record ExerciseResponse(
     Guid Id,
     string? FreeExerciseDbId,
@@ -9,7 +11,9 @@ public sealed record ExerciseResponse(
     string Muscle,
     string BodyPart,
     string Type,
-    IReadOnlyList<ExerciseTranslationResponse> Translations)
+    IReadOnlyList<ExerciseTranslationResponse> Translations,
+    Guid? OwnerId,
+    DateTime? ArchivedAtUtc)
 {
     public static ExerciseResponse From(Exercise exercise)
         => new(
@@ -19,7 +23,9 @@ public sealed record ExerciseResponse(
             exercise.Muscle.ToString(),
             exercise.BodyPart.ToString(),
             exercise.Type.ToString(),
-            exercise.Translations.Select(ExerciseTranslationResponse.From).ToList());
+            exercise.Translations.Select(ExerciseTranslationResponse.From).ToList(),
+            exercise.OwnerId?.Value,
+            exercise.ArchivedAtUtc);
 }
 
 public sealed record ExerciseTranslationResponse(string LanguageCode, string Name)

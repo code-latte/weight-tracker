@@ -30,7 +30,7 @@ When selecting a reference, first decide whether it is:
 | Item                    | Classification                                | Why                                                                       |
 | ----------------------- | --------------------------------------------- | ------------------------------------------------------------------------- |
 | `Workouts`              | `Aggregate root with value objects`           | Create / Rehydrate / IsNew, inner entity (WorkoutExercise), value objects, multi-table aggregate |
-| `ExerciseUseCase`       | `UseCase for getAll operation`                | Stable reference data used by auth and users                              |
+| `ExerciseUseCase`       | `Caller-scoped read use case`                 | Reads scoped by the caller (anonymous, owner, admin, visible workouts); the same aggregate also has owner-checked writes |
 | `Id` / `Email`          | `Shared value objects`                        | Shared identifier and business identifier used across modules             |
 | `WorkoutRepository`     | `Repository implementation`                   | Multi-table aggregate load, cross-aggregate reference by id               |
 | `WorkoutMapper`         | `Aggregate mapper`                            | MapToEntity / MapToDomain across three tables, discriminated value object  |
@@ -104,7 +104,7 @@ Rule:
 ## Quick Selection Rules
 
 - If the requested piece is an aggregate root with value objects, replicate `Workouts`. Its state is **mutable**: do not use it as evidence that anything is read-only.
-- If you need to create a new UseCase for read only, replicate the `ExerciseUseCase`
+- If you need a new read use case whose result depends on the caller, replicate the `ExerciseUseCase` (`GetAllExercisesUseCase`); Exercises are a mutable aggregate, so do not use them as evidence that anything is read-only
 - If you need a repository implementation or an aggregate mapper spanning several tables, replicate `WorkoutRepository` and `WorkoutMapper`
 - If you need a new endpoint, replicate `WorkoutsController`, and route every catch through `ExceptionMapper`
 - If a controller has protected routes, inherit `AuthorizedController` and read the caller from `CurrentUser`; never parse claims in the controller

@@ -11,6 +11,8 @@ const exercise: Exercise = {
   bodyPart: "LEGS",
   type: "STRENGTH",
   translations: [],
+  ownerId: null,
+  archivedAtUtc: null,
 };
 
 class FakeExerciseRepository implements ExerciseRepositoryInterface {
@@ -21,6 +23,10 @@ class FakeExerciseRepository implements ExerciseRepositoryInterface {
   async getAll(): Promise<Result<Exercise[], DomainError>> {
     this.getAllCalls += 1;
     return this.result;
+  }
+
+  async create(): Promise<Result<Exercise, DomainError>> {
+    return fail(new DomainError("UNEXPECTED", "Not used by this use case"));
   }
 }
 

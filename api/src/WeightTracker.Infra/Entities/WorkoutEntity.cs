@@ -22,6 +22,14 @@ public class WorkoutEntity
     /// <summary>Stored as the integer value of the domain <c>WorkoutStatus</c>.</summary>
     public int Status { get; set; }
 
+    /// <summary>
+    /// Mesocycle the workout is planned in. A plain foreign key column: the Mesocycle aggregate is referenced
+    /// by identifier only. Null, together with <c>MesocycleWeekNumber</c>, for a standalone workout.
+    /// </summary>
+    public Guid? MesocycleId { get; set; }
+
+    public int? MesocycleWeekNumber { get; set; }
+
     /// <summary>Navigation inside the Workout aggregate boundary.</summary>
     public List<WorkoutExerciseEntity> WorkoutExercises { get; set; } = [];
 }

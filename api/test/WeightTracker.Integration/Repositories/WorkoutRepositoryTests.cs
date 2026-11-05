@@ -1,8 +1,10 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WeightTracker.Application.Common;
 using WeightTracker.Application.Interfaces;
 using WeightTracker.Domain.Common;
+using WeightTracker.Domain.Mesocycles;
 using WeightTracker.Domain.Workouts;
 using WeightTracker.Infra.Seed;
 using WeightTracker.Integration.Bootstrap;
@@ -429,5 +431,127 @@ public class WorkoutRepositoryTests : IntegrationTest
         var entry = EntryFor(reloaded!, PressBanca);
         entry.PerSide.Should().BeTrue();
         entry.Rest.Should().Be(TimeInMinutes.From(2m));
+    }
+
+    [Fact]
+    public async Task GetById_ShouldRestoreTheSeededPlacement()
+    {
+        // Arrange
+        var workoutId = Id.From(SeedData.TrainedWorkoutId);
+
+        // Act
+        var workout = await Read(workoutId);
+
+        // Assert
+        workout!.MesocycleId.Should().Be(Id.From(SeedData.MesocycleId));
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistANewWorkoutPlacedInAMesocycleWeek()
+    {
+        // Arrange
+        var workout = Workout.Create(
+            Id.From(SeedData.UserId), Id.From(SeedData.TrainerId), Name, null, new DateTime(2026, 10, 8));
+        workout.LinkToMesocycle(Id.From(SeedData.MesocycleId), WeekNumber.From(2));
+
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        // Act
+        var reloaded = await Read(workout.Id);
+
+        // Assert
+        reloaded!.MesocycleId.Should().Be(Id.From(SeedData.MesocycleId));
+        reloaded.MesocycleWeekNumber.Should().Be(WeekNumber.From(2));
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistANewPlacementOfAStoredStandaloneWorkout()
+    {
+        // Arrange
+        var stored = await Read(Id.From(SeedData.PrescribedDraftWorkoutId));
+        stored!.LinkToMesocycle(Id.From(SeedData.MesocycleId), WeekNumber.From(1));
+
+        await Write(repository => repository.Save(stored, CancellationToken.None));
+
+        // Act
+        var reloaded = await Read(Id.From(SeedData.PrescribedDraftWorkoutId));
+
+        // Assert
+        reloaded!.MesocycleId.Should().Be(Id.From(SeedData.MesocycleId));
+        reloaded.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistAnUnlinkOfAStoredWorkout()
+    {
+        // Arrange
+        var stored = await Read(Id.From(SeedData.TrainedWorkoutId));
+        stored!.UnlinkFromMesocycle();
+
+        await Write(repository => repository.Save(stored, CancellationToken.None));
+
+        // Act
+        var reloaded = await Read(Id.From(SeedData.TrainedWorkoutId));
+
+        // Assert
+        reloaded!.MesocycleId.Should().BeNull();
+        reloaded.MesocycleWeekNumber.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Save_ShouldKeepThePlacementWhenOtherDetailsChange()
+    {
+        // Arrange
+        var stored = await Read(Id.From(SeedData.TrainedWorkoutId));
+        stored!.UpdateDetails(WorkoutName.From("Renamed"), null, stored.WorkoutDate);
+
+        await Write(repository => repository.Save(stored, CancellationToken.None));
+
+        // Act
+        var reloaded = await Read(Id.From(SeedData.TrainedWorkoutId));
+
+        // Assert
+        reloaded!.Name.Should().Be(WorkoutName.From("Renamed"));
+        reloaded.MesocycleId.Should().Be(Id.From(SeedData.MesocycleId));
+        reloaded.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
+    }
+
+    [Fact]
+    public async Task Save_ShouldRejectAPlacementInAMesocycleThatDoesNotExist()
+    {
+        // Arrange
+        var workout = Workout.Create(Id.From(SeedData.UserId), null, Name, null, new DateTime(2026, 10, 8));
+        workout.LinkToMesocycle(Id.New(), WeekNumber.From(1));
+
+        // Act
+        var act = () => Write(repository => repository.Save(workout, CancellationToken.None));
+
+        // Assert
+        await act.Should().ThrowAsync<DbUpdateException>();
+        (await Read(workout.Id)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SavingAMesocycle_ShouldLeaveItsPlacedWorkoutsUnchanged()
+    {
+        // Arrange
+        await Factory.WithScope(async services =>
+        {
+            var mesocycles = services.GetRequiredService<IMesocycleRepository>();
+            var mesocycle = await mesocycles.GetById(Id.From(SeedData.MesocycleId), CancellationToken.None);
+            mesocycle!.DefineWeek(WeekNumber.From(1), TrainingWeekType.RECOVERY, MesocycleObjective.From("Easy week"));
+            await mesocycles.Save(mesocycle, CancellationToken.None);
+            await services.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+
+            return true;
+        });
+
+        // Act
+        var workout = await Read(Id.From(SeedData.TrainedWorkoutId));
+
+        // Assert
+        workout!.MesocycleId.Should().Be(Id.From(SeedData.MesocycleId));
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
     }
 }

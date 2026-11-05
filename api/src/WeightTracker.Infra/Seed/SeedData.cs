@@ -159,5 +159,21 @@ public static class SeedData
 
     public const string UnregisteredInvitationEmail = "invited@weighttracker.test";
 
+    /// <summary>
+    /// Four-week mesocycle from the trainer to the user, with weeks 1, 2 and 4 defined and week 3 left undefined.
+    /// <see cref="TrainedWorkoutId"/> is placed in week 1 and <see cref="PrescribedStartedWorkoutId"/> in week 2.
+    /// </summary>
+    public static readonly Guid MesocycleId = new("00000000-0000-0000-0000-000000000071");
+
+    public const string MesocycleName = "Hypertrophy block";
+
+    public const int MesocycleDurationInWeeks = 4;
+
+    public static readonly Guid MesocycleAdaptationWeekId = new("00000000-0000-0000-0000-000000000072");
+
+    public static readonly Guid MesocycleAccumulationWeekId = new("00000000-0000-0000-0000-000000000073");
+
+    public static readonly Guid MesocycleDeloadWeekId = new("00000000-0000-0000-0000-000000000074");
+
     public static readonly DateTime CreatedAt = new(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc);
 }

@@ -3,6 +3,7 @@ using WeightTracker.Application.Interfaces;
 using WeightTracker.Domain.AthleteInvitations;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exercises;
+using WeightTracker.Domain.Mesocycles;
 using WeightTracker.Domain.TrainerAthletes;
 using WeightTracker.Domain.Users;
 using WeightTracker.Domain.Workouts;
@@ -44,6 +45,7 @@ public class DatabaseSeeder
 
         await SeedExercises(cancellationToken);
         await SeedUsers(cancellationToken);
+        await SeedMesocycles(cancellationToken);
         await SeedWorkouts(cancellationToken);
         await SeedTrainerAthletes(cancellationToken);
         await SeedTrainerInvitations(cancellationToken);
@@ -160,7 +162,9 @@ public class DatabaseSeeder
                 WorkoutExercise.Rehydrate(
                     Id.From(SeedData.TrainedPlanchaEntryId), Id.From(SeedData.PlanchaId), Effort.LOW,
                     [new SetPrescription(3, new SetTarget.Duration(40))]),
-            ]);
+            ],
+            Id.From(SeedData.MesocycleId),
+            WeekNumber.From(1));
 
         var trainerOwnWorkout = Workout.Rehydrate(
             Id.From(SeedData.TrainerOwnWorkoutId),
@@ -275,7 +279,9 @@ public class DatabaseSeeder
                 WorkoutExercise.Rehydrate(
                     Id.From(SeedData.PrescribedStartedPressBancaEntryId), Id.From(SeedData.PressBancaId), Effort.HIGH,
                     [new SetPrescription(3, new SetTarget.Reps(10))]),
-            ]);
+            ],
+            Id.From(SeedData.MesocycleId),
+            WeekNumber.From(2));
 
         var workouts = new[]
         {
@@ -292,6 +298,31 @@ public class DatabaseSeeder
         => User.Rehydrate(
             Id.From(id), Email.From(email), PersonName.From(name), PersonName.From(surname),
             dateBirth, role, passwordHash, SeedData.CreatedAt, true, null);
+
+    private async Task SeedMesocycles(CancellationToken cancellationToken)
+    {
+        var mesocycle = Mesocycle.Rehydrate(
+            Id.From(SeedData.MesocycleId),
+            Id.From(SeedData.TrainerId),
+            Id.From(SeedData.UserId),
+            MesocycleName.From(SeedData.MesocycleName),
+            MesocycleObjective.From("Build muscle mass before the strength block"),
+            new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+            DurationInWeeks.From(SeedData.MesocycleDurationInWeeks),
+            [
+                MesocycleWeek.Rehydrate(
+                    Id.From(SeedData.MesocycleAdaptationWeekId), WeekNumber.From(1), TrainingWeekType.ADAPTATION,
+                    MesocycleObjective.From("Learn the technique with moderate loads")),
+                MesocycleWeek.Rehydrate(
+                    Id.From(SeedData.MesocycleAccumulationWeekId), WeekNumber.From(2), TrainingWeekType.ACCUMULATION,
+                    MesocycleObjective.From("Raise the weekly volume")),
+                MesocycleWeek.Rehydrate(
+                    Id.From(SeedData.MesocycleDeloadWeekId), WeekNumber.From(4), TrainingWeekType.DELOAD,
+                    MesocycleObjective.From("Recover before the next block")),
+            ]);
+
+        await _context.Mesocycles.AddAsync(MesocycleMapper.MapToEntity(mesocycle), cancellationToken);
+    }
 
     private async Task SeedTrainerAthletes(CancellationToken cancellationToken)
     {

@@ -4,6 +4,7 @@ using WeightTracker.Domain.Auth;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.ExerciseFavorites;
 using WeightTracker.Domain.Exercises;
+using WeightTracker.Domain.Mesocycles;
 using WeightTracker.Domain.TrainerAthletes;
 using WeightTracker.Domain.Users;
 using WeightTracker.Infra.Exceptions;
@@ -784,6 +785,117 @@ public class AggregateMapperTests
 
             // Act
             var act = () => TrainerInvitationMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+    }
+
+    public class Mesocycles
+    {
+        private static readonly MesocycleObjective WeekObjective = MesocycleObjective.From("Week objective");
+
+        private static Mesocycle AMesocycle(int durationInWeeks = 4) => Mesocycle.Create(
+            Id.New(), Id.New(), MesocycleName.From("Hypertrophy block"), MesocycleObjective.From("Build work capacity"),
+            new DateTime(2026, 11, 2), DurationInWeeks.From(durationInWeeks));
+
+        private static Mesocycle RoundTrip(Mesocycle mesocycle)
+            => MesocycleMapper.MapToDomain(MesocycleMapper.MapToEntity(mesocycle));
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveEveryFieldOfAMesocycleWithoutWeeks()
+        {
+            // Arrange
+            var original = AMesocycle();
+
+            // Act
+            var restored = RoundTrip(original);
+
+            // Assert
+            restored.Id.Should().Be(original.Id);
+            restored.TrainerId.Should().Be(original.TrainerId);
+            restored.AthleteId.Should().Be(original.AthleteId);
+            restored.Name.Should().Be(original.Name);
+            restored.Objective.Should().Be(original.Objective);
+            restored.StartDate.Should().Be(original.StartDate);
+            restored.DurationInWeeks.Should().Be(original.DurationInWeeks);
+            restored.Weeks.Should().BeEmpty();
+            restored.IsNew.Should().BeFalse();
+        }
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveSparseWeeks()
+        {
+            // Arrange
+            var original = AMesocycle();
+            original.DefineWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, MesocycleObjective.From("Heavy triples"));
+            original.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+
+            // Act
+            var restored = RoundTrip(original);
+
+            // Assert
+            restored.Weeks.Select(week => (week.Id, week.WeekNumber, week.TrainingWeekType, week.Objective))
+                .Should().Equal(original.Weeks.Select(week => (week.Id, week.WeekNumber, week.TrainingWeekType, week.Objective)));
+        }
+
+        [Fact]
+        public void RoundTrip_ShouldPreserveEveryWeekAndEveryTrainingWeekType()
+        {
+            // Arrange
+            var types = Enum.GetValues<TrainingWeekType>();
+            var original = AMesocycle(types.Length);
+            for (var index = 0; index < types.Length; index++)
+                original.DefineWeek(WeekNumber.From(index + 1), types[index], WeekObjective);
+
+            // Act
+            var restored = RoundTrip(original);
+
+            // Assert
+            restored.Weeks.Select(week => week.TrainingWeekType).Should().Equal(types);
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAnUnknownTrainingWeekType()
+        {
+            // Arrange
+            var original = AMesocycle();
+            original.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+            var entity = MesocycleMapper.MapToEntity(original);
+            entity.Weeks[0].TrainingWeekType = 99;
+
+            // Act
+            var act = () => MesocycleMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectAStoredWeekBeyondTheDuration()
+        {
+            // Arrange
+            var original = AMesocycle();
+            original.DefineWeek(WeekNumber.From(4), TrainingWeekType.DELOAD, WeekObjective);
+            var entity = MesocycleMapper.MapToEntity(original);
+            entity.DurationInWeeks = 3;
+
+            // Act
+            var act = () => MesocycleMapper.MapToDomain(entity);
+
+            // Assert
+            act.Should().Throw<PersistenceMappingException>();
+        }
+
+        [Fact]
+        public void MapToDomain_ShouldRejectABlankStoredObjective()
+        {
+            // Arrange
+            var entity = MesocycleMapper.MapToEntity(AMesocycle());
+            entity.Objective = " ";
+
+            // Act
+            var act = () => MesocycleMapper.MapToDomain(entity);
 
             // Assert
             act.Should().Throw<PersistenceMappingException>();

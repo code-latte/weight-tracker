@@ -1230,4 +1230,184 @@ public class WorkoutTests
         entry.PerSide.Should().BeTrue();
         entry.Rest.Should().Be(rest);
     }
+
+    [Fact]
+    public void Create_ShouldStartAsAStandaloneWorkout()
+    {
+        // Arrange & Act
+        var workout = Workout.Create(Id.New(), null, Name, null, WorkoutDate);
+
+        // Assert
+        workout.MesocycleId.Should().BeNull();
+        workout.MesocycleWeekNumber.Should().BeNull();
+    }
+
+    [Fact]
+    public void LinkToMesocycle_ShouldPlaceADraftWorkoutInTheWeek()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.DRAFT);
+        var mesocycleId = Id.New();
+
+        // Act
+        workout.LinkToMesocycle(mesocycleId, WeekNumber.From(2));
+
+        // Assert
+        workout.MesocycleId.Should().Be(mesocycleId);
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(2));
+    }
+
+    [Fact]
+    public void LinkToMesocycle_ShouldMoveAPublishedWorkoutToAnotherWeek()
+    {
+        // Arrange
+        var mesocycleId = Id.New();
+        var workout = APlacedWorkoutIn(WorkoutStatus.PUBLISHED, mesocycleId, WeekNumber.From(2));
+
+        // Act
+        workout.LinkToMesocycle(mesocycleId, WeekNumber.From(3));
+
+        // Assert
+        workout.MesocycleId.Should().Be(mesocycleId);
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(3));
+    }
+
+    [Fact]
+    public void LinkToMesocycle_ShouldMoveADraftWorkoutToAnotherMesocycle()
+    {
+        // Arrange
+        var workout = APlacedWorkoutIn(WorkoutStatus.DRAFT, Id.New(), WeekNumber.From(2));
+        var otherMesocycleId = Id.New();
+
+        // Act
+        workout.LinkToMesocycle(otherMesocycleId, WeekNumber.From(1));
+
+        // Assert
+        workout.MesocycleId.Should().Be(otherMesocycleId);
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.FINISHED)]
+    public void LinkToMesocycle_ShouldRejectMovingALockedWorkoutAndKeepItsPlacement(WorkoutStatus status)
+    {
+        // Arrange
+        var mesocycleId = Id.New();
+        var workout = APlacedWorkoutIn(status, mesocycleId, WeekNumber.From(2));
+
+        // Act
+        var act = () => workout.LinkToMesocycle(mesocycleId, WeekNumber.From(3));
+
+        // Assert
+        act.Should().Throw<WorkoutPlacementLockedException>();
+        workout.MesocycleId.Should().Be(mesocycleId);
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(2));
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.FINISHED)]
+    public void LinkToMesocycle_ShouldRejectPlacingALockedStandaloneWorkout(WorkoutStatus status)
+    {
+        // Arrange
+        var workout = AWorkoutIn(status);
+
+        // Act
+        var act = () => workout.LinkToMesocycle(Id.New(), WeekNumber.From(1));
+
+        // Assert
+        act.Should().Throw<WorkoutPlacementLockedException>();
+        workout.MesocycleId.Should().BeNull();
+        workout.MesocycleWeekNumber.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    public void UnlinkFromMesocycle_ShouldLeaveAPlannedWorkoutStandalone(WorkoutStatus status)
+    {
+        // Arrange
+        var workout = APlacedWorkoutIn(status, Id.New(), WeekNumber.From(2));
+
+        // Act
+        workout.UnlinkFromMesocycle();
+
+        // Assert
+        workout.MesocycleId.Should().BeNull();
+        workout.MesocycleWeekNumber.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.FINISHED)]
+    public void UnlinkFromMesocycle_ShouldRejectALockedWorkoutAndKeepItsPlacement(WorkoutStatus status)
+    {
+        // Arrange
+        var mesocycleId = Id.New();
+        var workout = APlacedWorkoutIn(status, mesocycleId, WeekNumber.From(2));
+
+        // Act
+        var act = () => workout.UnlinkFromMesocycle();
+
+        // Assert
+        act.Should().Throw<WorkoutPlacementLockedException>();
+        workout.MesocycleId.Should().Be(mesocycleId);
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(2));
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRestoreTheStoredPlacement()
+    {
+        // Arrange
+        var mesocycleId = Id.New();
+
+        // Act
+        var workout = APlacedWorkoutIn(WorkoutStatus.FINISHED, mesocycleId, WeekNumber.From(4));
+
+        // Assert
+        workout.MesocycleId.Should().Be(mesocycleId);
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(4));
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRestoreAStandaloneWorkoutWithoutPlacement()
+    {
+        // Arrange & Act
+        var workout = AWorkoutIn(WorkoutStatus.DRAFT);
+
+        // Assert
+        workout.MesocycleId.Should().BeNull();
+        workout.MesocycleWeekNumber.Should().BeNull();
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRejectAMesocycleWithoutWeekNumber()
+    {
+        // Arrange
+        var mesocycleId = Id.New();
+
+        // Act
+        var act = () => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.DRAFT, [], mesocycleId, null);
+
+        // Assert
+        act.Should().Throw<IncompleteWorkoutPlacementException>();
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRejectAWeekNumberWithoutMesocycle()
+    {
+        // Arrange
+        var weekNumber = WeekNumber.From(1);
+
+        // Act
+        var act = () => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.DRAFT, [], null, weekNumber);
+
+        // Assert
+        act.Should().Throw<IncompleteWorkoutPlacementException>();
+    }
+
+    private static Workout APlacedWorkoutIn(WorkoutStatus status, Id mesocycleId, WeekNumber weekNumber)
+        => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, status, [], mesocycleId, weekNumber);
 }
+

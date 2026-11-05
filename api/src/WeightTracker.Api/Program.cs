@@ -71,6 +71,7 @@ builder.Services.AddScoped<IWorkoutRepository, WorkoutRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<ITrainerAthleteRepository, TrainerAthleteRepository>();
 builder.Services.AddScoped<ITrainerInvitationRepository, TrainerInvitationRepository>();
+builder.Services.AddScoped<IMesocycleRepository, MesocycleRepository>();
 
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();

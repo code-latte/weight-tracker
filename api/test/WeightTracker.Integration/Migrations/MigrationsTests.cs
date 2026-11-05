@@ -73,6 +73,29 @@ public class MigrationsTests : IAsyncLifetime
         INSERT INTO "Exercises" ("Id", "Muscle", "Type") VALUES ('00000000-0000-0000-0000-0000000000f2', 6, 1);
         """;
 
+    /// <summary>Last migration before <c>CreateMesocyclesTable_202611051037</c>.</summary>
+    private const long BeforeMesocyclesVersion = 202611031642;
+
+    /// <summary>Last migration before <c>AddMesocycleToWorkouts_202611051049</c>.</summary>
+    private const long BeforeWorkoutPlacementVersion = 202611051043;
+
+    /// <summary>
+    /// A trainer, an athlete, a mesocycle between them with week 1, and a standalone workout of the athlete.
+    /// Roles are not enforced by the schema.
+    /// </summary>
+    private const string MesocycleAndWorkout = """
+        INSERT INTO "Users" ("Id", "Email", "Name", "Surname", "DateBirth", "Role", "PasswordHash", "CreatedAt", "IsActive")
+        VALUES ('00000000-0000-0000-0000-0000000000e1', 'meso-trainer@weighttracker.test', 'T', 'T', '1990-01-01', 2, 'hash', now(), true),
+               ('00000000-0000-0000-0000-0000000000e2', 'meso-athlete@weighttracker.test', 'A', 'A', '1990-01-01', 1, 'hash', now(), true);
+        INSERT INTO "Mesocycles" ("Id", "TrainerId", "AthleteId", "Name", "Objective", "StartDate", "DurationInWeeks")
+        VALUES ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000e1',
+                '00000000-0000-0000-0000-0000000000e2', 'Block', 'Objective', '2026-11-02', 4);
+        INSERT INTO "MesocycleWeeks" ("Id", "MesocycleId", "WeekNumber", "TrainingWeekType", "Objective")
+        VALUES ('00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000e3', 1, 1, 'Week objective');
+        INSERT INTO "Workouts" ("Id", "UserId", "TrainerId", "WorkoutDate", "Name", "Status")
+        VALUES ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000e2', NULL, '2026-11-02', 'Workout', 1);
+        """;
+
     /// <summary>Entries in <c>infra/exercises.json</c>.</summary>
     private const int CatalogSize = 876;
 
@@ -88,6 +111,8 @@ public class MigrationsTests : IAsyncLifetime
         "TrainerAthletes",
         "TrainerInvitations",
         "FavoriteExercises",
+        "Mesocycles",
+        "MesocycleWeeks",
     ];
 
     private readonly string _maintenanceConnectionString;
@@ -640,6 +665,139 @@ public class MigrationsTests : IAsyncLifetime
         (await Scalar<bool>("""
             SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'FavoriteExercises')
             """)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AddMesocycleToWorkouts_ShouldLeaveExistingWorkoutsStandalone()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser, BeforeWorkoutPlacementVersion);
+        await Execute(_connectionString, """
+            INSERT INTO "Users" ("Id", "Email", "Name", "Surname", "DateBirth", "Role", "PasswordHash", "CreatedAt", "IsActive")
+            VALUES ('00000000-0000-0000-0000-0000000000e6', 'legacy-placement@weighttracker.test', 'L', 'L', '1990-01-01', 1, 'hash', now(), true);
+            INSERT INTO "Workouts" ("Id", "UserId", "TrainerId", "WorkoutDate", "Name", "Status")
+            VALUES ('00000000-0000-0000-0000-0000000000e7', '00000000-0000-0000-0000-0000000000e6', NULL, '2026-10-01', 'Workout', 1);
+            """);
+
+        // Act
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+
+        // Assert
+        (await Scalar<bool>("""
+            SELECT "MesocycleId" IS NULL AND "MesocycleWeekNumber" IS NULL FROM "Workouts"
+            """)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AddMesocycleToWorkouts_ShouldAcceptAWorkoutPlacedInAMesocycleWeek()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, MesocycleAndWorkout);
+
+        // Act
+        await Execute(_connectionString, """
+            UPDATE "Workouts" SET "MesocycleId" = '00000000-0000-0000-0000-0000000000e3', "MesocycleWeekNumber" = 1
+            """);
+
+        // Assert
+        (await Scalar<int>("SELECT \"MesocycleWeekNumber\" FROM \"Workouts\"")).Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("\"MesocycleId\" = '00000000-0000-0000-0000-0000000000e3'")]
+    [InlineData("\"MesocycleWeekNumber\" = 1")]
+    public async Task AddMesocycleToWorkouts_ShouldRejectAHalfSetPlacement(string assignment)
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, MesocycleAndWorkout);
+
+        // Act
+        var act = () => Execute(_connectionString, $"""UPDATE "Workouts" SET {assignment}""");
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+    }
+
+    [Fact]
+    public async Task AddMesocycleToWorkouts_ShouldRejectAMesocycleThatDoesNotExist()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, MesocycleAndWorkout);
+
+        // Act
+        var act = () => Execute(_connectionString, """
+            UPDATE "Workouts" SET "MesocycleId" = '00000000-0000-0000-0000-0000000000e9', "MesocycleWeekNumber" = 1
+            """);
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.ForeignKeyViolation);
+    }
+
+    [Fact]
+    public async Task CreateMesocycleWeeks_ShouldRejectTheSameWeekNumberTwiceInAMesocycle()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, MesocycleAndWorkout);
+
+        // Act
+        var act = () => Execute(_connectionString, """
+            INSERT INTO "MesocycleWeeks" ("Id", "MesocycleId", "WeekNumber", "TrainingWeekType", "Objective")
+            VALUES ('00000000-0000-0000-0000-0000000000e8', '00000000-0000-0000-0000-0000000000e3', 1, 2, 'Again');
+            """);
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation);
+    }
+
+    [Fact]
+    public async Task CreateMesocycles_ShouldRejectAnAthleteThatDoesNotExist()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, MesocycleAndWorkout);
+
+        // Act
+        var act = () => Execute(_connectionString, """
+            INSERT INTO "Mesocycles" ("Id", "TrainerId", "AthleteId", "Name", "Objective", "StartDate", "DurationInWeeks")
+            VALUES ('00000000-0000-0000-0000-0000000000ea', '00000000-0000-0000-0000-0000000000e1',
+                    '00000000-0000-0000-0000-0000000000eb', 'Block', 'Objective', '2026-11-02', 4);
+            """);
+
+        // Assert
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(PostgresErrorCodes.ForeignKeyViolation);
+    }
+
+    [Fact]
+    public async Task AddMesocycleToWorkouts_Down_ShouldRemoveTheColumnsAndKeepTheWorkouts()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+        await Execute(_connectionString, MesocycleAndWorkout);
+
+        // Act
+        DatabaseMigrator.MigrateDown(_connectionString, BeforeWorkoutPlacementVersion);
+
+        // Assert
+        (await ColumnsOf("Workouts")).Should().NotContain(["MesocycleId", "MesocycleWeekNumber"]);
+        (await Scalar<long>("SELECT count(*) FROM \"Workouts\"")).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CreateMesocycles_Down_ShouldRemoveBothTables()
+    {
+        // Arrange
+        DatabaseMigrator.MigrateUp(_connectionString, ApiFactory.AdminUser);
+
+        // Act
+        DatabaseMigrator.MigrateDown(_connectionString, BeforeMesocyclesVersion);
+
+        // Assert
+        TableExists("Mesocycles").Should().BeFalse();
+        TableExists("MesocycleWeeks").Should().BeFalse();
     }
 
     private static string AdminColumn(string column) =>

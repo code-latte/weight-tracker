@@ -23,6 +23,8 @@ public static class WorkoutMapper
             Name = workout.Name.Value,
             Description = workout.Description?.Value,
             Status = (int)workout.Status,
+            MesocycleId = workout.MesocycleId?.Value,
+            MesocycleWeekNumber = workout.MesocycleWeekNumber?.Value,
         };
 
         var exercisePosition = 0;
@@ -96,7 +98,9 @@ public static class WorkoutMapper
                 WorkoutDescription.From(entity.Description),
                 entity.WorkoutDate.ToDateTime(TimeOnly.MinValue),
                 MapStatus(entity.Status),
-                exercises);
+                exercises,
+                entity.MesocycleId is null ? null : Id.From(entity.MesocycleId.Value),
+                entity.MesocycleWeekNumber is null ? null : WeekNumber.From(entity.MesocycleWeekNumber.Value));
         }
         catch (DomainException exception)
         {

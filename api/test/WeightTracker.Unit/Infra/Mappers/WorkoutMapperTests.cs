@@ -517,4 +517,48 @@ public class WorkoutMapperTests
         // Assert
         restored.Exercises.Should().OnlyContain(entry => entry.PerSide == false && entry.Rest == null);
     }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveTheMesocyclePlacement()
+    {
+        // Arrange
+        var mesocycleId = Id.New();
+        var original = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED, [],
+            mesocycleId, WeekNumber.From(2));
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.MesocycleId.Should().Be(mesocycleId);
+        restored.MesocycleWeekNumber.Should().Be(WeekNumber.From(2));
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveAStandaloneWorkout()
+    {
+        // Arrange
+        var original = Workout.Create(Id.New(), null, Name, null, WorkoutDate);
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.MesocycleId.Should().BeNull();
+        restored.MesocycleWeekNumber.Should().BeNull();
+    }
+
+    [Fact]
+    public void MapToDomain_ShouldRejectAHalfSetStoredPlacement()
+    {
+        // Arrange
+        var entity = WorkoutMapper.MapToEntity(Workout.Create(Id.New(), null, Name, null, WorkoutDate));
+        entity.MesocycleId = Id.New().Value;
+
+        // Act
+        var act = () => WorkoutMapper.MapToDomain(entity);
+
+        // Assert
+        act.Should().Throw<PersistenceMappingException>();
+    }
 }

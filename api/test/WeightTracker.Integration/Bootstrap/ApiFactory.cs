@@ -113,6 +113,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             """
             TRUNCATE TABLE
                 "FavoriteExercises",
+                "MesocycleWeeks",
+                "Mesocycles",
                 "TrainerInvitations",
                 "TrainerAthletes",
                 "RefreshTokens",
@@ -128,8 +130,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>
-    /// Deletes a seeded user, and the workouts, trainer–athlete relationships, trainer invitations and favorite
-    /// exercises they take part in, so a test can exercise a
+    /// Deletes a seeded user, and the workouts, mesocycles, trainer–athlete relationships, trainer invitations and
+    /// favorite exercises they take part in, so a test can exercise a
     /// token whose user no longer exists. No endpoint removes users. The next
     /// <see cref="ResetDatabase"/> restores the baseline.
     /// </summary>
@@ -149,6 +151,23 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             $"""
             DELETE FROM "Workouts"
             WHERE "UserId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
+               OR "TrainerId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
+            """);
+
+        // Workouts of other users placed in the user's mesocycles become standalone before those mesocycles go
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            UPDATE "Workouts" SET "MesocycleId" = NULL, "MesocycleWeekNumber" = NULL
+            WHERE "MesocycleId" IN (
+                SELECT "Id" FROM "Mesocycles"
+                WHERE "AthleteId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
+                   OR "TrainerId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()}))
+            """);
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            DELETE FROM "Mesocycles"
+            WHERE "AthleteId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
                OR "TrainerId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
             """);
 

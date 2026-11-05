@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using WeightTracker.Application.Interfaces;
+using WeightTracker.Domain.Common;
 using WeightTracker.Infra.Seed;
 using WeightTracker.Integration.Bootstrap;
 using Xunit;
@@ -191,6 +194,26 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
         stored.GetProperty("status").GetString().Should().Be("PUBLISHED");
         stored.GetProperty("exercises").EnumerateArray().Select(entry => entry.GetProperty("exerciseId").GetGuid())
             .Should().Equal(SeedData.SentadillaId, SeedData.PlanchaId);
+    }
+
+    [Fact]
+    public async Task PrescribingTrainer_ShouldKeepTheMesocyclePlacementWithoutExposingIt()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+
+        // Act
+        var response = await Put(trainer, SeedData.TrainedWorkoutId, TrainedWorkoutChange());
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.TryGetProperty("mesocycleId", out _).Should().BeFalse();
+        body.TryGetProperty("mesocycleWeekNumber", out _).Should().BeFalse();
+        var stored = await Factory.WithScope(services => services.GetRequiredService<IWorkoutRepository>()
+            .GetById(Id.From(SeedData.TrainedWorkoutId), CancellationToken.None));
+        stored!.MesocycleId.Should().Be(Id.From(SeedData.MesocycleId));
+        stored.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
     }
 
     [Fact]

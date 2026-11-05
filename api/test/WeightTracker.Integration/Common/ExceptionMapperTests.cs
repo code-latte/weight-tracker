@@ -489,4 +489,31 @@ public class ExceptionMapperTests
         // Assert
         status.Should().Be(StatusCodes.Status400BadRequest);
     }
+
+    public static TheoryData<Exception, int> MesocycleFailures() => new()
+    {
+        { new InvalidMesocycleNameException("blank"), StatusCodes.Status400BadRequest },
+        { new InvalidMesocycleObjectiveException("blank"), StatusCodes.Status400BadRequest },
+        { new InvalidDurationInWeeksException(53, 1, 52), StatusCodes.Status400BadRequest },
+        { new InvalidWeekNumberException(0), StatusCodes.Status400BadRequest },
+        { new InvalidTrainingWeekTypeException(99), StatusCodes.Status400BadRequest },
+        { new MesocycleWeekNotFoundException(WeekNumber.From(3), Id.New()), StatusCodes.Status404NotFound },
+        { new MesocycleTrainerIsAthleteException(Id.New()), StatusCodes.Status409Conflict },
+        { new MesocycleWeekOutOfRangeException(WeekNumber.From(5), 4, Id.New()), StatusCodes.Status409Conflict },
+        { new DuplicateMesocycleWeekException(WeekNumber.From(2), Id.New()), StatusCodes.Status409Conflict },
+        { new MesocycleDurationTooShortException(3, WeekNumber.From(4), Id.New()), StatusCodes.Status409Conflict },
+        { new WorkoutPlacementLockedException(Id.New(), WorkoutStatus.STARTED), StatusCodes.Status409Conflict },
+        { new IncompleteWorkoutPlacementException(Id.New()), StatusCodes.Status409Conflict },
+    };
+
+    [Theory]
+    [MemberData(nameof(MesocycleFailures))]
+    public void Map_ShouldMapEveryMesocycleAndPlacementFailure(Exception exception, int expected)
+    {
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(expected);
+    }
 }

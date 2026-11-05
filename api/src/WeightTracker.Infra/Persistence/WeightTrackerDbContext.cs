@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using WeightTracker.Domain.Exercises;
+using WeightTracker.Domain.Mesocycles;
 using WeightTracker.Domain.Workouts;
 using WeightTracker.Infra.Entities;
 
@@ -36,6 +37,10 @@ public class WeightTrackerDbContext : DbContext
     public DbSet<TrainerInvitationEntity> TrainerInvitations => Set<TrainerInvitationEntity>();
 
     public DbSet<ExerciseFavoriteEntity> FavoriteExercises => Set<ExerciseFavoriteEntity>();
+
+    public DbSet<MesocycleEntity> Mesocycles => Set<MesocycleEntity>();
+
+    public DbSet<MesocycleWeekEntity> MesocycleWeeks => Set<MesocycleWeekEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -100,6 +105,8 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(workout => workout.Name).HasColumnName("Name").HasMaxLength(WorkoutName.MaxLength).IsRequired();
             entity.Property(workout => workout.Description).HasColumnName("Description").HasMaxLength(WorkoutDescription.MaxLength);
             entity.Property(workout => workout.Status).HasColumnName("Status");
+            entity.Property(workout => workout.MesocycleId).HasColumnName("MesocycleId");
+            entity.Property(workout => workout.MesocycleWeekNumber).HasColumnName("MesocycleWeekNumber");
 
             // Declared without navigation properties: the User aggregate stays referenced by
             // identifier only, while EF still orders writes to satisfy the real constraints.
@@ -112,6 +119,14 @@ public class WeightTrackerDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(workout => workout.TrainerId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // The Mesocycle aggregate is referenced by identifier only; future read views join on these columns.
+            entity.HasOne<MesocycleEntity>()
+                .WithMany()
+                .HasForeignKey(workout => workout.MesocycleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(workout => new { workout.MesocycleId, workout.MesocycleWeekNumber });
 
             entity.HasMany(workout => workout.WorkoutExercises)
                 .WithOne()
@@ -256,6 +271,52 @@ public class WeightTrackerDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(invitation => invitation.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MesocycleEntity>(entity =>
+        {
+            entity.ToTable("Mesocycles");
+            entity.HasKey(mesocycle => mesocycle.Id);
+            entity.Property(mesocycle => mesocycle.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(mesocycle => mesocycle.TrainerId).HasColumnName("TrainerId");
+            entity.Property(mesocycle => mesocycle.AthleteId).HasColumnName("AthleteId");
+            entity.Property(mesocycle => mesocycle.Name).HasColumnName("Name").HasMaxLength(MesocycleName.MaxLength).IsRequired();
+            entity.Property(mesocycle => mesocycle.Objective).HasColumnName("Objective").HasMaxLength(MesocycleObjective.MaxLength).IsRequired();
+            entity.Property(mesocycle => mesocycle.StartDate).HasColumnName("StartDate").HasColumnType("date");
+            entity.Property(mesocycle => mesocycle.DurationInWeeks).HasColumnName("DurationInWeeks");
+            entity.HasIndex(mesocycle => mesocycle.TrainerId);
+            entity.HasIndex(mesocycle => mesocycle.AthleteId);
+
+            // Declared without navigation properties: the User aggregate stays referenced by
+            // identifier only, while EF still orders writes to satisfy the real constraints.
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(mesocycle => mesocycle.TrainerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(mesocycle => mesocycle.AthleteId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(mesocycle => mesocycle.Weeks)
+                .WithOne()
+                .HasForeignKey(week => week.MesocycleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MesocycleWeekEntity>(entity =>
+        {
+            entity.ToTable("MesocycleWeeks");
+            entity.HasKey(week => week.Id);
+            entity.Property(week => week.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(week => week.MesocycleId).HasColumnName("MesocycleId");
+            entity.Property(week => week.WeekNumber).HasColumnName("WeekNumber");
+            entity.Property(week => week.TrainingWeekType).HasColumnName("TrainingWeekType");
+            entity.Property(week => week.Objective).HasColumnName("Objective").HasMaxLength(MesocycleObjective.MaxLength).IsRequired();
+
+            // Lets EF delete a removed week before inserting a new one with the same number
+            entity.HasIndex(week => new { week.MesocycleId, week.WeekNumber }).IsUnique();
         });
     }
 }

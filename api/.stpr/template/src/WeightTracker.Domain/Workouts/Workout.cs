@@ -40,6 +40,17 @@ public sealed class Workout : AggregateRoot
     public bool IsLocked => Status is WorkoutStatus.STARTED or WorkoutStatus.FINISHED;
 
     /// <summary>
+    /// Mesocycle this workout is planned in, <c>null</c> for a standalone workout.
+    /// Set together with <see cref="MesocycleWeekNumber"/>. The mesocycle is referenced by identifier only.
+    /// </summary>
+    public Id? MesocycleId { get; private set; }
+
+    /// <summary>
+    /// Week of the mesocycle this workout is planned in, <c>null</c> for a standalone workout.
+    /// </summary>
+    public WeekNumber? MesocycleWeekNumber { get; private set; }
+
+    /// <summary>
     /// Snapshot of the exercises of this workout, in the order they must be performed.
     /// The list is copied so callers cannot mutate the aggregate through it.
     /// </summary>
@@ -86,6 +97,7 @@ public sealed class Workout : AggregateRoot
     /// <exception cref="ExerciseAlreadyInWorkoutException">When two entries share the same exercise.</exception>
     /// <exception cref="SuperSeriesRequiresTwoExercisesException">When a stored superseries has a single member.</exception>
     /// <exception cref="SuperSeriesSetCountMismatchException">When the members of a stored superseries have different set totals.</exception>
+    /// <exception cref="IncompleteWorkoutPlacementException">When only one of the mesocycle id and week number is given.</exception>
     public static Workout Rehydrate(
         Id id,
         Id userId,
@@ -94,10 +106,15 @@ public sealed class Workout : AggregateRoot
         WorkoutDescription? description,
         DateTime workoutdate,
         WorkoutStatus status,
-        IEnumerable<WorkoutExercise> exercises
+        IEnumerable<WorkoutExercise> exercises,
+        Id? mesocycleId = null,
+        WeekNumber? mesocycleWeekNumber = null
     )
     {
         EnsureDefined(status);
+
+        if ((mesocycleId is null) != (mesocycleWeekNumber is null))
+            throw new IncompleteWorkoutPlacementException(id);
 
         var entries = exercises.ToList();
 
@@ -116,6 +133,8 @@ public sealed class Workout : AggregateRoot
             Id = id,
             IsNew = false,
             _exercises = entries,
+            MesocycleId = mesocycleId,
+            MesocycleWeekNumber = mesocycleWeekNumber,
         };
     }
 
@@ -142,6 +161,31 @@ public sealed class Workout : AggregateRoot
 
         UserId = userId;
         TrainerId = trainerId;
+    }
+
+    /// <summary>
+    /// Places the workout in a week of a mesocycle, or moves it there when it is already placed.
+    /// Whether the mesocycle exists and the week fits it is checked by the caller, which knows both aggregates.
+    /// </summary>
+    /// <exception cref="WorkoutPlacementLockedException">When the workout is started or finished.</exception>
+    public void LinkToMesocycle(Id mesocycleId, WeekNumber weekNumber)
+    {
+        EnsurePlacementCanChange();
+
+        MesocycleId = mesocycleId;
+        MesocycleWeekNumber = weekNumber;
+    }
+
+    /// <summary>
+    /// Takes the workout out of its mesocycle, leaving it standalone.
+    /// </summary>
+    /// <exception cref="WorkoutPlacementLockedException">When the workout is started or finished.</exception>
+    public void UnlinkFromMesocycle()
+    {
+        EnsurePlacementCanChange();
+
+        MesocycleId = null;
+        MesocycleWeekNumber = null;
     }
 
     /// <summary>
@@ -340,6 +384,15 @@ public sealed class Workout : AggregateRoot
     {
         if (trainerId is not null && trainerId == userId)
             throw new TrainerCannotBeWorkoutOwnerException(userId);
+    }
+
+    /// <summary>
+    /// A started or finished workout keeps its planning context, whoever asks.
+    /// </summary>
+    private void EnsurePlacementCanChange()
+    {
+        if (IsLocked)
+            throw new WorkoutPlacementLockedException(this.Id, Status);
     }
 
     private static void EnsureDefined(WorkoutStatus status)

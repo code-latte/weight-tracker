@@ -63,6 +63,8 @@ public class WorkoutRepository : IWorkoutRepository
         tracked.Name = entity.Name;
         tracked.Description = entity.Description;
         tracked.Status = entity.Status;
+        tracked.MesocycleId = entity.MesocycleId;
+        tracked.MesocycleWeekNumber = entity.MesocycleWeekNumber;
 
         Reconcile(tracked, entity);
     }

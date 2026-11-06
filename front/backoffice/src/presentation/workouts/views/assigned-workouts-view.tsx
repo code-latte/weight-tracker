@@ -15,7 +15,7 @@ import CreateWorkoutDialog from "@/presentation/workouts/components/organisms/cr
 import WorkoutsTable from "@/presentation/workouts/components/organisms/workouts-table";
 import useWorkouts from "@/presentation/workouts/hooks/use-workouts";
 
-function AssignedPlansList() {
+function AssignedWorkoutsList() {
   const current = useCurrentUser();
   const { status, workouts, errorCode, reload } = useWorkouts();
 
@@ -33,7 +33,7 @@ function AssignedPlansList() {
   return <WorkoutsTable workouts={workouts} showTrainer={current.profile.role === "ADMIN"} />;
 }
 
-function AssignedPlansContent() {
+function AssignedWorkoutsContent() {
   const { t } = useTranslation("workouts");
   const [creating, setCreating] = useState(false);
 
@@ -41,22 +41,22 @@ function AssignedPlansContent() {
     <Container sx={{ py: 4 }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
         <Typography variant="h4" component="h1">
-          {t("assignedPlans.title")}
+          {t("assignedWorkouts.title")}
         </Typography>
         <Button variant="contained" startIcon={<AddOutlined />} onClick={() => setCreating(true)}>
-          {t("assignedPlans.newWorkout")}
+          {t("assignedWorkouts.newWorkout")}
         </Button>
       </Box>
-      <AssignedPlansList />
+      <AssignedWorkoutsList />
       <CreateWorkoutDialog open={creating} onClose={() => setCreating(false)} />
     </Container>
   );
 }
 
-export default function AssignedPlansView() {
+export default function AssignedWorkoutsView() {
   return (
     <AppShell>
-      <AssignedPlansContent />
+      <AssignedWorkoutsContent />
     </AppShell>
   );
 }

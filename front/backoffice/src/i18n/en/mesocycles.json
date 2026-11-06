@@ -1,0 +1,80 @@
+{
+  "assignedPlans": {
+    "title": "Mesocycles",
+    "newMesocycle": "New mesocycle",
+    "columns": {
+      "name": "Name",
+      "athlete": "Athlete",
+      "trainer": "Trainer",
+      "startDate": "Start date",
+      "duration": "Duration",
+      "weeks": "Defined weeks"
+    },
+    "empty": "No mesocycles yet.",
+    "edit": "Edit {{name}}",
+    "duration_one": "{{count}} week",
+    "duration_other": "{{count}} weeks",
+    "definedWeeks": "{{defined}} / {{total}}"
+  },
+  "mesocycle": {
+    "createTitle": "Create mesocycle",
+    "editTitle": "Edit mesocycle",
+    "subtitle": "Define the mesocycle's goal and plan its weeks",
+    "back": "Back",
+    "notFound": "We could not find this mesocycle.",
+    "backToList": "Back to mesocycles",
+    "saved": "Mesocycle saved.",
+    "details": {
+      "title": "General information",
+      "create": "Create mesocycle",
+      "save": "Save"
+    },
+    "fields": {
+      "athlete": "Athlete",
+      "trainer": "Trainer",
+      "name": "Name",
+      "startDate": "Start date",
+      "duration": "Duration (weeks)",
+      "objective": "General objective"
+    },
+    "duration": {
+      "decrease": "Decrease duration",
+      "increase": "Increase duration"
+    },
+    "validation": {
+      "required": "This field is required.",
+      "maxLength": "It cannot be longer than {{max}} characters.",
+      "date": "Enter a valid date.",
+      "range": "It must be between {{min}} and {{max}}.",
+      "uuid": "Enter a valid identifier.",
+      "athleteRequired": "Select an athlete.",
+      "trainerRequired": "Select a trainer."
+    },
+    "noAthletes": "No athletes available.",
+    "noTrainers": "No trainers available.",
+    "retry": "Retry"
+  },
+  "weeks": {
+    "title": "Weekly planning",
+    "subtitle": "Define each week's goal",
+    "add": "Add week",
+    "week": "Week {{number}}",
+    "edit": "Edit week {{number}}",
+    "empty": "No weeks defined yet.",
+    "saveFirst": "Save the mesocycle to plan its weeks.",
+    "dialog": {
+      "type": "Week type",
+      "objective": "Objective",
+      "cancel": "Cancel",
+      "save": "Save"
+    }
+  },
+  "trainingWeekType": {
+    "ADAPTATION": "Adaptation",
+    "ACCUMULATION": "Accumulation",
+    "INTENSIFICATION": "Intensification",
+    "REALIZATION": "Realization",
+    "DELOAD": "Deload",
+    "RECOVERY": "Recovery"
+  }
+}

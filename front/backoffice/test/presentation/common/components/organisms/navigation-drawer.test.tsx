@@ -1,8 +1,9 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ok } from "@weight-tracker/core/domain";
 import type { DomainError, Result, UserProfile } from "@weight-tracker/core/domain";
+import i18n from "@/infrastructure/i18n";
 import NavigationDrawerProvider from "@/presentation/common/components/navigation-drawer-provider";
 import NavigationDrawer from "@/presentation/common/components/organisms/navigation-drawer";
 import LoadProfile from "../../../../support/load-profile";
@@ -35,7 +36,8 @@ const items = [
   "Inicio",
   "Todos los atletas",
   "Invitaciones",
-  "Planes asignados",
+  "Mesociclos",
+  "Entrenamientos",
   "Calendario",
   "Plantillas de entrenamiento",
   "Catálogo de ejercicios",
@@ -66,7 +68,8 @@ describe("NavigationDrawer", () => {
       "Todos los atletas",
       "Invitaciones",
       "Programación",
-      "Planes asignados",
+      "Mesociclos",
+      "Entrenamientos",
       "Calendario",
       "Biblioteca",
       "Plantillas de entrenamiento",
@@ -100,17 +103,17 @@ describe("NavigationDrawer", () => {
     expect(first).toHaveClass("Mui-selected");
   });
 
-  it("links Planes asignados to its screen, not selected elsewhere", async () => {
+  it("links Mesociclos to its screen, not selected elsewhere", async () => {
     // Arrange & Act
     await renderWithProviders(<NavigationDrawer />);
 
     // Assert
-    const entry = screen.getByRole("link", { name: "Planes asignados" });
+    const entry = screen.getByRole("link", { name: "Mesociclos" });
     expect(entry).toHaveAttribute("href", "/assigned-plans");
     expect(entry).not.toHaveClass("Mui-selected");
   });
 
-  it("selects Planes asignados and not Inicio on its screen", async () => {
+  it("selects Mesociclos and not Inicio on its screen", async () => {
     // Arrange
     navigation.pathname = "/assigned-plans";
 
@@ -118,8 +121,43 @@ describe("NavigationDrawer", () => {
     await renderWithProviders(<NavigationDrawer />);
 
     // Assert
-    expect(screen.getByRole("link", { name: "Planes asignados" })).toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Mesociclos" })).toHaveClass("Mui-selected");
     expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Entrenamientos" })).not.toHaveClass("Mui-selected");
+  });
+
+  it("links Entrenamientos to its screen, not selected elsewhere", async () => {
+    // Arrange & Act
+    await renderWithProviders(<NavigationDrawer />);
+
+    // Assert
+    const entry = screen.getByRole("link", { name: "Entrenamientos" });
+    expect(entry).toHaveAttribute("href", "/assigned-workouts");
+    expect(entry).not.toHaveClass("Mui-selected");
+  });
+
+  it("selects Entrenamientos and neither Inicio nor Mesociclos on its screen", async () => {
+    // Arrange
+    navigation.pathname = "/assigned-workouts";
+
+    // Act
+    await renderWithProviders(<NavigationDrawer />);
+
+    // Assert
+    expect(screen.getByRole("link", { name: "Entrenamientos" })).toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Mesociclos" })).not.toHaveClass("Mui-selected");
+  });
+
+  it("shows Entrenamientos in English", async () => {
+    // Arrange
+    await renderWithProviders(<NavigationDrawer />);
+
+    // Act
+    await act(() => i18n.changeLanguage("en"));
+
+    // Assert
+    expect(screen.getByRole("link", { name: "Workouts" })).toBeInTheDocument();
   });
 
   it("links Catálogo de ejercicios to its screen, not selected elsewhere", async () => {
@@ -144,7 +182,7 @@ describe("NavigationDrawer", () => {
       "Mui-selected",
     );
     expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveClass("Mui-selected");
-    expect(screen.getByRole("link", { name: "Planes asignados" })).not.toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Mesociclos" })).not.toHaveClass("Mui-selected");
   });
 
   it("keeps every other item without a link", async () => {
@@ -161,7 +199,8 @@ describe("NavigationDrawer", () => {
       "Inicio",
       "Todos los atletas",
       "Invitaciones",
-      "Planes asignados",
+      "Mesociclos",
+      "Entrenamientos",
       "Catálogo de ejercicios",
     ]);
   });
@@ -366,7 +405,7 @@ describe("NavigationDrawer", () => {
     expect(screen.queryByText("Atletas")).not.toBeInTheDocument();
     expect(screen.queryByText("Inicio")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Inicio" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Planes asignados" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Mesociclos" })).toHaveAttribute(
       "href",
       "/assigned-plans",
     );

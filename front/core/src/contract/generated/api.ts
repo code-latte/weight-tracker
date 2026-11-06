@@ -13,7 +13,9 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    standalone?: boolean;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -117,6 +119,17 @@ export interface paths {
                 };
                 /** @description Not Found */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1350,6 +1363,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/{userId}/mesocycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MesocycleResponse"][];
+                        "application/json": components["schemas"]["MesocycleResponse"][];
+                        "text/json": components["schemas"]["MesocycleResponse"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/trainer-athletes": {
         parameters: {
             query?: never;
@@ -1610,6 +1695,493 @@ export interface paths {
                         "text/plain": components["schemas"]["ValidationProblemDetails"];
                         "application/json": components["schemas"]["ValidationProblemDetails"];
                         "text/json": components["schemas"]["ValidationProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mesocycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MesocycleResponse"][];
+                        "application/json": components["schemas"]["MesocycleResponse"][];
+                        "text/json": components["schemas"]["MesocycleResponse"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateMesocycleRequest"];
+                    "text/json": components["schemas"]["CreateMesocycleRequest"];
+                    "application/*+json": components["schemas"]["CreateMesocycleRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MesocycleResponse"];
+                        "application/json": components["schemas"]["MesocycleResponse"];
+                        "text/json": components["schemas"]["MesocycleResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mesocycles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MesocycleResponse"];
+                        "application/json": components["schemas"]["MesocycleResponse"];
+                        "text/json": components["schemas"]["MesocycleResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateMesocycleRequest"];
+                    "text/json": components["schemas"]["UpdateMesocycleRequest"];
+                    "application/*+json": components["schemas"]["UpdateMesocycleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MesocycleResponse"];
+                        "application/json": components["schemas"]["MesocycleResponse"];
+                        "text/json": components["schemas"]["MesocycleResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mesocycles/{id}/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DefineMesocycleWeekRequest"];
+                    "text/json": components["schemas"]["DefineMesocycleWeekRequest"];
+                    "application/*+json": components["schemas"]["DefineMesocycleWeekRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MesocycleResponse"];
+                        "application/json": components["schemas"]["MesocycleResponse"];
+                        "text/json": components["schemas"]["MesocycleResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mesocycles/{id}/weeks/{weekNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    weekNumber: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RedefineMesocycleWeekRequest"];
+                    "text/json": components["schemas"]["RedefineMesocycleWeekRequest"];
+                    "application/*+json": components["schemas"]["RedefineMesocycleWeekRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MesocycleResponse"];
+                        "application/json": components["schemas"]["MesocycleResponse"];
+                        "text/json": components["schemas"]["MesocycleResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
                     };
                 };
                 /** @description Unauthorized */
@@ -2812,6 +3384,18 @@ export interface components {
             dateBirth: string;
             role: string;
         };
+        CreateMesocycleRequest: {
+            /** Format: uuid */
+            trainerId?: null | string;
+            /** Format: uuid */
+            athleteId: null | string;
+            name: null | string;
+            objective: null | string;
+            /** Format: date */
+            startDate: null | string;
+            /** Format: int32 */
+            durationInWeeks: null | number | string;
+        };
         CreateSuperSeriesRequest: {
             exerciseIds: null | string[];
         };
@@ -2833,6 +3417,16 @@ export interface components {
             description?: null | string;
             /** Format: date */
             workoutDate: null | string;
+            /** Format: uuid */
+            mesocycleId?: null | string;
+            /** Format: int32 */
+            mesocycleWeekNumber?: null | number | string;
+        };
+        DefineMesocycleWeekRequest: {
+            /** Format: int32 */
+            weekNumber: null | number | string;
+            trainingWeekType: null | components["schemas"]["TrainingWeekType"];
+            objective: null | string;
         };
         /** @enum {unknown} */
         Effort: "LOW" | "MIDLOW" | "MID" | "MIDHIGH" | "HIGH" | null;
@@ -2899,6 +3493,29 @@ export interface components {
             email: string;
             password: string;
         };
+        MesocycleResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            trainerId: string;
+            /** Format: uuid */
+            athleteId: string;
+            name: string;
+            objective: string;
+            /** Format: date */
+            startDate: string;
+            /** Format: int32 */
+            durationInWeeks: number | string;
+            weeks: components["schemas"]["MesocycleWeekResponse"][];
+            trainer: components["schemas"]["UserProfileResponse"];
+            athlete: components["schemas"]["UserProfileResponse"];
+        };
+        MesocycleWeekResponse: {
+            /** Format: int32 */
+            weekNumber: number | string;
+            trainingWeekType: string;
+            objective: string;
+        };
         /** @enum {unknown} */
         Muscles: "ABDOMINALS" | "ABDUCTORS" | "ADDUCTORS" | "BICEPS" | "CALVES" | "CHEST" | "FOREARMS" | "GLUTES" | "HAMSTRINGS" | "LATS" | "LOWER_BACK" | "MIDDLE_BACK" | "NECK" | "QUADRICEPS" | "SHOULDERS" | "TRAPS" | "TRICEPS" | null;
         ProblemDetails: {
@@ -2908,6 +3525,10 @@ export interface components {
             status?: null | number | string;
             detail?: null | string;
             instance?: null | string;
+        };
+        RedefineMesocycleWeekRequest: {
+            trainingWeekType: null | components["schemas"]["TrainingWeekType"];
+            objective: null | string;
         };
         RefreshRequest: {
             refreshToken: string;
@@ -2984,6 +3605,16 @@ export interface components {
             /** Format: date-time */
             finishedAtUtc: null | string;
         };
+        /** @enum {unknown} */
+        TrainingWeekType: "ADAPTATION" | "ACCUMULATION" | "INTENSIFICATION" | "REALIZATION" | "DELOAD" | "RECOVERY" | null;
+        UpdateMesocycleRequest: {
+            name: null | string;
+            objective: null | string;
+            /** Format: date */
+            startDate: null | string;
+            /** Format: int32 */
+            durationInWeeks: null | number | string;
+        };
         UpdateProfileRequest: {
             name: string;
             surname: string;
@@ -2997,6 +3628,10 @@ export interface components {
             userId: null | string;
             /** Format: uuid */
             trainerId?: null | string;
+            /** Format: uuid */
+            mesocycleId?: null | string;
+            /** Format: int32 */
+            mesocycleWeekNumber?: null | number | string;
         };
         UserListItemResponse: {
             /** Format: uuid */
@@ -3053,6 +3688,10 @@ export interface components {
             trainerId: null | string;
             status: string;
             exercises: components["schemas"]["WorkoutExerciseDetailResponse"][];
+            /** Format: uuid */
+            mesocycleId: null | string;
+            /** Format: int32 */
+            mesocycleWeekNumber: null | number | string;
         };
         WorkoutExerciseDetailResponse: {
             /** Format: uuid */
@@ -3113,6 +3752,10 @@ export interface components {
             trainerId: null | string;
             status: string;
             exercises: components["schemas"]["WorkoutExerciseResponse"][];
+            /** Format: uuid */
+            mesocycleId: null | string;
+            /** Format: int32 */
+            mesocycleWeekNumber: null | number | string;
         };
         /** @enum {unknown} */
         WorkoutStatus: "DRAFT" | "PUBLISHED" | "STARTED" | "FINISHED" | null;

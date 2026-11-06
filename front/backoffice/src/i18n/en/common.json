@@ -21,7 +21,8 @@
     },
     "programming": {
       "title": "Programming",
-      "assignedPlans": "Assigned plans",
+      "assignedPlans": "Mesocycles",
+      "assignedWorkouts": "Workouts",
       "calendar": "Calendar"
     },
     "library": {

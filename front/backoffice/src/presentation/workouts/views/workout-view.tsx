@@ -51,7 +51,7 @@ function WorkoutNotFound() {
   return (
     <Box sx={{ py: 2 }}>
       <Typography sx={{ mb: 1 }}>{t("workout.notFound")}</Typography>
-      <Link component={NextLink} href="/assigned-plans">
+      <Link component={NextLink} href="/assigned-workouts">
         {t("workout.backToList")}
       </Link>
     </Box>
@@ -69,7 +69,7 @@ function WorkoutHeader() {
       </Typography>
       <Link
         component={NextLink}
-        href="/assigned-plans"
+        href="/assigned-workouts"
         underline="hover"
         sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, mt: 0.5 }}
       >

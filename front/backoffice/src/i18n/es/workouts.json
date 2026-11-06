@@ -1,6 +1,6 @@
 {
-  "assignedPlans": {
-    "title": "Planes asignados",
+  "assignedWorkouts": {
+    "title": "Entrenamientos",
     "newWorkout": "Nuevo entrenamiento",
     "columns": {
       "name": "Nombre",
@@ -9,7 +9,7 @@
       "trainer": "Entrenador",
       "exercises": "Ejercicios"
     },
-    "empty": "Todavía no hay entrenamientos asignados.",
+    "empty": "Todavía no hay entrenamientos.",
     "edit": "Editar {{name}}",
     "noTrainer": "Sin entrenador"
   },
@@ -151,7 +151,7 @@
       "cancel": "Cancelar"
     },
     "notFound": "No hemos encontrado este entrenamiento.",
-    "backToList": "Volver a planes asignados",
+    "backToList": "Volver a entrenamientos",
     "back": "Volver",
     "editTitle": "Editar entrenamiento",
     "properties": {

@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { DomainError, fail, ok } from "@weight-tracker/core/domain";
 import type { Result, UserProfile, WorkoutListItem } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
-import AssignedPlansView from "@/presentation/workouts/views/assigned-plans-view";
+import AssignedWorkoutsView from "@/presentation/workouts/views/assigned-workouts-view";
 import renderWithProviders, { completeProfile } from "../../../support/render-with-providers";
 
 const replace = vi.fn();
@@ -12,7 +12,7 @@ const push = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push }),
-  usePathname: () => "/assigned-plans",
+  usePathname: () => "/assigned-workouts",
 }));
 
 const adminProfile: UserProfile = { ...completeProfile, email: "admin@example.com", role: "ADMIN" };
@@ -96,7 +96,7 @@ function renderAssignedPlans({
 
   return {
     execute,
-    rendered: renderWithProviders(<AssignedPlansView />, {
+    rendered: renderWithProviders(<AssignedWorkoutsView />, {
       getSessionUseCase: () => ({
         execute: async () => ok({ accessToken: "a", refreshToken: "r" }),
       }),
@@ -112,7 +112,7 @@ function bodyRows() {
   return rows;
 }
 
-describe("AssignedPlansView", () => {
+describe("AssignedWorkoutsView", () => {
   // A zone behind UTC, where reading "YYYY-MM-DD" as UTC midnight would show the previous day, and so the week before
   // for a Monday.
   const originalTimeZone = process.env.TZ;
@@ -141,7 +141,7 @@ describe("AssignedPlansView", () => {
 
     // Assert
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Planes asignados" }),
+      await screen.findByRole("heading", { level: 1, name: "Entrenamientos" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Nuevo entrenamiento" })).toBeInTheDocument();
     await screen.findByText("Pierna");
@@ -149,6 +149,19 @@ describe("AssignedPlansView", () => {
     expect(rows).toHaveLength(2);
     expect(within(rows[0]).getByText("Pierna")).toBeInTheDocument();
     expect(within(rows[1]).getByText("Empuje")).toBeInTheDocument();
+  });
+
+  it("asks only for the workouts outside a mesocycle", async () => {
+    // Arrange
+    const { execute, rendered } = renderAssignedPlans();
+
+    // Act
+    await rendered;
+    await screen.findByText("Pierna");
+
+    // Assert
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith({ standalone: true });
   });
 
   it("shows the name, the week, the athlete and the exercise count of each workout", async () => {
@@ -213,7 +226,7 @@ describe("AssignedPlansView", () => {
     await renderAssignedPlans({ getWorkouts: async () => ok([]) }).rendered;
 
     // Assert
-    expect(await screen.findByText("Todavía no hay entrenamientos asignados.")).toBeInTheDocument();
+    expect(await screen.findByText("Todavía no hay entrenamientos.")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
@@ -324,7 +337,7 @@ describe("AssignedPlansView", () => {
     await act(() => i18n.changeLanguage("en"));
 
     // Assert
-    expect(screen.getByRole("heading", { level: 1, name: "Assigned plans" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Workouts" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New workout" })).toBeInTheDocument();
     for (const header of ["Name", "Week", "Athlete", "Trainer", "Exercises"]) {
       expect(screen.getByRole("columnheader", { name: header })).toBeInTheDocument();

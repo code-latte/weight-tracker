@@ -21,7 +21,8 @@
     },
     "programming": {
       "title": "Programación",
-      "assignedPlans": "Planes asignados",
+      "assignedPlans": "Mesociclos",
+      "assignedWorkouts": "Entrenamientos",
       "calendar": "Calendario"
     },
     "library": {

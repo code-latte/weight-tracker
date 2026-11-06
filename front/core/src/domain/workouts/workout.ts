@@ -16,6 +16,8 @@ export type ReorderWorkoutExercisesRequest =
 export type UpdateWorkoutInput = UpdateWorkoutRequest & { id: string };
 export type AddExerciseToWorkoutInput = AddExerciseRequest & { workoutId: string };
 export type GetWorkoutByIdInput = { id: string };
+/** The list's query: `standalone` keeps only the workouts not placed in a mesocycle. */
+export type GetWorkoutsInput = { standalone?: boolean };
 /** Both ids travel in the path; `exerciseId` is the catalog exercise, not the workout entry. */
 export type RemoveExerciseFromWorkoutInput = { workoutId: string; exerciseId: string };
 /** The workout id travels in the path; the catalog exercise id goes in the path and, repeated, in the body. */

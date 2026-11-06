@@ -3,7 +3,7 @@
 import Autocomplete from "@/presentation/common/components/atoms/autocomplete";
 import { fullNameOf } from "@/presentation/common/full-name";
 import { normalized } from "@/presentation/common/search-text";
-import type { Assignee } from "@/presentation/workouts/hooks/use-workout-assignees";
+import type { Assignee } from "@/presentation/common/hooks/use-assignees";
 
 interface PersonPickerProps {
   label: string;

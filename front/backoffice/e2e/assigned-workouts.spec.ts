@@ -79,11 +79,12 @@ const json = (body: unknown) => ({
 });
 
 /** Intercepts everything the screen and its create dialog read, and records what is sent to `POST /workouts`. */
-async function mockAssignedPlans(page: Page, profile = completeProfile) {
+async function mockAssignedWorkouts(page: Page, profile = completeProfile) {
   const created: unknown[] = [];
 
   await mockUsersMe(page, profile);
-  await page.route(`${api}/workouts`, (route) => {
+  // The list is read as `?standalone=true`, so the query string is part of the match.
+  await page.route(new RegExp(`^${api}/workouts(\\?.*)?$`), (route) => {
     const request = route.request();
 
     if (request.method() === "OPTIONS") {
@@ -119,32 +120,35 @@ async function mockAssignedPlans(page: Page, profile = completeProfile) {
   return created;
 }
 
-test("opens Planes asignados from the drawer and lists the workouts with names", async ({
-  page,
-}) => {
+test("opens Entrenamientos from the drawer and lists the workouts with names", async ({ page }) => {
   // Arrange
-  await mockAssignedPlans(page);
+  await mockAssignedWorkouts(page);
   await page.goto("/");
   await expect(page.getByText("Ana García")).toBeVisible();
 
+  const list = page.waitForRequest(
+    (request) => request.url().startsWith(`${api}/workouts`) && request.method() === "GET",
+  );
+
   // Act
-  await page.getByRole("link", { name: "Planes asignados" }).click();
+  await page.getByRole("link", { name: "Entrenamientos" }).click();
 
   // Assert
-  await expect(page).toHaveURL(/\/assigned-plans\/?$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Planes asignados" })).toBeVisible();
+  await expect(page).toHaveURL(/\/assigned-workouts\/?$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Entrenamientos" })).toBeVisible();
   await expect(page.getByRole("row", { name: /Pierna.*Ana García/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /Empuje.*Bea López/ })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Entrenador" })).toHaveCount(0);
   await expect(page.getByText(anaId)).toHaveCount(0);
+  expect((await list).url()).toBe(`${api}/workouts?standalone=true`);
 });
 
 test("shows an admin the trainer of each workout, or Sin entrenador", async ({ page }) => {
   // Arrange
-  await mockAssignedPlans(page, adminProfile);
+  await mockAssignedWorkouts(page, adminProfile);
 
   // Act
-  await page.goto("/assigned-plans/");
+  await page.goto("/assigned-workouts/");
 
   // Assert
   await expect(page.getByRole("columnheader", { name: "Entrenador" })).toBeVisible();
@@ -154,8 +158,8 @@ test("shows an admin the trainer of each workout, or Sin entrenador", async ({ p
 
 test("lets a trainer create a workout by choosing one of their athletes", async ({ page }) => {
   // Arrange
-  const created = await mockAssignedPlans(page);
-  await page.goto("/assigned-plans/");
+  const created = await mockAssignedWorkouts(page);
+  await page.goto("/assigned-workouts/");
   await page.getByRole("button", { name: "Nuevo entrenamiento" }).click();
   const dialog = page.getByRole("dialog", { name: "Nuevo entrenamiento" });
   await dialog.getByRole("textbox", { name: "Nombre" }).fill("Torso");
@@ -174,8 +178,8 @@ test("lets a trainer create a workout by choosing one of their athletes", async 
 
 test("lets an admin create a workout choosing an athlete and a trainer", async ({ page }) => {
   // Arrange
-  const created = await mockAssignedPlans(page, adminProfile);
-  await page.goto("/assigned-plans/");
+  const created = await mockAssignedWorkouts(page, adminProfile);
+  await page.goto("/assigned-workouts/");
   await page.getByRole("button", { name: "Nuevo entrenamiento" }).click();
   const dialog = page.getByRole("dialog", { name: "Nuevo entrenamiento" });
   await dialog.getByRole("textbox", { name: "Nombre" }).fill("Torso");

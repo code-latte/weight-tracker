@@ -12,7 +12,10 @@ interface WorkoutsState {
   reload: () => void;
 }
 
-/** Reads the caller's workouts when the screen opens. Held by the screen only, so it resets on exit. */
+/**
+ * Reads the caller's workouts outside any mesocycle when the screen opens; those inside one belong to its plan. Held by
+ * the screen only, so it resets on exit.
+ */
 export default function useWorkouts(): WorkoutsState {
   const container = useContainer();
   const { runWithSession } = useSession();
@@ -26,7 +29,9 @@ export default function useWorkouts(): WorkoutsState {
   const request = useCallback(() => {
     const current = ++generation.current;
 
-    void runWithSession(() => container.resolve("getWorkoutsUseCase").execute()).then((result) => {
+    void runWithSession(() =>
+      container.resolve("getWorkoutsUseCase").execute({ standalone: true }),
+    ).then((result) => {
       if (current !== generation.current) {
         return;
       }

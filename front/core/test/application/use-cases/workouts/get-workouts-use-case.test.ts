@@ -4,6 +4,7 @@ import { GetWorkoutsUseCase } from "../../../../src/application";
 import {
   DomainError,
   fail,
+  type GetWorkoutsInput,
   ok,
   type Result,
   type Workout,
@@ -51,11 +52,13 @@ const prescribed: WorkoutListItem = {
 class FakeWorkoutRepository implements WorkoutRepositoryInterface {
   listCalls = 0;
   otherCalls = 0;
+  queries: (GetWorkoutsInput | undefined)[] = [];
 
   constructor(private readonly result: Result<WorkoutListItem[], DomainError>) {}
 
-  async getAll(): Promise<Result<WorkoutListItem[], DomainError>> {
+  async getAll(query?: GetWorkoutsInput): Promise<Result<WorkoutListItem[], DomainError>> {
     this.listCalls += 1;
+    this.queries.push(query);
     return this.result;
   }
 
@@ -131,6 +134,18 @@ describe("GetWorkoutsUseCase", () => {
     // Assert
     expect(repository.listCalls).toBe(1);
     expect(repository.otherCalls).toBe(0);
+  });
+
+  it("forwards the standalone query to the repository", async () => {
+    // Arrange
+    const repository = new FakeWorkoutRepository(ok([workout]));
+    const useCase = new GetWorkoutsUseCase(repository);
+
+    // Act
+    await useCase.execute({ standalone: true });
+
+    // Assert
+    expect(repository.queries).toEqual([{ standalone: true }]);
   });
 
   it.each(["UNAUTHORIZED", "FORBIDDEN"] as const)(

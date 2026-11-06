@@ -158,6 +158,8 @@ const workout: WorkoutDetail = {
   userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
   trainerId: null,
   status: "DRAFT",
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
   exercises: [squatInWorkout, benchInWorkout, pressInWorkout],
 };
 
@@ -933,7 +935,10 @@ describe("WorkoutView", () => {
       screen.getByRole("heading", { level: 1, name: "Editar entrenamiento" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, name: "Pierna" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute("href", "/assigned-plans");
+    expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute(
+      "href",
+      "/assigned-workouts",
+    );
     expect(
       within(propertiesSection()).getByRole("button", { name: "Guardar" }),
     ).toBeInTheDocument();
@@ -2076,9 +2081,9 @@ describe("WorkoutView", () => {
 
     // Assert
     expect(await screen.findByText("No hemos encontrado este entrenamiento.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Volver a planes asignados" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Volver a entrenamientos" })).toHaveAttribute(
       "href",
-      "/assigned-plans",
+      "/assigned-workouts",
     );
     expect(readWorkout).not.toHaveBeenCalled();
   });
@@ -2090,7 +2095,7 @@ describe("WorkoutView", () => {
 
     // Assert
     expect(await screen.findByText("No hemos encontrado este entrenamiento.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Volver a planes asignados" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Volver a entrenamientos" })).toBeInTheDocument();
   });
 
   it("reads the catalog again when Reintentar is pressed after it failed", async () => {

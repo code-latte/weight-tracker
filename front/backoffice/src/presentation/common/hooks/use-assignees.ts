@@ -3,9 +3,9 @@ import type { DomainError, DomainErrorCode, Result } from "@weight-tracker/core/
 import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
 
-type WorkoutAssigneesStatus = "loading" | "loaded" | "failed";
+type AssigneesStatus = "loading" | "loaded" | "failed";
 
-/** A person a workout can be given to or prescribed by, whichever endpoint they came from. */
+/** A person a workout or a mesocycle can be given to or prescribed by, whichever endpoint they came from. */
 export interface Assignee {
   id: string;
   name: string;
@@ -13,8 +13,8 @@ export interface Assignee {
   email: string;
 }
 
-interface WorkoutAssigneesState {
-  status: WorkoutAssigneesStatus;
+interface AssigneesState {
+  status: AssigneesStatus;
   athletes: Assignee[];
   /** Always empty for a trainer: only an admin chooses the trainer. */
   trainers: Assignee[];
@@ -39,16 +39,14 @@ function mapResult<T, U>(
 }
 
 /**
- * Reads the people the create workout dialog offers when it opens: a trainer's current athletes, or, for an admin, the
- * active athletes and trainers of one users request. It waits while the role is unknown. Held by the dialog only, so
- * it resets when it closes.
+ * Reads the people a create form offers when it opens: a trainer's current athletes, or, for an admin, the
+ * active athletes and trainers of one users request. It waits while the role is unknown. Held by the form only, so
+ * it resets when the form goes away.
  */
-export default function useWorkoutAssignees(
-  role: "ADMIN" | "TRAINER" | null,
-): WorkoutAssigneesState {
+export default function useAssignees(role: "ADMIN" | "TRAINER" | null): AssigneesState {
   const container = useContainer();
   const { runWithSession } = useSession();
-  const [status, setStatus] = useState<WorkoutAssigneesStatus>("loading");
+  const [status, setStatus] = useState<AssigneesStatus>("loading");
   const [assignees, setAssignees] = useState<Assignees>({ athletes: [], trainers: [] });
   const [errorCode, setErrorCode] = useState<DomainErrorCode | null>(null);
   // Bumped by every read and on unmount, so an answer that arrives after either is ignored.

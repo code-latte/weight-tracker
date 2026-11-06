@@ -36,6 +36,8 @@ const created: Workout = {
   userId: athleteId,
   trainerId: null,
   status: "DRAFT",
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
   exercises: [],
 };
 
@@ -77,7 +79,7 @@ const users = [
   userOf("m-1", "ADMIN", "Marta", "Gil", "marta@example.com"),
 ];
 
-/** Stands in for the assigned plans screen: owns the open state and can open the dialog again. */
+/** Stands in for the workouts screen: owns the open state and can open the dialog again. */
 function Harness() {
   const [open, setOpen] = useState(true);
 

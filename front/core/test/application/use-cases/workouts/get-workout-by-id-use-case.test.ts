@@ -20,6 +20,8 @@ const workoutDetail: WorkoutDetail = {
   userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
   trainerId: null,
   status: "DRAFT",
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
   exercises: [
     {
       id: "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",

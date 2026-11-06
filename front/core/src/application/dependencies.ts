@@ -6,12 +6,19 @@ import type {
   CreatedUserResponse,
   CreateUserRequest,
   CreateExerciseRequest,
+  CreateMesocycleRequest,
   CreateWorkoutRequest,
+  DefineMesocycleWeekInput,
   Exercise,
   ExerciseFavorite,
+  GetAthleteMesocyclesInput,
+  GetMesocycleByIdInput,
   GetWorkoutByIdInput,
+  GetWorkoutsInput,
   InvitationResponseInput,
   InviteAthleteRequest,
+  Mesocycle,
+  RedefineMesocycleWeekInput,
   RemoveExerciseFromWorkoutInput,
   ReorderWorkoutExercisesInput,
   LoginRequest,
@@ -20,6 +27,7 @@ import type {
   TrainerAthlete,
   TrainerAthleteInput,
   TrainerAthleteRelationship,
+  UpdateMesocycleInput,
   UpdateProfileRequest,
   UpdateWorkoutExerciseInput,
   UpdateWorkoutInput,
@@ -38,6 +46,7 @@ import type {
   ExerciseRepositoryInterface,
   HttpClientInterface,
   KeyValueStoreInterface,
+  MesocycleRepositoryInterface,
   NotificationServiceInterface,
   TrainerAthleteRepositoryInterface,
   UseCaseInterface,
@@ -53,6 +62,7 @@ export default interface Dependencies {
   authRepository: AuthRepositoryInterface;
   userRepository: UserRepositoryInterface;
   workoutRepository: WorkoutRepositoryInterface;
+  mesocycleRepository: MesocycleRepositoryInterface;
   exerciseRepository: ExerciseRepositoryInterface;
   exerciseFavoriteRepository: ExerciseFavoriteRepositoryInterface;
   trainerAthleteRepository: TrainerAthleteRepositoryInterface;
@@ -72,7 +82,7 @@ export default interface Dependencies {
   createUserUseCase: UseCaseInterface<CreateUserRequest, CreatedUserResponse>;
   activateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
   deactivateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
-  getWorkoutsUseCase: UseCaseInterface<void, WorkoutListItem[]>;
+  getWorkoutsUseCase: UseCaseInterface<GetWorkoutsInput, WorkoutListItem[]>;
   getWorkoutByIdUseCase: UseCaseInterface<GetWorkoutByIdInput, WorkoutDetail>;
   createWorkoutUseCase: UseCaseInterface<CreateWorkoutRequest, Workout>;
   updateWorkoutUseCase: UseCaseInterface<UpdateWorkoutInput, Workout>;
@@ -80,6 +90,13 @@ export default interface Dependencies {
   updateWorkoutExerciseUseCase: UseCaseInterface<UpdateWorkoutExerciseInput, WorkoutExerciseDetail>;
   removeExerciseFromWorkoutUseCase: UseCaseInterface<RemoveExerciseFromWorkoutInput, void>;
   reorderWorkoutExercisesUseCase: UseCaseInterface<ReorderWorkoutExercisesInput, WorkoutDetail>;
+  getMesocyclesUseCase: UseCaseInterface<void, Mesocycle[]>;
+  getMesocycleByIdUseCase: UseCaseInterface<GetMesocycleByIdInput, Mesocycle>;
+  getAthleteMesocyclesUseCase: UseCaseInterface<GetAthleteMesocyclesInput, Mesocycle[]>;
+  createMesocycleUseCase: UseCaseInterface<CreateMesocycleRequest, Mesocycle>;
+  updateMesocycleUseCase: UseCaseInterface<UpdateMesocycleInput, Mesocycle>;
+  defineMesocycleWeekUseCase: UseCaseInterface<DefineMesocycleWeekInput, Mesocycle>;
+  redefineMesocycleWeekUseCase: UseCaseInterface<RedefineMesocycleWeekInput, Mesocycle>;
   getExercisesUseCase: UseCaseInterface<void, Exercise[]>;
   createExerciseUseCase: UseCaseInterface<CreateExerciseRequest, Exercise>;
   getExerciseFavoritesUseCase: UseCaseInterface<void, ExerciseFavorite[]>;

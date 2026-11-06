@@ -156,6 +156,21 @@ public class OpenApiDocumentTests : IntegrationTest
     }
 
     [Fact]
+    public async Task ListMesocycleWorkouts_ShouldDocumentTheWorkoutListItemAndItsResponses()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var responses = Operation(document, "/mesocycles/{id}/workouts", "get").GetProperty("responses");
+        responses.EnumerateObject().Select(property => property.Name)
+            .Should().Contain(["200", "401", "403", "404"]);
+        var itemReference = responses.GetProperty("200").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("items").GetProperty("$ref").GetString();
+        itemReference.Should().Be("#/components/schemas/WorkoutListItemResponse");
+    }
+
+    [Fact]
     public async Task CreateWorkout_ShouldDocumentItsSecurityAndResponses()
     {
         // Arrange & Act
@@ -393,6 +408,49 @@ public class OpenApiDocumentTests : IntegrationTest
             .GetProperty("responses").GetProperty("201").GetProperty("content").GetProperty("application/json")
             .GetProperty("schema").GetProperty("$ref").GetString();
         createdReference.Should().Be("#/components/schemas/WorkoutResponse");
+    }
+
+    [Fact]
+    public async Task GetWorkoutById_ShouldDocumentTheAthleteAndANullableTrainer()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var reference = Operation(document, "/workouts/{id}", "get")
+            .GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("$ref").GetString();
+        reference.Should().Be("#/components/schemas/WorkoutByIdResponse");
+
+        var schema = document.GetProperty("components").GetProperty("schemas").GetProperty("WorkoutByIdResponse");
+        schema.GetProperty("required").EnumerateArray().Select(name => name.GetString()).Should().Contain("athlete");
+        schema.GetProperty("properties").GetProperty("athlete").GetRawText()
+            .Should().Contain("#/components/schemas/UserProfileResponse");
+        var trainer = schema.GetProperty("properties").GetProperty("trainer").GetRawText();
+        trainer.Should().Contain("#/components/schemas/UserProfileResponse");
+        trainer.Should().Match(text => text.Contains("\"null\"") || text.Contains("\"nullable\": true") || text.Contains("\"nullable\":true"));
+
+        var updatedReference = Operation(document, "/workouts/{id}", "put")
+            .GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("$ref").GetString();
+        updatedReference.Should().Be("#/components/schemas/WorkoutDetailResponse");
+    }
+
+    [Fact]
+    public async Task ListWorkouts_ShouldDocumentANullablePlacementOnEachItem()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var properties = document.GetProperty("components").GetProperty("schemas")
+            .GetProperty("WorkoutListItemResponse").GetProperty("properties");
+        var mesocycleId = properties.GetProperty("mesocycleId").GetRawText();
+        mesocycleId.Should().Contain("\"uuid\"");
+        mesocycleId.Should().Match(text => text.Contains("\"null\"") || text.Contains("\"nullable\": true") || text.Contains("\"nullable\":true"));
+        var weekNumber = properties.GetProperty("mesocycleWeekNumber").GetRawText();
+        weekNumber.Should().Contain("\"integer\"");
+        weekNumber.Should().Match(text => text.Contains("\"null\"") || text.Contains("\"nullable\": true") || text.Contains("\"nullable\":true"));
     }
 
     [Fact]

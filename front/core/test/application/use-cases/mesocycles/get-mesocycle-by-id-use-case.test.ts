@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { MesocycleRepositoryInterface } from "../../../../src/application";
 import { GetMesocycleByIdUseCase } from "../../../../src/application";
-import { DomainError, fail, ok, type Mesocycle, type Result } from "../../../../src/domain";
+import {
+  DomainError,
+  fail,
+  ok,
+  type Mesocycle,
+  type Result,
+  type WorkoutListItem,
+} from "../../../../src/domain";
 
 const mesocycle: Mesocycle = {
   id: "9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
@@ -42,6 +49,11 @@ class FakeMesocycleRepository implements MesocycleRepositoryInterface {
   async getById(id: string): Promise<Result<Mesocycle, DomainError>> {
     this.reads.push(id);
     return this.result;
+  }
+
+  async getWorkouts(): Promise<Result<WorkoutListItem[], DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
   async getByAthlete(): Promise<Result<Mesocycle[], DomainError>> {

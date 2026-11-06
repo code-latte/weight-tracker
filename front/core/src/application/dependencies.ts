@@ -13,6 +13,7 @@ import type {
   ExerciseFavorite,
   GetAthleteMesocyclesInput,
   GetMesocycleByIdInput,
+  GetMesocycleWorkoutsInput,
   GetWorkoutByIdInput,
   GetWorkoutsInput,
   InvitationResponseInput,
@@ -35,6 +36,7 @@ import type {
   UserProfile,
   UserSummary,
   Workout,
+  WorkoutById,
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
@@ -83,7 +85,7 @@ export default interface Dependencies {
   activateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
   deactivateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
   getWorkoutsUseCase: UseCaseInterface<GetWorkoutsInput, WorkoutListItem[]>;
-  getWorkoutByIdUseCase: UseCaseInterface<GetWorkoutByIdInput, WorkoutDetail>;
+  getWorkoutByIdUseCase: UseCaseInterface<GetWorkoutByIdInput, WorkoutById>;
   createWorkoutUseCase: UseCaseInterface<CreateWorkoutRequest, Workout>;
   updateWorkoutUseCase: UseCaseInterface<UpdateWorkoutInput, Workout>;
   addExerciseToWorkoutUseCase: UseCaseInterface<AddExerciseToWorkoutInput, WorkoutExerciseDetail>;
@@ -92,6 +94,7 @@ export default interface Dependencies {
   reorderWorkoutExercisesUseCase: UseCaseInterface<ReorderWorkoutExercisesInput, WorkoutDetail>;
   getMesocyclesUseCase: UseCaseInterface<void, Mesocycle[]>;
   getMesocycleByIdUseCase: UseCaseInterface<GetMesocycleByIdInput, Mesocycle>;
+  getMesocycleWorkoutsUseCase: UseCaseInterface<GetMesocycleWorkoutsInput, WorkoutListItem[]>;
   getAthleteMesocyclesUseCase: UseCaseInterface<GetAthleteMesocyclesInput, Mesocycle[]>;
   createMesocycleUseCase: UseCaseInterface<CreateMesocycleRequest, Mesocycle>;
   updateMesocycleUseCase: UseCaseInterface<UpdateMesocycleInput, Mesocycle>;

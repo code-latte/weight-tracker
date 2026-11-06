@@ -162,6 +162,12 @@
       "previous": "Semana anterior",
       "next": "Semana siguiente",
       "pick": "Elegir semana"
+    },
+    "context": {
+      "mesocycle": "Mesociclo",
+      "label": "Datos del entrenamiento",
+      "week": "Semana {{number}}",
+      "breadcrumb": "Mesociclo y semana"
     }
   },
   "muscles": {

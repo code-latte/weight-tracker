@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DomainErrorCode, WorkoutDetail } from "@weight-tracker/core/domain";
+import type { DomainErrorCode, WorkoutById } from "@weight-tracker/core/domain";
 import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
 
@@ -7,7 +7,7 @@ type WorkoutStatus = "loading" | "loaded" | "failed";
 
 interface WorkoutState {
   status: WorkoutStatus;
-  workout: WorkoutDetail | null;
+  workout: WorkoutById | null;
   errorCode: DomainErrorCode | null;
   reload: () => void;
 }
@@ -20,7 +20,7 @@ export default function useWorkout(id: string | null): WorkoutState {
   const container = useContainer();
   const { runWithSession } = useSession();
   const [status, setStatus] = useState<WorkoutStatus>(id === null ? "failed" : "loading");
-  const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
+  const [workout, setWorkout] = useState<WorkoutById | null>(null);
   const [errorCode, setErrorCode] = useState<DomainErrorCode | null>(
     id === null ? "NOT_FOUND" : null,
   );

@@ -82,4 +82,93 @@ public class WorkoutVisibilityTests
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
         _workouts.VerifyNoOtherCalls();
     }
+
+    [Fact]
+    public void CanSee_ShouldLetAnAdminSeeAnyWorkoutIncludingADraft()
+    {
+        // Arrange
+        var workout = AWorkout(Id.New(), Id.New());
+
+        // Act
+        var canSee = AVisibility().CanSee(workout, Id.New(), Role.ADMIN);
+
+        // Assert
+        canSee.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanSee_ShouldLetATrainerSeeWhatTheyOwnOrPrescribe()
+    {
+        // Arrange
+        var callerId = Id.New();
+        var owned = AWorkout(callerId);
+        var prescribed = AWorkout(Id.New(), callerId);
+        var visibility = AVisibility();
+
+        // Act
+        var seen = new[] { owned, prescribed }.Select(workout => visibility.CanSee(workout, callerId, Role.TRAINER));
+
+        // Assert
+        seen.Should().AllBeEquivalentTo(true);
+    }
+
+    [Fact]
+    public void CanSee_ShouldRefuseATrainerAnUnrelatedWorkout()
+    {
+        // Arrange
+        var workout = AWorkout(Id.New(), Id.New(), WorkoutStatus.PUBLISHED);
+
+        // Act
+        var canSee = AVisibility().CanSee(workout, Id.New(), Role.TRAINER);
+
+        // Assert
+        canSee.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanSee_ShouldLetAUserSeeTheirOwnWorkoutButNotAnotherUsers()
+    {
+        // Arrange
+        var callerId = Id.New();
+        var own = AWorkout(callerId);
+        var other = AWorkout(Id.New());
+        var visibility = AVisibility();
+
+        // Act
+        var seen = new[] { own, other }.Select(workout => visibility.CanSee(workout, callerId, Role.USER)).ToList();
+
+        // Assert
+        seen.Should().Equal(true, false);
+    }
+
+    [Fact]
+    public void CanSee_ShouldRefuseTheAthleteAPrescribedDraftButNotOncePublished()
+    {
+        // Arrange
+        var callerId = Id.New();
+        var trainerId = Id.New();
+        var draft = AWorkout(callerId, trainerId);
+        var published = AWorkout(callerId, trainerId, WorkoutStatus.PUBLISHED);
+        var visibility = AVisibility();
+
+        // Act
+        var seen = new[] { draft, published }.Select(workout => visibility.CanSee(workout, callerId, Role.USER)).ToList();
+
+        // Assert
+        seen.Should().Equal(false, true);
+    }
+
+    [Fact]
+    public void CanSee_ShouldRefuseAnUnknownRole()
+    {
+        // Arrange
+        var callerId = Id.New();
+        var workout = AWorkout(callerId);
+
+        // Act
+        var canSee = AVisibility().CanSee(workout, callerId, (Role)99);
+
+        // Assert
+        canSee.Should().BeFalse();
+    }
 }

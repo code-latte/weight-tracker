@@ -19,7 +19,6 @@ import TextField from "@/presentation/common/components/atoms/text-field";
 import Typography from "@/presentation/common/components/atoms/typography";
 import PersonPicker from "@/presentation/common/components/molecules/person-picker";
 import type { Assignee } from "@/presentation/common/hooks/use-assignees";
-import DurationField from "@/presentation/mesocycles/components/molecules/duration-field";
 
 type Field = keyof CreateMesocycleFormValues;
 
@@ -34,13 +33,6 @@ export interface MesocyclePeoplePickers {
   onRetry: () => void;
 }
 
-/** Who the mesocycle is for, shown once it exists. */
-export interface MesocyclePeopleNames {
-  athlete: string;
-  /** `null` leaves the trainer out. */
-  trainer: string | null;
-}
-
 interface MesocycleDetailsCardProps {
   values: CreateMesocycleFormValues;
   errors: CreateMesocycleFormViolations;
@@ -48,10 +40,8 @@ interface MesocycleDetailsCardProps {
   onSave: () => void;
   /** A save is in progress: the fields and the save action are disabled. */
   saving: boolean;
-  /** The pickers while creating, or the names once the mesocycle exists. */
-  people:
-    | { kind: "pickers"; pickers: MesocyclePeoplePickers }
-    | { kind: "names"; names: MesocyclePeopleNames };
+  /** The pickers while creating; once the mesocycle exists, who it is for is shown outside the card. */
+  people: { kind: "pickers"; pickers: MesocyclePeoplePickers } | { kind: "none" };
   errorCode: DomainErrorCode | null;
   saved: boolean;
   titleId: string;
@@ -62,21 +52,9 @@ const maxLengthOf: Partial<Record<Field, number>> = {
   objective: MESOCYCLE_OBJECTIVE_MAX_LENGTH,
 };
 
-/** One read-only line: a label above a value. */
-function NameLine({ label, value }: { label: string; value: string }) {
-  return (
-    <Box>
-      <Typography variant="caption" color="text.secondary" component="p">
-        {label}
-      </Typography>
-      <Typography>{value}</Typography>
-    </Box>
-  );
-}
-
 /**
- * The mesocycle's general information: who it is for, its name, start, duration and objective, with the save action.
- * The screen owns and saves the values.
+ * The mesocycle's general information: its name, start, duration and objective, with the save action, and who it is
+ * for while it is being created. The screen owns and saves the values.
  */
 export default function MesocycleDetailsCard({
   values,
@@ -157,7 +135,7 @@ export default function MesocycleDetailsCard({
           )}
           {errorCode && <Alert severity="error">{tc(`errors:${errorCode}`)}</Alert>}
           {saved && <Alert severity="success">{t("mesocycle.saved")}</Alert>}
-          {people.kind === "pickers" ? (
+          {people.kind === "pickers" && (
             <Box
               sx={{
                 display: "grid",
@@ -186,44 +164,30 @@ export default function MesocycleDetailsCard({
                 />
               )}
             </Box>
-          ) : (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              <NameLine label={t("mesocycle.fields.athlete")} value={people.names.athlete} />
-              {people.names.trainer !== null && (
-                <NameLine label={t("mesocycle.fields.trainer")} value={people.names.trainer} />
-              )}
-            </Box>
           )}
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+              gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) auto auto" },
               gap: 2,
             }}
           >
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-              <TextField {...field("name")} />
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                <TextField
-                  {...field("startDate")}
-                  type="date"
-                  slotProps={{ inputLabel: { shrink: true } }}
-                />
-                <DurationField
-                  label={field("durationInWeeks").label}
-                  value={values.durationInWeeks}
-                  onChange={(value) => onChange("durationInWeeks", value)}
-                  min={MESOCYCLE_DURATION_MIN}
-                  max={MESOCYCLE_DURATION_MAX}
-                  decreaseLabel={t("mesocycle.duration.decrease")}
-                  increaseLabel={t("mesocycle.duration.increase")}
-                  disabled={saving}
-                  error={messageOf("durationInWeeks")}
-                />
-              </Box>
-            </Box>
-            <TextField {...field("objective")} multiline minRows={4} />
+            <TextField {...field("name")} />
+            <TextField
+              {...field("startDate")}
+              type="date"
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              {...field("durationInWeeks")}
+              type="number"
+              slotProps={{
+                htmlInput: { min: MESOCYCLE_DURATION_MIN, max: MESOCYCLE_DURATION_MAX, step: 1 },
+              }}
+              sx={{ width: { sm: 180 } }}
+            />
           </Box>
+          <TextField {...field("objective")} multiline minRows={2} />
           <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
             <Button
               variant="contained"

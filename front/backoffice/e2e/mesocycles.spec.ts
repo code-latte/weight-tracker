@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { mockMesocyclesApi } from "./support/mesocycles-api";
+import {
+  mockMesocyclesApi,
+  mockWeekWorkoutsApi,
+  type StoredMesocycle,
+  type StoredWorkout,
+} from "./support/mesocycles-api";
 import { completeProfile, mockUsersMe } from "./support/users-me";
 
 const api = "http://localhost:5199";
@@ -100,6 +105,75 @@ test("creates a mesocycle, then defines and redefines one of its weeks", async (
       method: "PUT",
       path: `/mesocycles/${newId}/weeks/1`,
       body: { trainingWeekType: "DELOAD", objective: "Cargas iniciales" },
+    },
+  ]);
+});
+
+test("creates a workout in a mesocycle week, opens it and goes back to the week", async ({
+  page,
+}) => {
+  // Arrange
+  const mesocycleId = "7b0c1f7e-3a54-4d4e-9d0e-1a2b3c4d5e6f";
+  const workoutId = "8c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f";
+  const hypertrophy: StoredMesocycle = {
+    id: mesocycleId,
+    trainerId: trainer.id,
+    athleteId: beaId,
+    name: "Hipertrofia",
+    objective: "Ganar masa muscular",
+    startDate: "2026-11-02",
+    durationInWeeks: 4,
+    weeks: [
+      { weekNumber: 1, trainingWeekType: "ADAPTATION", objective: "Cargas iniciales" },
+      { weekNumber: 2, trainingWeekType: "ACCUMULATION", objective: "Subir volumen" },
+    ],
+    trainer,
+    athlete: bea,
+  };
+  const workouts: StoredWorkout[] = [];
+  await mockUsersMe(page);
+  await mockMesocyclesApi(page, { initial: [hypertrophy], people: [bea], trainer, workouts });
+  const sent = await mockWeekWorkoutsApi(page, {
+    workouts,
+    people: [bea, trainer],
+    newId: workoutId,
+    workoutDate: "2026-11-11",
+  });
+  await page.addInitScript(() => {
+    window.localStorage.setItem("auth.accessToken", "access");
+    window.localStorage.setItem("auth.refreshToken", "refresh");
+  });
+  await page.goto(`/mesocycle?id=${mesocycleId}`);
+  const weeks = page.getByRole("region", { name: "Planificación semanal" });
+  const secondWeek = weeks.getByRole("listitem").filter({ hasText: "Semana 2" });
+  await secondWeek.getByRole("button", { name: "Nuevo entrenamiento" }).click();
+  const dialog = page.getByRole("dialog", { name: "Nuevo entrenamiento · Semana 2" });
+  await dialog.getByRole("textbox", { name: "Nombre" }).fill("Pierna");
+
+  // Act
+  await dialog.getByRole("button", { name: "Crear" }).click();
+  await expect(page).toHaveURL(new RegExp(`/workout/?\\?id=${workoutId}$`));
+  const context = page.getByRole("region", { name: "Datos del entrenamiento" });
+  await expect(context).toContainText("Bea López");
+  await expect(context.getByRole("navigation", { name: "Mesociclo y semana" })).toHaveText(
+    "Hipertrofia/Semana 2",
+  );
+  await expect(context.getByRole("link")).toHaveCount(0);
+  await page.getByRole("link", { name: "Volver", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/mesocycle/?\\?id=${mesocycleId}$`));
+  await secondWeek.getByRole("button", { name: "Mostrar entrenamientos de la semana 2" }).click();
+
+  // Assert
+  await expect(secondWeek).toContainText("1 entrenamiento");
+  await expect(secondWeek.getByRole("link", { name: "Editar Pierna" })).toHaveAttribute(
+    "href",
+    new RegExp(`/workout/?\\?id=${workoutId}$`),
+  );
+  expect(sent).toEqual([
+    {
+      method: "POST",
+      path: "/workouts",
+      body: { name: "Pierna", userId: beaId, mesocycleId, mesocycleWeekNumber: 2 },
     },
   ]);
 });

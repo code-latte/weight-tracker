@@ -8,6 +8,7 @@ import {
   type Mesocycle,
   type RedefineMesocycleWeekRequest,
   type Result,
+  type WorkoutListItem,
 } from "../../../../src/domain";
 
 const mesocycle: Mesocycle = {
@@ -56,6 +57,11 @@ class FakeMesocycleRepository implements MesocycleRepositoryInterface {
   }
 
   async getById(): Promise<Result<Mesocycle, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async getWorkouts(): Promise<Result<WorkoutListItem[], DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }

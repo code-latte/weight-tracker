@@ -34,6 +34,22 @@ export interface StoredMesocycle {
   athlete: Person;
 }
 
+/** A workout placed in a mesocycle week, as the workout endpoints answer with it. */
+export interface StoredWorkout {
+  id: string;
+  name: string;
+  description: string | null;
+  workoutDate: string;
+  userId: string;
+  trainerId: string | null;
+  status: string;
+  exercises: unknown[];
+  mesocycleId: string | null;
+  mesocycleWeekNumber: number | null;
+  athlete: Person;
+  trainer: Person | null;
+}
+
 export interface SentRequest {
   method: string;
   path: string;
@@ -49,7 +65,8 @@ const json = (body: unknown, status = 200) => ({
 
 /**
  * Intercepts the mesocycle endpoints over an in-memory list, so the screens see their own writes. A creation is
- * given `newId` and the `people` it names. Every write is recorded, in order.
+ * given `newId` and the `people` it names. `workouts` is the list `GET /mesocycles/{id}/workouts` reads, shared with
+ * `mockWeekWorkoutsApi`. Every write is recorded, in order.
  */
 export async function mockMesocyclesApi(
   page: Page,
@@ -58,7 +75,14 @@ export async function mockMesocyclesApi(
     people,
     newId = "9d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a",
     trainer,
-  }: { initial: StoredMesocycle[]; people: Person[]; newId?: string; trainer: Person },
+    workouts = [],
+  }: {
+    initial: StoredMesocycle[];
+    people: Person[];
+    newId?: string;
+    trainer: Person;
+    workouts?: StoredWorkout[];
+  },
 ): Promise<SentRequest[]> {
   const mesocycles = [...initial];
   const sent: SentRequest[] = [];
@@ -103,6 +127,9 @@ export async function mockMesocyclesApi(
     if (!mesocycle) {
       return route.fulfill(json({}, 404));
     }
+    if (weeks === "workouts") {
+      return route.fulfill(json(workouts.filter((workout) => workout.mesocycleId === id)));
+    }
     if (weeks === undefined) {
       if (method === "PUT") {
         Object.assign(mesocycle, request.postDataJSON());
@@ -117,6 +144,75 @@ export async function mockMesocyclesApi(
     Object.assign(week, request.postDataJSON());
     return route.fulfill(json(mesocycle));
   });
+
+  return sent;
+}
+
+/**
+ * Intercepts what creating and opening a week workout needs: `POST /workouts` stores the workout in `workouts` with
+ * `newId`, the `people` it names and the date of its week; `GET /workouts/{id}` answers it; the catalog and the
+ * favorites are empty. Every creation body is recorded, in order.
+ */
+export async function mockWeekWorkoutsApi(
+  page: Page,
+  {
+    workouts,
+    people,
+    newId = "8c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+    workoutDate,
+  }: { workouts: StoredWorkout[]; people: Person[]; newId?: string; workoutDate: string },
+): Promise<SentRequest[]> {
+  const sent: SentRequest[] = [];
+  const personOf = (id: string) => people.find((person) => person.id === id)!;
+
+  await page.route(`${api}/workouts`, (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    const body = request.postDataJSON() as {
+      name: string;
+      description?: string;
+      userId: string;
+      trainerId?: string;
+      mesocycleId: string;
+      mesocycleWeekNumber: number;
+    };
+    sent.push({ method: "POST", path: "/workouts", body });
+    const trainerId = body.trainerId ?? people.find((person) => person.role === "TRAINER")!.id;
+    const created: StoredWorkout = {
+      id: newId,
+      name: body.name,
+      description: body.description ?? null,
+      // The API dates a placed workout from its week.
+      workoutDate,
+      userId: body.userId,
+      trainerId,
+      status: "DRAFT",
+      exercises: [],
+      mesocycleId: body.mesocycleId,
+      mesocycleWeekNumber: body.mesocycleWeekNumber,
+      athlete: personOf(body.userId),
+      trainer: personOf(trainerId),
+    };
+    workouts.push(created);
+    return route.fulfill(json(created, 201));
+  });
+  await page.route(`${api}/workouts/*`, (route) => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    const id = new URL(route.request().url()).pathname.split("/").pop() ?? "";
+    const workout = workouts.find((item) => item.id === id);
+    return workout ? route.fulfill(json(workout)) : route.fulfill(json({ status: 404 }, 404));
+  });
+  for (const path of ["exercises", "exercise-favorites"]) {
+    await page.route(`${api}/${path}`, (route) =>
+      route.request().method() === "OPTIONS"
+        ? route.fulfill({ status: 204, headers: cors })
+        : route.fulfill(json([])),
+    );
+  }
 
   return sent;
 }

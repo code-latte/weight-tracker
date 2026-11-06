@@ -7,6 +7,7 @@ import type {
   Result,
   UpdateWorkoutRequest,
   Workout,
+  WorkoutById,
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
@@ -14,7 +15,7 @@ import type {
 
 export default interface WorkoutRepositoryInterface {
   getAll(query?: GetWorkoutsInput): Promise<Result<WorkoutListItem[], DomainError>>;
-  getById(id: string): Promise<Result<WorkoutDetail, DomainError>>;
+  getById(id: string): Promise<Result<WorkoutById, DomainError>>;
   create(request: CreateWorkoutRequest): Promise<Result<Workout, DomainError>>;
   update(id: string, request: UpdateWorkoutRequest): Promise<Result<Workout, DomainError>>;
   addExercise(

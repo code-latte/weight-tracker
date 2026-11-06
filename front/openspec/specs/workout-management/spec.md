@@ -2,13 +2,14 @@
 
 ## Purpose
 
-TBD - created by archiving change add-workout-usecases. Update Purpose after archive.
+Lets both fronts list, read, create and update workouts and manage their exercises through `core`, each operation
+returning the API's answer or a `DomainError` as a result, with every role and placement rule left to the API.
 
 ## Requirements
 
 ### Requirement: Creating a workout sends its data without exercises
 
-Creating a workout SHALL send `POST /workouts` with the given `name`, `workoutDate`, optional `description`, the optional `userId` and `trainerId` and the optional `mesocycleId` and `mesocycleWeekNumber`, unchanged, and SHALL return a successful result holding the workout the API answers with. It SHALL NOT send any exercises and SHALL NOT check the caller's role.
+Creating a workout SHALL send `POST /workouts` with the given `name`, the optional `workoutDate` and `description`, the optional `userId` and `trainerId` and the optional `mesocycleId` and `mesocycleWeekNumber`, unchanged, and SHALL return a successful result holding the workout the API answers with. It SHALL NOT send any exercises, SHALL NOT fill in a date the caller omitted and SHALL NOT check the caller's role.
 
 #### Scenario: Workout created with every field
 
@@ -27,9 +28,15 @@ Creating a workout SHALL send `POST /workouts` with the given `name`, `workoutDa
 - **THEN** the request body holds both values unchanged
 - **AND** the result's workout holds the `mesocycleId` and `mesocycleWeekNumber` the API answered with
 
+#### Scenario: Placed workout created without a date
+
+- **WHEN** a workout is created with a name, a user id, a `mesocycleId` and a `mesocycleWeekNumber` and no date, and the API accepts it
+- **THEN** the request body holds no `workoutDate`
+- **AND** the result's workout holds the date the API answered with
+
 #### Scenario: Rejected by the API
 
-- **WHEN** the API refuses the creation (missing name, missing user or trainer for the caller's role, unknown user or trainer)
+- **WHEN** the API refuses the creation (missing name, missing date without a placement, missing user or trainer for the caller's role, unknown user or trainer)
 - **THEN** the result is a failure holding the matching `DomainError` code (`VALIDATION`, `FORBIDDEN` or `NOT_FOUND`) with the API's detail kept in the message
 
 #### Scenario: Placement rejected by the API
@@ -145,13 +152,19 @@ answers with, unchanged. It SHALL NOT filter, sort or check the caller's role.
 ### Requirement: Reading a workout by id returns it with its exercises
 
 Reading a workout SHALL send `GET /workouts/{id}` with the given workout id in the path and no body, and SHALL return a
-successful result holding the workout and its exercises as the API answers them.
+successful result holding the workout, its exercises, its placement and its athlete and trainer profiles as the API
+answers them.
 
 #### Scenario: Workout read
 
 - **WHEN** a workout is read by id and the API answers with it
 - **THEN** exactly one `GET /workouts/{id}` request is sent with that id in the path
 - **AND** the result is successful and its value is the API's answer
+
+#### Scenario: Workout read with its people
+
+- **WHEN** the API answers with a workout whose athlete is "Ana García" and whose trainer is "Luis Pérez"
+- **THEN** the result's workout holds both profiles unchanged
 
 #### Scenario: Unknown workout
 

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using FluentAssertions;
 using WeightTracker.Domain.Users;
 using WeightTracker.Infra.Seed;
@@ -8,8 +9,9 @@ using Xunit;
 namespace WeightTracker.Integration.Mesocycles;
 
 /// <summary>
-/// <c>GET /mesocycles/{id}</c>, <c>GET /mesocycles</c> and <c>GET /users/{userId}/mesocycles</c>. The seed holds
-/// one four-week mesocycle from the trainer to the user, with weeks 1, 2 and 4 defined.
+/// <c>GET /mesocycles/{id}</c>, <c>GET /mesocycles/{id}/workouts</c>, <c>GET /mesocycles</c> and
+/// <c>GET /users/{userId}/mesocycles</c>. The seed holds one four-week mesocycle from the trainer to the user, with
+/// weeks 1, 2 and 4 defined, the trained workout placed in week 1 and the prescribed started workout in week 2.
 /// </summary>
 public class MesocycleReadEndpointsTests : MesocycleEndpointTest
 {
@@ -23,7 +25,31 @@ public class MesocycleReadEndpointsTests : MesocycleEndpointTest
         SeededMesocycleRoute,
         "/mesocycles",
         UserMesocyclesRoute,
+        SeededMesocycleWorkoutsRoute,
     };
+
+    private static readonly string SeededMesocycleWorkoutsRoute = $"{SeededMesocycleRoute}/workouts";
+
+    /// <summary>
+    /// Places the seeded prescribed draft in week 3 of the seeded mesocycle through <c>PUT /workouts/{id}</c>,
+    /// as its trainer.
+    /// </summary>
+    private async Task GivenPrescribedDraftPlacedInTheSeededMesocycle()
+    {
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+
+        var response = await trainer.PutAsJsonAsync($"/workouts/{SeedData.PrescribedDraftWorkoutId}", new
+        {
+            name = "Planned draft",
+            workoutDate = "2026-10-14",
+            userId = SeedData.UserId,
+            trainerId = SeedData.TrainerId,
+            mesocycleId = SeedData.MesocycleId,
+            mesocycleWeekNumber = 3,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "the draft must be placed first");
+    }
 
     [Theory]
     [MemberData(nameof(Routes))]
@@ -299,6 +325,130 @@ public class MesocycleReadEndpointsTests : MesocycleEndpointTest
 
         // Act
         var response = await trainer.GetAsync($"/users/{Guid.NewGuid()}/mesocycles");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetWorkouts_ShouldListEveryWeekByWeekNumberAndLeaveOutEveryOtherWorkout()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.GetAsync(SeededMesocycleWorkoutsRoute);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var workouts = await Body(response);
+        Ids(workouts).Should().Equal(SeedData.TrainedWorkoutId, SeedData.PrescribedStartedWorkoutId);
+        Ids(workouts).Should().NotContain([SeedData.OwnedWorkoutId, SeedData.PrescribedDraftWorkoutId]);
+        workouts.EnumerateArray().Select(workout => workout.GetProperty("mesocycleWeekNumber").GetInt32())
+            .Should().Equal(1, 2);
+        workouts.EnumerateArray().Select(workout => workout.GetProperty("mesocycleId").GetGuid())
+            .Should().AllBeEquivalentTo(SeedData.MesocycleId);
+        workouts[0].GetProperty("athlete").GetProperty("id").GetGuid().Should().Be(SeedData.UserId);
+        workouts[0].GetProperty("trainer").GetProperty("id").GetGuid().Should().Be(SeedData.TrainerId);
+    }
+
+    [Fact]
+    public async Task GetWorkouts_ShouldLeaveOutTheWorkoutsOfAnotherMesocycle()
+    {
+        // Arrange
+        var otherMesocycleId = await GivenMesocycle(SeedData.TrainerId, SeedData.UserId);
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var created = await trainer.PostAsJsonAsync("/workouts", new
+        {
+            userId = SeedData.UserId,
+            name = "Other block day",
+            mesocycleId = otherMesocycleId,
+            mesocycleWeekNumber = 1,
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created, "the other mesocycle's workout must be arranged first");
+        var otherWorkoutId = (await Body(created)).GetProperty("id").GetGuid();
+
+        // Act
+        var response = await trainer.GetAsync(SeededMesocycleWorkoutsRoute);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Ids(await Body(response)).Should().NotContain(otherWorkoutId);
+    }
+
+    [Fact]
+    public async Task GetWorkouts_ShouldReturnAnEmptyListForAMesocycleWithoutWorkouts()
+    {
+        // Arrange
+        var mesocycleId = await GivenMesocycle(SeedData.TrainerId, SeedData.UserId);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.GetAsync($"/mesocycles/{mesocycleId}/workouts");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Body(response)).GetArrayLength().Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(SeedCredentials.User)]
+    [InlineData(SeedCredentials.Trainer)]
+    [InlineData(SeedCredentials.Admin)]
+    public async Task GetWorkouts_ShouldLetTheAthleteTheTrainerAndAdminsRead(string callerEmail)
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(callerEmail);
+
+        // Act
+        var response = await client.GetAsync(SeededMesocycleWorkoutsRoute);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Ids(await Body(response)).Should().Equal(SeedData.TrainedWorkoutId, SeedData.PrescribedStartedWorkoutId);
+    }
+
+    [Fact]
+    public async Task GetWorkouts_ShouldHideAPrescribedDraftFromTheAthleteButNotFromTheTrainer()
+    {
+        // Arrange
+        await GivenPrescribedDraftPlacedInTheSeededMesocycle();
+        var athlete = await AuthenticatedClientFor(SeedCredentials.User);
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+
+        // Act
+        var responses = await Task.WhenAll(
+            athlete.GetAsync(SeededMesocycleWorkoutsRoute), trainer.GetAsync(SeededMesocycleWorkoutsRoute));
+
+        // Assert
+        Ids(await Body(responses[0])).Should().NotContain(SeedData.PrescribedDraftWorkoutId);
+        Ids(await Body(responses[1])).Should().Contain(SeedData.PrescribedDraftWorkoutId);
+    }
+
+    [Theory]
+    [InlineData(Role.TRAINER)]
+    [InlineData(Role.USER)]
+    public async Task GetWorkouts_ShouldRefuseSomebodyWhoIsNotPartOfTheMesocycle(Role role)
+    {
+        // Arrange
+        var (_, email) = await GivenUser(role);
+        var outsider = await AuthenticatedClientFor(email);
+
+        // Act
+        var response = await outsider.GetAsync(SeededMesocycleWorkoutsRoute);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetWorkouts_ShouldNotFindAnUnknownMesocycle()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.GetAsync($"/mesocycles/{Guid.NewGuid()}/workouts");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);

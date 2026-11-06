@@ -25,6 +25,7 @@ const keys: (keyof Dependencies)[] = [
   "mesocycleRepository",
   "getMesocyclesUseCase",
   "getMesocycleByIdUseCase",
+  "getMesocycleWorkoutsUseCase",
   "getAthleteMesocyclesUseCase",
   "createMesocycleUseCase",
   "updateMesocycleUseCase",

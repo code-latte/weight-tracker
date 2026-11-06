@@ -23,6 +23,9 @@
     "back": "Volver",
     "notFound": "No hemos encontrado este mesociclo.",
     "backToList": "Volver a mesociclos",
+    "context": {
+      "label": "Personas del mesociclo"
+    },
     "saved": "Mesociclo guardado.",
     "details": {
       "title": "Información general",
@@ -36,10 +39,6 @@
       "startDate": "Fecha de inicio",
       "duration": "Duración (semanas)",
       "objective": "Objetivo general"
-    },
-    "duration": {
-      "decrease": "Reducir duración",
-      "increase": "Aumentar duración"
     },
     "validation": {
       "required": "Este campo es obligatorio.",
@@ -67,7 +66,17 @@
       "objective": "Objetivo",
       "cancel": "Cancelar",
       "save": "Guardar"
-    }
+    },
+    "newWorkout": "Nuevo entrenamiento",
+    "workoutCount_one": "{{count}} entrenamiento",
+    "workoutCount_other": "{{count}} entrenamientos",
+    "showWorkouts": "Mostrar entrenamientos de la semana {{number}}",
+    "hideWorkouts": "Ocultar entrenamientos de la semana {{number}}",
+    "workoutsTable": {
+      "name": "Nombre",
+      "exercises": "Ejercicios"
+    },
+    "editWorkout": "Editar {{name}}"
   },
   "trainingWeekType": {
     "ADAPTATION": "Adaptación",
@@ -76,5 +85,16 @@
     "REALIZATION": "Realización",
     "DELOAD": "Descarga",
     "RECOVERY": "Recuperación"
+  },
+  "weekWorkout": {
+    "title": "Nuevo entrenamiento · Semana {{number}}",
+    "fields": {
+      "name": "Nombre",
+      "description": "Descripción"
+    },
+    "actions": {
+      "cancel": "Cancelar",
+      "create": "Crear"
+    }
   }
 }

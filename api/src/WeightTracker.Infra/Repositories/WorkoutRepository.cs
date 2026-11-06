@@ -27,6 +27,9 @@ public class WorkoutRepository : IWorkoutRepository
         => Query(workouts => workouts.Where(workout =>
             workout.UserId == id.Value || workout.TrainerId == id.Value), cancellationToken);
 
+    public Task<IEnumerable<Workout>> GetAllByMesocycleId(Id mesocycleId, CancellationToken cancellationToken)
+        => Query(workouts => workouts.Where(workout => workout.MesocycleId == mesocycleId.Value), cancellationToken);
+
     public Task<bool> ExistsByMesocycleWeek(Id mesocycleId, WeekNumber weekNumber, CancellationToken cancellationToken)
         => _context.Workouts.AnyAsync(workout =>
             workout.MesocycleId == mesocycleId.Value && workout.MesocycleWeekNumber == weekNumber.Value, cancellationToken);

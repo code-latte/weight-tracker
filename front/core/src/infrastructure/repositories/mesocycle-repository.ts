@@ -9,6 +9,7 @@ import {
   type RedefineMesocycleWeekRequest,
   type Result,
   type UpdateMesocycleRequest,
+  type WorkoutListItem,
 } from "../../domain";
 import { mapHttpError } from "../http";
 
@@ -33,6 +34,19 @@ export default class MesocycleRepository implements MesocycleRepositoryInterface
       const response = await this.httpClient.request<Mesocycle>({
         method: "GET",
         path: `/mesocycles/${id}`,
+      });
+
+      return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async getWorkouts(mesocycleId: string): Promise<Result<WorkoutListItem[], DomainError>> {
+    try {
+      const response = await this.httpClient.request<WorkoutListItem[]>({
+        method: "GET",
+        path: `/mesocycles/${mesocycleId}/workouts`,
       });
 
       return ok(response);

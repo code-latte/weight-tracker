@@ -85,5 +85,11 @@
       "NOT_FOUND": "This relationship is no longer active. Reload the list.",
       "CONFLICT": "This relationship is no longer active. Reload the list."
     }
+  },
+  "person": {
+    "role": {
+      "athlete": "Athlete",
+      "trainer": "Trainer"
+    }
   }
 }

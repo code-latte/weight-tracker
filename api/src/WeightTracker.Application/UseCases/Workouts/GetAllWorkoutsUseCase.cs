@@ -1,9 +1,7 @@
 using WeightTracker.Application.Exceptions;
-using WeightTracker.Application.Interfaces;
 using WeightTracker.Application.Services;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Users;
-using WeightTracker.Domain.Workouts;
 
 namespace WeightTracker.Application.UseCases.Workouts;
 
@@ -18,19 +16,15 @@ public class GetAllWorkoutsUseCase
 {
     private WorkoutVisibility _visibility;
 
-    private IExerciseRepository _exercises;
-
-    private IUserRepository _users;
+    private WorkoutListLoader _lists;
 
     public GetAllWorkoutsUseCase(
         WorkoutVisibility visibility,
-        IExerciseRepository exercises,
-        IUserRepository users
+        WorkoutListLoader lists
     )
     {
         _visibility = visibility;
-        _exercises = exercises;
-        _users = users;
+        _lists = lists;
     }
 
     /// <param name="standaloneOnly">Keeps only the workouts that are not placed in a mesocycle.</param>
@@ -45,30 +39,6 @@ public class GetAllWorkoutsUseCase
             ? visible.Where(workout => workout.MesocycleId is null).ToList()
             : visible;
 
-        // Only exercises referenced by the scoped workouts, so the join never widens visibility
-        var exerciseIds = workouts
-            .SelectMany(workout => workout.Exercises)
-            .Select(entry => entry.ExerciseId)
-            .Distinct()
-            .ToList();
-
-        var exercises = await _exercises.GetAllByIds(exerciseIds, cancellationToken);
-
-        // Only owners and trainers of the scoped workouts, so the join never widens visibility either
-        var userIds = workouts
-            .Select(workout => workout.UserId)
-            .Concat(workouts.Where(workout => workout.TrainerId is not null).Select(workout => workout.TrainerId!))
-            .Distinct()
-            .ToList();
-
-        var users = (await _users.GetAllByIds(userIds, cancellationToken)).ToDictionary(user => user.Id);
-
-        // Foreign keys keep every referenced user in place, so a missing one is a data-integrity failure
-        var missing = userIds.FirstOrDefault(userId => users.ContainsKey(userId) == false);
-
-        if (missing is not null)
-            throw new InvalidOperationException($"User '{missing}' referenced by a listed workout does not exist");
-
-        return new WorkoutListDTO(workouts, exercises.ToDictionary(exercise => exercise.Id), users);
+        return await _lists.Load(workouts, cancellationToken);
     }
 }

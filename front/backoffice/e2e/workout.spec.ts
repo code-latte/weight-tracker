@@ -273,7 +273,8 @@ async function mockWorkoutsApi(
       workouts.set(id, updated);
       return route.fulfill(json(updated));
     }
-    return route.fulfill(json(workout));
+    // The read by id carries the athlete and the trainer, as the list does.
+    return route.fulfill(json({ ...workout, athlete, trainer: null }));
   });
   await page.route(`${api}/workouts/*/exercises`, (route) => {
     const request = route.request();

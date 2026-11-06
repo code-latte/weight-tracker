@@ -40,6 +40,23 @@ public class WorkoutVisibility
     }
 
     /// <summary>
+    /// Whether the caller may see one workout. Anyone but an admin is refused a prescribed draft of which they are
+    /// the athlete, since the trainer has not published it yet.
+    /// </summary>
+    public bool CanSee(Workout workout, Id callerId, Role callerRole)
+    {
+        var inScope = callerRole switch
+        {
+            Role.ADMIN => true,
+            Role.TRAINER => workout.UserId == callerId || workout.TrainerId == callerId,
+            Role.USER => workout.UserId == callerId,
+            _ => false,
+        };
+
+        return inScope && (callerRole == Role.ADMIN || workout.IsHiddenFrom(callerId) == false);
+    }
+
+    /// <summary>
     /// Leaves out the prescribed drafts of which the caller is the athlete: their trainer has not published them yet.
     /// </summary>
     private static IEnumerable<Workout> PublishedToCaller(IEnumerable<Workout> workouts, Id callerId)

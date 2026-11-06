@@ -104,7 +104,7 @@ Storage SHALL refuse a workout whose mesocycle id matches no mesocycle, and SHAL
 - **THEN** storage rejects it
 
 ### Requirement: Workout responses expose the placement
-`POST /workouts`, `GET /workouts/{id}` and `PUT /workouts/{id}` SHALL return `mesocycleId` and `mesocycleWeekNumber`, both `null` for a standalone workout. The workout list item shape SHALL NOT change.
+`POST /workouts`, `GET /workouts/{id}` and `PUT /workouts/{id}` SHALL return `mesocycleId` and `mesocycleWeekNumber`, both `null` for a standalone workout. The workout list items of `GET /workouts` and `GET /mesocycles/{id}/workouts` SHALL carry the same two properties, as `workout-retrieval` and `mesocycle-retrieval` specify.
 
 #### Scenario: Reading a linked workout
 - **WHEN** an allowed caller reads the seeded workout placed in week 1 of the seeded mesocycle
@@ -113,6 +113,10 @@ Storage SHALL refuse a workout whose mesocycle id matches no mesocycle, and SHAL
 #### Scenario: Reading a standalone workout
 - **WHEN** an allowed caller reads a workout with no placement
 - **THEN** `mesocycleId` and `mesocycleWeekNumber` are both `null`
+
+#### Scenario: Listing a linked workout
+- **WHEN** an allowed caller lists workouts and the seeded workout placed in week 1 of the seeded mesocycle is listed
+- **THEN** its item has the mesocycle's id and week number 1
 
 ### Requirement: The placement is sent as a pair
 On `POST /workouts` and `PUT /workouts/{id}`, `mesocycleId` and `mesocycleWeekNumber` SHALL be both sent or both omitted. Sending only one SHALL be refused with `400` and nothing SHALL change. A week number below 1 SHALL be refused with `400`.
@@ -205,3 +209,41 @@ Changing or clearing the placement of a `STARTED` or `FINISHED` workout through 
 #### Scenario: Admin edits a started workout keeping its placement
 - **WHEN** an admin renames the seeded started workout sending its current placement
 - **THEN** the response is `200` and it stays in week 2
+
+### Requirement: A placed workout's date is the date of its week
+When `POST /workouts` or `PUT /workouts/{id}` sends a mesocycle placement, the stored `workoutDate` SHALL be the date of that mesocycle week, and any `workoutDate` that is sent SHALL be ignored without error. On `PUT`, the date SHALL be recalculated whenever a placement is sent, even one equal to the current placement. Taking a workout out of its mesocycle SHALL store the sent `workoutDate`.
+
+#### Scenario: Create with a conflicting date
+- **WHEN** the seeded trainer creates a workout for the seeded athlete in week 3 of the seeded mesocycle, which starts on Thursday `2026-10-01`, sending `workoutDate` `2026-12-25`
+- **THEN** the response is `201` with `workoutDate` `2026-10-14`
+
+#### Scenario: Create without a date
+- **WHEN** the seeded trainer creates a workout for the seeded athlete in week 1 of the seeded mesocycle without `workoutDate`
+- **THEN** the response is `201` with `workoutDate` `2026-09-30`
+
+#### Scenario: Move to another week
+- **WHEN** the trainer moves the published workout from week 1 to week 3 of the seeded mesocycle
+- **THEN** its `workoutDate` is `2026-10-14`
+
+#### Scenario: Unchanged placement after a reschedule
+- **WHEN** the seeded mesocycle is rescheduled to `2026-10-08` and the trainer then updates the published workout in week 1, keeping its placement
+- **THEN** its `workoutDate` is `2026-10-07`
+
+#### Scenario: Unlink with a date
+- **WHEN** the trainer takes the published workout out of the seeded mesocycle sending `workoutDate` `2026-11-04`
+- **THEN** the workout is standalone with `workoutDate` `2026-11-04`
+
+#### Scenario: Unlink without a date
+- **WHEN** the trainer takes the published workout out of the seeded mesocycle without `workoutDate`
+- **THEN** the response is `400` and the workout keeps its placement and date
+
+#### Scenario: Placement refused
+- **WHEN** a placement is refused for any placement rule
+- **THEN** the workout's `workoutDate` is unchanged
+
+### Requirement: Rescheduling a mesocycle does not move its workouts
+Changing a mesocycle's start date SHALL NOT change the `workoutDate` of the workouts placed in it. Their date SHALL be recalculated only on their next `PUT /workouts/{id}` with a placement.
+
+#### Scenario: Reschedule leaves workout dates
+- **WHEN** the seeded mesocycle is rescheduled to `2026-10-08`
+- **THEN** the published workout in week 1 still has `workoutDate` `2026-09-30`

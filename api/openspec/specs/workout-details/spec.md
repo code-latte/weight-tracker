@@ -20,7 +20,7 @@ The system SHALL expose `PUT /workouts/{id}` to authenticated callers. A request
 - **AND** the workout is unchanged
 
 ### Requirement: The request replaces every editable property
-The body SHALL carry `name`, `description`, `workoutDate`, `userId` and `trainerId`, and the workout SHALL take exactly those values. A `null` or missing `description` clears it, and a `null` or missing `trainerId` leaves the workout without trainer. A body without `name`, `workoutDate` or `userId` SHALL be rejected with `400 Bad Request`.
+The body SHALL carry `name`, `description`, `workoutDate`, `userId` and `trainerId`, and the workout SHALL take exactly those values. A `null` or missing `description` clears it, and a `null` or missing `trainerId` leaves the workout without trainer. A body without `name` or `userId` SHALL be rejected with `400 Bad Request`. A body without `workoutDate` SHALL be rejected with `400 Bad Request` only when it sends no mesocycle placement. With a placement, `workoutDate` SHALL be ignored and the date SHALL follow the workout mesocycle placement rules.
 
 #### Scenario: Owner renames and reschedules
 - **WHEN** the owner of a workout without trainer sends a new `name`, `description` and `workoutDate` with the current `userId` and a `null` `trainerId`
@@ -32,9 +32,13 @@ The body SHALL carry `name`, `description`, `workoutDate`, `userId` and `trainer
 - **THEN** the response is `200 OK` with `description` `null`
 
 #### Scenario: Missing required field
-- **WHEN** an authorized caller sends a body without `name`, without `workoutDate` or without `userId`
+- **WHEN** an authorized caller sends a body without `name`, without `userId`, or without `workoutDate` and without a placement
 - **THEN** the response is `400 Bad Request`
 - **AND** the workout is unchanged
+
+#### Scenario: Placed workout without date
+- **WHEN** the trainer updates the published workout in week 1 of the seeded mesocycle, keeping its placement and sending no `workoutDate`
+- **THEN** the response is `200 OK`
 
 ### Requirement: The update returns the whole workout
 A successful update SHALL respond `200 OK` with the same shape as `GET /workouts/{id}`, including `name`, `description`, `status` and the unchanged `exercises`. The update SHALL NOT change the workout's status or exercises.

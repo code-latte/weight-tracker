@@ -6,7 +6,7 @@ import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import PersonOutlined from "@mui/icons-material/PersonOutlined";
 import SettingsOutlined from "@mui/icons-material/SettingsOutlined";
 import Alert from "@/presentation/common/components/atoms/alert";
-import Avatar from "@mui/material/Avatar";
+import Avatar from "@/presentation/common/components/atoms/avatar";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import IconButton from "@/presentation/common/components/atoms/icon-button";
@@ -20,11 +20,7 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
 import useLogout from "@/presentation/common/hooks/use-logout";
-
-/** First letter of the name and of the surname: "Ana" "García" → "AG". */
-function initials(name: string, surname: string) {
-  return [name, surname].map((word) => word.trim().charAt(0).toUpperCase()).join("");
-}
+import { initialsOf } from "@/presentation/common/initials";
 
 export default function UserMenu() {
   const { t } = useTranslation("common");
@@ -51,7 +47,7 @@ export default function UserMenu() {
               {t(`header.user.roles.${profile.role}`)}
             </Typography>
           </Box>
-          <Avatar>{initials(profile.name, profile.surname)}</Avatar>
+          <Avatar>{initialsOf(profile)}</Avatar>
         </>
       ) : (
         <>

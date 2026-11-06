@@ -22,7 +22,7 @@ public class GetAllWorkoutsUseCaseTests
 
     private readonly Mock<IUserRepository> _users = new(MockBehavior.Strict);
 
-    private GetAllWorkoutsUseCase AUseCase() => new(new WorkoutVisibility(_workouts.Object), _exercises.Object, _users.Object);
+    private GetAllWorkoutsUseCase AUseCase() => new(new WorkoutVisibility(_workouts.Object), new WorkoutListLoader(_exercises.Object, _users.Object));
 
     private static Workout AWorkout(Id ownerId, params Id[] exerciseIds) =>
         Workout.Rehydrate(

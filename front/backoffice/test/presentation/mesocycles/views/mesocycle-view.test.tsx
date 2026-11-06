@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DomainError, fail, ok } from "@weight-tracker/core/domain";
 import type {
   CreateMesocycleRequest,
+  CreateWorkoutRequest,
   DefineMesocycleWeekInput,
   Mesocycle,
   RedefineMesocycleWeekInput,
@@ -12,6 +13,8 @@ import type {
   UpdateMesocycleInput,
   UserProfile,
   UserSummary,
+  Workout,
+  WorkoutListItem,
 } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
 import MesocycleView from "@/presentation/mesocycles/views/mesocycle-view";
@@ -95,6 +98,61 @@ const users = [
   userOf(trainerId, "TRAINER", "Luis", "Pérez", "luis@example.com"),
 ];
 
+/** A workout of mesocycle `m-1`, as listed, in the given week. */
+function weekWorkoutOf(id: string, name: string, week: number): WorkoutListItem {
+  return {
+    id,
+    name,
+    description: null,
+    workoutDate: "2026-11-04",
+    userId: athleteId,
+    trainerId,
+    status: "DRAFT",
+    exercises: [],
+    athlete: ana,
+    trainer: luis,
+    mesocycleId: "m-1",
+    mesocycleWeekNumber: week,
+  };
+}
+
+/** One exercise of a listed workout; only how many there are is shown. */
+const exercise = {
+  id: "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  exerciseId: "1f2e3d4c-5b6a-4978-8695-a4b3c2d1e0f9",
+  translations: [],
+  muscle: "QUADRICEPS",
+  bodyPart: "LEGS",
+  type: "STRENGTH",
+  effort: "HIGH",
+  perSide: false,
+  restMinutes: null,
+  sets: [],
+  superSeriesId: null,
+} satisfies WorkoutListItem["exercises"][number];
+
+const legs: WorkoutListItem = {
+  ...weekWorkoutOf("w-1", "Pierna", 1),
+  exercises: [exercise, { ...exercise, id: "e-2" }, { ...exercise, id: "e-3" }],
+};
+const pushDay = weekWorkoutOf("w-2", "Empuje", 1);
+
+/** What the API answers to a workout creation: the workout, placed as asked. */
+function createdWorkout(request: CreateWorkoutRequest): Workout {
+  return {
+    id: "w-9",
+    name: request.name ?? "",
+    description: request.description ?? null,
+    workoutDate: "2026-11-11",
+    userId: request.userId ?? athleteId,
+    trainerId: request.trainerId ?? trainerId,
+    status: "DRAFT",
+    exercises: [],
+    mesocycleId: request.mesocycleId ?? null,
+    mesocycleWeekNumber: request.mesocycleWeekNumber ?? null,
+  };
+}
+
 type Answer<T> = Promise<Result<T, DomainError>>;
 
 function renderMesocycle({
@@ -137,6 +195,8 @@ function renderMesocycle({
     }),
   getMyAthletes = async () => ok(myAthletes),
   getUsers = async () => ok(users),
+  getWorkouts = async () => ok([]),
+  createWorkout = async (request: CreateWorkoutRequest) => ok(createdWorkout(request)),
 }: {
   search?: string;
   profile?: UserProfile;
@@ -147,6 +207,8 @@ function renderMesocycle({
   redefineWeek?: (input: RedefineMesocycleWeekInput) => Answer<Mesocycle>;
   getMyAthletes?: () => Answer<TrainerAthlete[]>;
   getUsers?: () => Answer<UserSummary[]>;
+  getWorkouts?: () => Answer<WorkoutListItem[]>;
+  createWorkout?: (request: CreateWorkoutRequest) => Answer<Workout>;
 } = {}) {
   navigation.search = search;
   const fakes = {
@@ -157,6 +219,8 @@ function renderMesocycle({
     redefineWeek: vi.fn(redefineWeek),
     getMyAthletes: vi.fn(getMyAthletes),
     getUsers: vi.fn(getUsers),
+    getWorkouts: vi.fn(getWorkouts),
+    createWorkout: vi.fn(createWorkout),
   };
 
   return {
@@ -173,6 +237,8 @@ function renderMesocycle({
       redefineMesocycleWeekUseCase: () => ({ execute: fakes.redefineWeek }),
       getMyAthletesUseCase: () => ({ execute: fakes.getMyAthletes }),
       getUsersUseCase: () => ({ execute: fakes.getUsers }),
+      getMesocycleWorkoutsUseCase: () => ({ execute: fakes.getWorkouts }),
+      createWorkoutUseCase: () => ({ execute: fakes.createWorkout }),
     }),
   };
 }
@@ -181,7 +247,7 @@ const athleteField = () => screen.getByRole("combobox", { name: "Atleta" });
 const trainerField = () => screen.getByRole("combobox", { name: "Entrenador" });
 const nameField = () => screen.getByRole("textbox", { name: "Nombre" });
 const objectiveField = () => screen.getByRole("textbox", { name: "Objetivo general" });
-const durationField = () => screen.getByRole("textbox", { name: "Duración (semanas)" });
+const durationField = () => screen.getByRole("spinbutton", { name: "Duración (semanas)" });
 const startDateField = () => screen.getByLabelText(/Fecha de inicio/);
 
 /** Waits until the profile and the people are read, so the create form is settled. */
@@ -250,8 +316,9 @@ describe("MesocycleView", () => {
       expect(weeks).toHaveAccessibleName("Planificación semanal");
       expect(nameField()).toHaveValue("");
       expect(startDateField()).toHaveValue("");
-      expect(durationField()).toHaveValue("4");
+      expect(durationField()).toHaveValue(4);
       expect(objectiveField()).toHaveValue("");
+      expect(screen.queryByRole("region", { name: "Personas del mesociclo" })).toBeNull();
       expect(screen.getByRole("button", { name: "Crear mesociclo" })).toBeEnabled();
       expect(getMesocycle).not.toHaveBeenCalled();
     });
@@ -269,21 +336,53 @@ describe("MesocycleView", () => {
       expect(screen.getByText("11 / 256")).toBeInTheDocument();
     });
 
-    it("steps the duration and stops at its bounds", async () => {
+    it("takes a typed duration, with no stepper buttons", async () => {
       // Arrange
       await renderMesocycle().rendered;
       await openedCreateForm();
       const user = userEvent.setup();
 
       // Act
-      await user.click(screen.getByRole("button", { name: "Aumentar duración" }));
+      await type(user, durationField(), "6");
 
       // Assert
-      expect(durationField()).toHaveValue("5");
-      await type(user, durationField(), "1");
-      expect(screen.getByRole("button", { name: "Reducir duración" })).toBeDisabled();
-      await type(user, durationField(), "52");
-      expect(screen.getByRole("button", { name: "Aumentar duración" })).toBeDisabled();
+      expect(durationField()).toHaveValue(6);
+      expect(screen.queryByRole("button", { name: "Reducir duración" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Aumentar duración" })).toBeNull();
+    });
+
+    it("reports a duration out of range and sends nothing", async () => {
+      // Arrange
+      const { createMesocycle, rendered } = renderMesocycle();
+      await rendered;
+      await openedCreateForm();
+      const user = userEvent.setup();
+      await fillTrainerForm(user);
+      await type(user, durationField(), "53");
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Crear mesociclo" }));
+
+      // Assert
+      expect(screen.getByText("Debe estar entre 1 y 52.")).toBeInTheDocument();
+      expect(createMesocycle).not.toHaveBeenCalled();
+    });
+
+    it("reports a blank duration and sends nothing", async () => {
+      // Arrange
+      const { createMesocycle, rendered } = renderMesocycle();
+      await rendered;
+      await openedCreateForm();
+      const user = userEvent.setup();
+      await fillTrainerForm(user);
+      await user.clear(durationField());
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Crear mesociclo" }));
+
+      // Assert
+      expect(screen.getByText("Este campo es obligatorio.")).toBeInTheDocument();
+      expect(createMesocycle).not.toHaveBeenCalled();
     });
 
     it("locks the weekly planning until the mesocycle exists", async () => {
@@ -475,11 +574,21 @@ describe("MesocycleView", () => {
       expect(getMesocycle).toHaveBeenCalledWith({ id: "m-1" });
       expect(nameField()).toHaveValue("Hipertrofia");
       expect(startDateField()).toHaveValue("2026-11-03");
-      expect(durationField()).toHaveValue("4");
+      expect(durationField()).toHaveValue(4);
       expect(objectiveField()).toHaveValue("Ganar masa muscular");
+      const people = screen.getByRole("region", { name: "Personas del mesociclo" });
+      expect(within(people).getByText("AG")).toBeInTheDocument();
+      expect(within(people).getByText("Ana García")).toBeInTheDocument();
+      expect(within(people).getByText("Atleta")).toBeInTheDocument();
+      expect(
+        people.compareDocumentPosition(
+          screen.getByRole("region", { name: "Información general" }),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
       const details = screen.getByRole("region", { name: "Información general" });
-      expect(within(details).getByText("Ana García")).toBeInTheDocument();
-      expect(within(details).queryByText("Entrenador")).not.toBeInTheDocument();
+      expect(within(details).queryByText("Ana García")).not.toBeInTheDocument();
+      // The header's user menu names the signed-in trainer's own role, so only the strip is checked.
+      expect(within(people).queryByText("Entrenador")).not.toBeInTheDocument();
       expect(screen.queryByText("Luis Pérez")).not.toBeInTheDocument();
       expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Guardar" })).toBeInTheDocument();
@@ -491,9 +600,26 @@ describe("MesocycleView", () => {
       await openedEditForm();
 
       // Assert
+      const people = screen.getByRole("region", { name: "Personas del mesociclo" });
+      expect(within(people).getByText("LP")).toBeInTheDocument();
+      expect(within(people).getByText("Luis Pérez")).toBeInTheDocument();
+      expect(within(people).getByText("Entrenador")).toBeInTheDocument();
       const details = screen.getByRole("region", { name: "Información general" });
-      expect(within(details).getByText("Entrenador")).toBeInTheDocument();
-      expect(within(details).getByText("Luis Pérez")).toBeInTheDocument();
+      expect(within(details).queryByText("Luis Pérez")).not.toBeInTheDocument();
+    });
+
+    it("shows the athlete's email when they have no name", async () => {
+      // Arrange
+      const nameless = { ...stored, athlete: { ...stored.athlete, name: "", surname: "" } };
+
+      // Act
+      await renderMesocycle({ search: "id=m-1", getMesocycle: async () => ok(nameless) }).rendered;
+      await openedEditForm();
+
+      // Assert
+      const people = screen.getByRole("region", { name: "Personas del mesociclo" });
+      expect(within(people).getByText("A")).toBeInTheDocument();
+      expect(within(people).getByText(stored.athlete.email)).toBeInTheDocument();
     });
 
     it("sends every general field on Guardar and confirms the save", async () => {
@@ -502,8 +628,7 @@ describe("MesocycleView", () => {
       await rendered;
       await openedEditForm();
       const user = userEvent.setup();
-      await user.click(screen.getByRole("button", { name: "Aumentar duración" }));
-      await user.click(screen.getByRole("button", { name: "Aumentar duración" }));
+      await type(user, durationField(), "6");
 
       // Act
       await user.click(screen.getByRole("button", { name: "Guardar" }));
@@ -540,7 +665,7 @@ describe("MesocycleView", () => {
       expect(
         await screen.findByText("La operación entra en conflicto con el estado actual."),
       ).toBeInTheDocument();
-      expect(durationField()).toHaveValue("2");
+      expect(durationField()).toHaveValue(2);
     });
 
     it("lists the weeks in order with their type, title and objective", async () => {
@@ -747,6 +872,329 @@ describe("MesocycleView", () => {
     });
   });
 
+  describe("week workouts", () => {
+    /** The row of a defined week; its nested workout items never read "Semana <n>". */
+    const weekRow = (number: number) =>
+      weekRows().find((row) => within(row).queryByText(`Semana ${number}`)) as HTMLElement;
+
+    /** Opens "Nuevo entrenamiento" in the given week and answers its dialog. */
+    async function openWorkoutDialog(user: ReturnType<typeof userEvent.setup>, number: number) {
+      await user.click(
+        within(weekRow(number)).getByRole("button", { name: "Nuevo entrenamiento" }),
+      );
+      return screen.findByRole("dialog", { name: `Nuevo entrenamiento · Semana ${number}` });
+    }
+
+    it("reads the mesocycle's workouts once in edit mode", async () => {
+      // Arrange
+      const { getWorkouts, rendered } = renderMesocycle({ search: "id=m-1" });
+
+      // Act
+      await rendered;
+      await openedEditForm();
+
+      // Assert
+      await waitFor(() => expect(getWorkouts).toHaveBeenCalledTimes(1));
+      expect(getWorkouts).toHaveBeenCalledWith({ mesocycleId: "m-1" });
+    });
+
+    it("reads no workouts in create mode", async () => {
+      // Arrange
+      const { getWorkouts, rendered } = renderMesocycle();
+
+      // Act
+      await rendered;
+      await openedCreateForm();
+
+      // Assert
+      expect(getWorkouts).not.toHaveBeenCalled();
+    });
+
+    it("collapses a week with workouts, showing how many it holds", async () => {
+      // Arrange
+      const { rendered } = renderMesocycle({
+        search: "id=m-1",
+        getWorkouts: async () => ok([legs, pushDay]),
+      });
+
+      // Act
+      await rendered;
+      await openedEditForm();
+
+      // Assert
+      const row = await waitFor(() => {
+        expect(within(weekRow(1)).getByText("2 entrenamientos")).toBeInTheDocument();
+        return weekRow(1);
+      });
+      expect(within(row).queryByText("Pierna")).not.toBeInTheDocument();
+      expect(
+        within(row).getByRole("button", { name: "Mostrar entrenamientos de la semana 1" }),
+      ).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("expands a week to the create action above a table of its workouts", async () => {
+      // Arrange
+      const { rendered } = renderMesocycle({
+        search: "id=m-1",
+        getWorkouts: async () => ok([legs, pushDay]),
+      });
+      await rendered;
+      await openedEditForm();
+      const user = userEvent.setup();
+      const toggle = await within(weeksCard()).findByRole("button", {
+        name: "Mostrar entrenamientos de la semana 1",
+      });
+
+      // Act
+      await user.click(toggle);
+
+      // Assert
+      const row = weekRow(1);
+      const table = within(row).getByRole("table");
+      const [header, legsRow, pushRow] = within(table).getAllByRole("row");
+      expect(header).toHaveTextContent("NombreEjercicios");
+      expect(
+        within(legsRow!)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      ).toEqual(["Pierna", "3", ""]);
+      expect(
+        within(pushRow!)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      ).toEqual(["Empuje", "0", ""]);
+      expect(within(row).queryByRole("link", { name: "Pierna" })).toBeNull();
+      expect(within(row).getByRole("link", { name: "Editar Pierna" })).toHaveAttribute(
+        "href",
+        "/workout?id=w-1",
+      );
+      expect(within(row).getByRole("link", { name: "Editar Empuje" })).toHaveAttribute(
+        "href",
+        "/workout?id=w-2",
+      );
+      const create = within(row).getByRole("button", { name: "Nuevo entrenamiento" });
+      expect(create.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        within(row).getByRole("button", { name: "Ocultar entrenamientos de la semana 1" }),
+      ).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("opens the week dialog from a collapsed week without expanding it", async () => {
+      // Arrange
+      const { rendered } = renderMesocycle({
+        search: "id=m-1",
+        getWorkouts: async () => ok([legs]),
+      });
+      await rendered;
+      await openedEditForm();
+      await within(weeksCard()).findByText("1 entrenamiento");
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(within(weekRow(1)).getByRole("button", { name: "Editar semana 1" }));
+
+      // Assert
+      expect(await screen.findByRole("dialog", { name: "Semana 1" })).toBeInTheDocument();
+      // The open dialog hides the page from assistive technology; `hidden` still reaches the row.
+      expect(
+        screen.getByRole("button", { name: "Mostrar entrenamientos de la semana 1", hidden: true }),
+      ).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("shows the create action in the row of a week without workouts, which does not expand", async () => {
+      // Arrange
+      const { rendered } = renderMesocycle({
+        search: "id=m-1",
+        getWorkouts: async () => ok([legs]),
+      });
+
+      // Act
+      await rendered;
+      await openedEditForm();
+      await within(weeksCard()).findByText("1 entrenamiento");
+
+      // Assert
+      const row = weekRow(3);
+      expect(within(row).getByRole("button", { name: "Nuevo entrenamiento" })).toBeInTheDocument();
+      expect(within(row).queryByRole("button", { name: /entrenamientos de la semana/ })).toBeNull();
+      expect(within(row).queryByText(/^\d+ entrenamientos?$/)).toBeNull();
+    });
+
+    it("asks only for a name and a description", async () => {
+      // Arrange
+      const { rendered } = renderMesocycle({ search: "id=m-1" });
+      await rendered;
+      await openedEditForm();
+      const user = userEvent.setup();
+      await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+
+      // Act
+      const dialog = await openWorkoutDialog(user, 3);
+
+      // Assert
+      expect(within(dialog).getByRole("textbox", { name: "Nombre" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("textbox", { name: "Descripción" })).toBeInTheDocument();
+      expect(within(dialog).queryByRole("combobox")).toBeNull();
+      expect(within(dialog).queryByText(/Semana del/)).toBeNull();
+    });
+
+    it("reports a blank or too long name and sends nothing", async () => {
+      // Arrange
+      const { createWorkout, rendered } = renderMesocycle({ search: "id=m-1" });
+      await rendered;
+      await openedEditForm();
+      const user = userEvent.setup();
+      await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+      const dialog = await openWorkoutDialog(user, 3);
+      await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+      expect(within(dialog).getByText("Este campo es obligatorio.")).toBeInTheDocument();
+      await type(user, within(dialog).getByRole("textbox", { name: "Nombre" }), "a".repeat(257));
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+
+      // Assert
+      expect(within(dialog).getByText("No puede superar los 256 caracteres.")).toBeInTheDocument();
+      expect(createWorkout).not.toHaveBeenCalled();
+    });
+
+    it("sends a trainer's workout placed in its week, without a trainer or date, and opens it", async () => {
+      // Arrange
+      const { createWorkout, rendered } = renderMesocycle({ search: "id=m-1" });
+      await rendered;
+      await openedEditForm();
+      const user = userEvent.setup();
+      await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+      const dialog = await openWorkoutDialog(user, 3);
+      await type(user, within(dialog).getByRole("textbox", { name: "Nombre" }), " Pierna ");
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+
+      // Assert
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/workout?id=w-9"));
+      expect(createWorkout).toHaveBeenCalledTimes(1);
+      expect(createWorkout).toHaveBeenCalledWith({
+        name: "Pierna",
+        userId: athleteId,
+        mesocycleId: "m-1",
+        mesocycleWeekNumber: 3,
+      });
+    });
+
+    it("sends the mesocycle's trainer when an admin creates a week workout", async () => {
+      // Arrange
+      const { createWorkout, rendered } = renderMesocycle({
+        search: "id=m-1",
+        profile: adminProfile,
+      });
+      await rendered;
+      await openedEditForm();
+      const user = userEvent.setup();
+      await within(weekRow(1)).findByRole("button", { name: "Nuevo entrenamiento" });
+      const dialog = await openWorkoutDialog(user, 1);
+      await type(user, within(dialog).getByRole("textbox", { name: "Nombre" }), "Empuje");
+      await type(user, within(dialog).getByRole("textbox", { name: "Descripción" }), " Día 2 ");
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+
+      // Assert
+      await waitFor(() => expect(createWorkout).toHaveBeenCalledTimes(1));
+      expect(createWorkout).toHaveBeenCalledWith({
+        name: "Empuje",
+        description: "Día 2",
+        userId: athleteId,
+        trainerId,
+        mesocycleId: "m-1",
+        mesocycleWeekNumber: 1,
+      });
+    });
+
+    it("disables Crear while the creation is in progress", async () => {
+      // Arrange
+      const { rendered } = renderMesocycle({
+        search: "id=m-1",
+        createWorkout: () => new Promise(() => {}),
+      });
+      await rendered;
+      await openedEditForm();
+      const user = userEvent.setup();
+      await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+      const dialog = await openWorkoutDialog(user, 3);
+      await type(user, within(dialog).getByRole("textbox", { name: "Nombre" }), "Pierna");
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+
+      // Assert
+      expect(within(dialog).getByRole("button", { name: "Crear" })).toBeDisabled();
+    });
+
+    it("keeps the dialog with the error when the creation is refused", async () => {
+      // Arrange
+      const { rendered } = renderMesocycle({
+        search: "id=m-1",
+        createWorkout: async () => fail(new DomainError("CONFLICT", "")),
+      });
+      await rendered;
+      await openedEditForm();
+      const user = userEvent.setup();
+      await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+      const dialog = await openWorkoutDialog(user, 3);
+      await type(user, within(dialog).getByRole("textbox", { name: "Nombre" }), "Pierna");
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+
+      // Assert
+      expect(
+        await within(dialog).findByText("La operación entra en conflicto con el estado actual."),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("textbox", { name: "Nombre" })).toHaveValue("Pierna");
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("closes the workout dialog on Cancelar without a request", async () => {
+      // Arrange
+      const { createWorkout, rendered } = renderMesocycle({ search: "id=m-1" });
+      await rendered;
+      await openedEditForm();
+      const user = userEvent.setup();
+      await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+      const dialog = await openWorkoutDialog(user, 3);
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+      // Assert
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(createWorkout).not.toHaveBeenCalled();
+    });
+
+    it("shows a workouts failure with Reintentar, keeps the weeks editable and reads them again", async () => {
+      // Arrange
+      const getWorkouts = vi
+        .fn<() => Answer<WorkoutListItem[]>>()
+        .mockResolvedValueOnce(fail(new DomainError("NETWORK", "")))
+        .mockResolvedValueOnce(ok([legs]));
+      const { rendered } = renderMesocycle({ search: "id=m-1", getWorkouts });
+      await rendered;
+      await openedEditForm();
+      await within(weeksCard()).findByText("No hay conexión con el servidor.");
+      expect(within(weeksCard()).queryByRole("button", { name: "Nuevo entrenamiento" })).toBeNull();
+      expect(within(weekRow(1)).getByRole("button", { name: "Editar semana 1" })).toBeEnabled();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(within(weeksCard()).getByRole("button", { name: "Reintentar" }));
+
+      // Assert
+      expect(await within(weekRow(1)).findByText("1 entrenamiento")).toBeInTheDocument();
+      expect(getWorkouts).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("follows the active language", async () => {
     // Arrange
     await renderMesocycle().rendered;
@@ -760,5 +1208,52 @@ describe("MesocycleView", () => {
     expect(screen.getByRole("heading", { name: "General information" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Weekly planning" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add week" })).toBeInTheDocument();
+  });
+
+  it("shows the week workouts in the active language", async () => {
+    // Arrange
+    await renderMesocycle({ search: "id=m-1", getWorkouts: async () => ok([legs]) }).rendered;
+    await openedEditForm();
+    await within(weeksCard()).findByText("1 entrenamiento");
+
+    // Act
+    await act(() => i18n.changeLanguage("en"));
+
+    // Assert
+    const card = screen.getByRole("region", { name: "Weekly planning" });
+    expect(within(card).getByText("1 workout")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Mesocycle people" })).toHaveTextContent("Athlete");
+    expect(within(card).getByRole("button", { name: "New workout" })).toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "Show the workouts of week 1" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the person cards and the week workouts table in the active language", async () => {
+    // Arrange
+    const user = userEvent.setup();
+    await renderMesocycle({
+      search: "id=m-1",
+      profile: adminProfile,
+      getWorkouts: async () => ok([legs]),
+    }).rendered;
+    await openedEditForm();
+    await user.click(
+      await within(weeksCard()).findByRole("button", {
+        name: "Mostrar entrenamientos de la semana 1",
+      }),
+    );
+
+    // Act
+    await act(() => i18n.changeLanguage("en"));
+
+    // Assert
+    const people = screen.getByRole("region", { name: "Mesocycle people" });
+    expect(within(people).getByText("Athlete")).toBeInTheDocument();
+    expect(within(people).getByText("Trainer")).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Exercises" })).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Edit Pierna" })).toBeInTheDocument();
   });
 });

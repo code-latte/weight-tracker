@@ -77,11 +77,11 @@ public class WorkoutsController : AuthorizedController
     }
 
     /// <summary>
-    /// Reads one workout the caller is entitled to see. Catalog exercise data is not embedded:
-    /// entries carry the catalog <c>exerciseId</c> only.
+    /// Reads one workout the caller is entitled to see, with the public profiles of its athlete and trainer.
+    /// Catalog exercise data is not embedded: entries carry the catalog <c>exerciseId</c> only.
     /// </summary>
     [HttpGet("{id:guid}")]
-    [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<WorkoutByIdResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -89,9 +89,9 @@ public class WorkoutsController : AuthorizedController
     {
         try
         {
-            var workout = await _getWorkoutById.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(id), cancellationToken);
+            var view = await _getWorkoutById.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(id), cancellationToken);
 
-            return Ok(WorkoutDetailResponse.From(workout));
+            return Ok(WorkoutByIdResponse.From(view));
         }
         catch (Exception exception)
         {

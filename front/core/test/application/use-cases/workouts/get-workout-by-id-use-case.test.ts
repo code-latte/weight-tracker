@@ -7,18 +7,19 @@ import {
   ok,
   type Result,
   type Workout,
+  type WorkoutById,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
 } from "../../../../src/domain";
 
-const workoutDetail: WorkoutDetail = {
+const workoutDetail: WorkoutById = {
   id: "7b0c1f7e-3a54-4d4e-9d0e-1a2b3c4d5e6f",
   name: "Pierna",
   description: null,
   workoutDate: "2026-11-02",
   userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
-  trainerId: null,
+  trainerId: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
@@ -33,20 +34,34 @@ const workoutDetail: WorkoutDetail = {
       superSeriesId: null,
     },
   ],
+  athlete: {
+    id: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
+    email: "ana@example.com",
+    name: "Ana",
+    surname: "García",
+    role: "USER",
+  },
+  trainer: {
+    id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
+    email: "luis@example.com",
+    name: "Luis",
+    surname: "Pérez",
+    role: "TRAINER",
+  },
 };
 
 class FakeWorkoutRepository implements WorkoutRepositoryInterface {
   readonly reads: string[] = [];
   otherCalls = 0;
 
-  constructor(private readonly result: Result<WorkoutDetail, DomainError>) {}
+  constructor(private readonly result: Result<WorkoutById, DomainError>) {}
 
   async getAll(): Promise<Result<WorkoutListItem[], DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
-  async getById(id: string): Promise<Result<WorkoutDetail, DomainError>> {
+  async getById(id: string): Promise<Result<WorkoutById, DomainError>> {
     this.reads.push(id);
     return this.result;
   }
@@ -83,7 +98,7 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
 }
 
 describe("GetWorkoutByIdUseCase", () => {
-  it("returns the workout the repository answers with", async () => {
+  it("returns the workout the repository answers with, athlete and trainer included", async () => {
     // Arrange
     const useCase = new GetWorkoutByIdUseCase(new FakeWorkoutRepository(ok(workoutDetail)));
 

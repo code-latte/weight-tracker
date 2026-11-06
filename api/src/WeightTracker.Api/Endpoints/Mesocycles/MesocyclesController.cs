@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using WeightTracker.Api.Common;
 using WeightTracker.Api.Endpoints.Mesocycles.Dtos;
+using WeightTracker.Api.Endpoints.Workouts.Dtos;
 using WeightTracker.Application.UseCases.Auth;
 using WeightTracker.Application.UseCases.Mesocycles;
 using WeightTracker.Domain.Common;
@@ -20,6 +21,7 @@ public class MesocyclesController : AuthorizedController
 {
     private readonly GetAllMesocyclesUseCase _getAllMesocycles;
     private readonly GetMesocycleByIdUseCase _getMesocycleById;
+    private readonly GetMesocycleWorkoutsUseCase _getMesocycleWorkouts;
     private readonly CreateMesocycleUseCase _createMesocycle;
     private readonly UpdateMesocycleUseCase _updateMesocycle;
     private readonly DefineMesocycleWeekUseCase _defineWeek;
@@ -29,6 +31,7 @@ public class MesocyclesController : AuthorizedController
     public MesocyclesController(
         GetAllMesocyclesUseCase getAllMesocycles,
         GetMesocycleByIdUseCase getMesocycleById,
+        GetMesocycleWorkoutsUseCase getMesocycleWorkouts,
         CreateMesocycleUseCase createMesocycle,
         UpdateMesocycleUseCase updateMesocycle,
         DefineMesocycleWeekUseCase defineWeek,
@@ -39,6 +42,7 @@ public class MesocyclesController : AuthorizedController
     {
         _getAllMesocycles = getAllMesocycles;
         _getMesocycleById = getMesocycleById;
+        _getMesocycleWorkouts = getMesocycleWorkouts;
         _createMesocycle = createMesocycle;
         _updateMesocycle = updateMesocycle;
         _defineWeek = defineWeek;
@@ -83,6 +87,30 @@ public class MesocyclesController : AuthorizedController
             var view = await _getMesocycleById.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(id), cancellationToken);
 
             return Ok(MesocycleResponse.From(view));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Lists the workouts placed in one mesocycle, across all its weeks, by week number and then workout date. The
+    /// caller must be allowed to read the mesocycle, and only the workouts they may see through <c>GET /workouts</c>
+    /// are listed.
+    /// </summary>
+    [HttpGet("{id:guid}/workouts")]
+    [ProducesResponseType<IReadOnlyList<WorkoutListItemResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetWorkouts(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _getMesocycleWorkouts.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(id), cancellationToken);
+
+            return Ok(result.Workouts.Select(workout => WorkoutListItemResponse.From(workout, result.Exercises, result.Users)).ToList());
         }
         catch (Exception exception)
         {

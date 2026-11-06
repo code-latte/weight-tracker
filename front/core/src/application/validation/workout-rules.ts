@@ -17,6 +17,13 @@ export type WorkoutDetailsFormViolations = Partial<
   Record<keyof WorkoutDetailsFormValues, WorkoutFieldViolation>
 >;
 
+/** The form of a workout created in a mesocycle week: the mesocycle says who it is for and its week dates it. */
+export type WeekWorkoutFormValues = Pick<WorkoutDetailsFormValues, "name" | "description">;
+
+export type WeekWorkoutFormViolations = Partial<
+  Record<keyof WeekWorkoutFormValues, WorkoutFieldViolation>
+>;
+
 /** The create workout form as typed: the workout's data plus who it is for. */
 export interface CreateWorkoutFormValues extends WorkoutDetailsFormValues {
   userId: string;
@@ -39,13 +46,11 @@ function validateId(value: string): WorkoutFieldViolation | null {
 }
 
 /**
- * Structural rules of a workout's own data, with the API's limits. The name is trimmed before it is measured.
- * Shared by the create form and the workout screen.
+ * Structural rules of a workout created in a mesocycle week: only its name and description, since the week dates it.
+ * The name is trimmed before it is measured.
  */
-export function validateWorkoutDetailsForm(
-  values: WorkoutDetailsFormValues,
-): WorkoutDetailsFormViolations {
-  const violations: WorkoutDetailsFormViolations = {};
+export function validateWeekWorkoutForm(values: WeekWorkoutFormValues): WeekWorkoutFormViolations {
+  const violations: WeekWorkoutFormViolations = {};
   const name = values.name.trim();
 
   if (name === "") {
@@ -56,6 +61,18 @@ export function validateWorkoutDetailsForm(
   if (values.description.length > WORKOUT_DESCRIPTION_MAX_LENGTH) {
     violations.description = "maxLength";
   }
+  return violations;
+}
+
+/**
+ * Structural rules of a workout's own data, with the API's limits. The name is trimmed before it is measured.
+ * Shared by the create form and the workout screen.
+ */
+export function validateWorkoutDetailsForm(
+  values: WorkoutDetailsFormValues,
+): WorkoutDetailsFormViolations {
+  const violations: WorkoutDetailsFormViolations = validateWeekWorkoutForm(values);
+
   if (values.workoutDate === "") {
     violations.workoutDate = "required";
   } else if (!isCalendarDate(values.workoutDate)) {

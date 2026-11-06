@@ -7,6 +7,7 @@ import {
   type Mesocycle,
   type RedefineMesocycleWeekRequest,
   type UpdateMesocycleRequest,
+  type WorkoutListItem,
 } from "../../../src/domain";
 import { HttpError, MesocycleRepository } from "../../../src/infrastructure";
 
@@ -37,6 +38,22 @@ const mesocycle: Mesocycle = {
   weeks: [{ weekNumber: 1, trainingWeekType: "ADAPTATION", objective: "Técnica" }],
   trainer,
   athlete,
+};
+
+/** A workout of the mesocycle, as listed, in its first week. */
+const weekWorkout: WorkoutListItem = {
+  id: "7b0c1f7e-3a54-4d4e-9d0e-1a2b3c4d5e6f",
+  name: "Pierna",
+  description: null,
+  workoutDate: "2026-11-11",
+  userId: athlete.id,
+  trainerId: trainer.id,
+  status: "DRAFT",
+  exercises: [],
+  athlete,
+  trainer,
+  mesocycleId: mesocycle.id,
+  mesocycleWeekNumber: 1,
 };
 
 const createRequest: CreateMesocycleRequest = {
@@ -184,6 +201,74 @@ describe("MesocycleRepository", () => {
 
       // Act
       const result = await repository.getById(mesocycle.id);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("getWorkouts", () => {
+    it("gets /mesocycles/{id}/workouts without a body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => [weekWorkout]);
+      const repository = new MesocycleRepository(httpClient);
+
+      // Act
+      await repository.getWorkouts(mesocycle.id);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "GET", path: `/mesocycles/${mesocycle.id}/workouts` },
+      ]);
+    });
+
+    it("returns the workouts with their week numbers, in the API's order", async () => {
+      // Arrange
+      const second: WorkoutListItem = { ...weekWorkout, id: "w-2", mesocycleWeekNumber: 2 };
+      const repository = new MesocycleRepository(
+        new FakeHttpClient(async () => [second, weekWorkout]),
+      );
+
+      // Act
+      const result = await repository.getWorkouts(mesocycle.id);
+
+      // Assert
+      expect(result).toEqual(ok([second, weekWorkout]));
+    });
+
+    it("returns an empty list when the mesocycle has no workouts", async () => {
+      // Arrange
+      const repository = new MesocycleRepository(new FakeHttpClient(async () => []));
+
+      // Act
+      const result = await repository.getWorkouts(mesocycle.id);
+
+      // Assert
+      expect(result).toEqual(ok([]));
+    });
+
+    it.each([
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new MesocycleRepository(failingWith(status));
+
+      // Act
+      const result = await repository.getWorkouts(mesocycle.id);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new MesocycleRepository(unreachable());
+
+      // Act
+      const result = await repository.getWorkouts(mesocycle.id);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

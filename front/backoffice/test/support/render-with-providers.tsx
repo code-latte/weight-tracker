@@ -51,6 +51,7 @@ const unusedDependencies: Registrations<Dependencies> = {
   mesocycleRepository: () => ({
     getAll: async () => undefined as never,
     getById: async () => undefined as never,
+    getWorkouts: async () => undefined as never,
     getByAthlete: async () => undefined as never,
     create: async () => undefined as never,
     update: async () => undefined as never,
@@ -104,6 +105,7 @@ const unusedDependencies: Registrations<Dependencies> = {
   reorderWorkoutExercisesUseCase: () => ({ execute: async () => undefined as never }),
   getMesocyclesUseCase: () => ({ execute: async () => undefined as never }),
   getMesocycleByIdUseCase: () => ({ execute: async () => undefined as never }),
+  getMesocycleWorkoutsUseCase: () => ({ execute: async () => undefined as never }),
   getAthleteMesocyclesUseCase: () => ({ execute: async () => undefined as never }),
   createMesocycleUseCase: () => ({ execute: async () => undefined as never }),
   updateMesocycleUseCase: () => ({ execute: async () => undefined as never }),

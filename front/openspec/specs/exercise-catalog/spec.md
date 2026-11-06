@@ -2,7 +2,8 @@
 
 ## Purpose
 
-TBD - created by archiving change add-workout-usecases. Update Purpose after archive.
+Lets both fronts read the exercise catalog through `core`, with each exercise's type, owner and archive date, as the
+API answers them, returning failures as results instead of throwing.
 
 ## Requirements
 

@@ -4,6 +4,8 @@ export type Workout = components["schemas"]["WorkoutResponse"];
 /** A workout as listed: the workout plus its athlete and, when it has one, its trainer. */
 export type WorkoutListItem = components["schemas"]["WorkoutListItemResponse"];
 export type WorkoutDetail = components["schemas"]["WorkoutDetailResponse"];
+/** A workout as read by id: the detail plus its athlete and, when it has one, its trainer. */
+export type WorkoutById = components["schemas"]["WorkoutByIdResponse"];
 export type WorkoutExerciseDetail = components["schemas"]["WorkoutExerciseDetailResponse"];
 export type CreateWorkoutRequest = components["schemas"]["CreateWorkoutRequest"];
 export type UpdateWorkoutRequest = components["schemas"]["UpdateWorkoutRequest"];

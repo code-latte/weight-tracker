@@ -5,6 +5,7 @@ import {
   validateCreateWorkoutForm,
   validateExerciseConfiguration,
   validateSetForm,
+  validateWeekWorkoutForm,
   validateWorkoutDetailsForm,
 } from "../../../src/application";
 
@@ -144,6 +145,39 @@ describe("validateWorkoutDetailsForm", () => {
 
     // Assert
     expect(result).toEqual({ name: "maxLength", workoutDate: "required" });
+  });
+});
+
+describe("validateWeekWorkoutForm", () => {
+  it("answers no violation for a name and no description", () => {
+    // Arrange / Act
+    const result = validateWeekWorkoutForm({ name: "Pierna", description: "" });
+
+    // Assert
+    expect(result).toEqual({});
+  });
+
+  it.each([
+    ["   ", "required"],
+    [`  ${"a".repeat(256)}  `, undefined],
+    ["a".repeat(257), "maxLength"],
+  ] as const)("answers the name %j with %j", (name, expected) => {
+    // Arrange / Act
+    const result = validateWeekWorkoutForm({ name, description: "" });
+
+    // Assert
+    expect(result.name).toBe(expected);
+  });
+
+  it.each([
+    ["a".repeat(1024), undefined],
+    ["a".repeat(1025), "maxLength"],
+  ] as const)("answers a description of length %#", (description, expected) => {
+    // Arrange / Act
+    const result = validateWeekWorkoutForm({ name: "Pierna", description });
+
+    // Assert
+    expect(result.description).toBe(expected);
   });
 });
 

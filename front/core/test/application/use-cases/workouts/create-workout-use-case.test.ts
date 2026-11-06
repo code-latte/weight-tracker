@@ -8,6 +8,7 @@ import {
   type CreateWorkoutRequest,
   type Result,
   type Workout,
+  type WorkoutById,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
@@ -41,7 +42,7 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
-  async getById(): Promise<Result<WorkoutDetail, DomainError>> {
+  async getById(): Promise<Result<WorkoutById, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
@@ -137,6 +138,21 @@ describe("CreateWorkoutUseCase", () => {
 
     // Assert
     expect(repository.creations).toEqual([request]);
+  });
+
+  it("fills in no date for a placed workout created without one", async () => {
+    // Arrange
+    const repository = new FakeWorkoutRepository(ok(placedWorkout));
+    const useCase = new CreateWorkoutUseCase(repository);
+    const request: CreateWorkoutRequest = { name: "Pierna", userId: workout.userId, ...placement };
+
+    // Act
+    const result = await useCase.execute(request);
+
+    // Assert
+    expect(repository.creations).toEqual([request]);
+    expect(repository.creations[0]).not.toHaveProperty("workoutDate");
+    expect(result).toEqual(ok(placedWorkout));
   });
 
   it("adds no mesocycle placement when it is omitted", async () => {

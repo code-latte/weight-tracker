@@ -18,6 +18,11 @@ public interface IWorkoutRepository
     /// </summary>
     public Task<IEnumerable<Workout>> GetAllByUserOrTrainerId(Id id, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Workouts placed in the given mesocycle, whatever their week and status.
+    /// </summary>
+    public Task<IEnumerable<Workout>> GetAllByMesocycleId(Id mesocycleId, CancellationToken cancellationToken);
+
     public Task<Workout?> GetById(Id workoutId, CancellationToken cancellationToken);
 
     /// <summary>

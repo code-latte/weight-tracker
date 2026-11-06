@@ -10,6 +10,8 @@ export type DefineMesocycleWeekRequest = components["schemas"]["DefineMesocycleW
 export type RedefineMesocycleWeekRequest = components["schemas"]["RedefineMesocycleWeekRequest"];
 
 export type GetMesocycleByIdInput = { id: string };
+/** The mesocycle id travels in the path. */
+export type GetMesocycleWorkoutsInput = { mesocycleId: string };
 /** The athlete id travels in the path. */
 export type GetAthleteMesocyclesInput = { userId: string };
 /** The mesocycle id travels in the path, the rest of the input in the body. */

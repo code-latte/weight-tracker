@@ -561,6 +561,38 @@ public class WorkoutRepositoryTests : IntegrationTest
     }
 
     [Fact]
+    public async Task GetAllByMesocycleId_ShouldReturnTheWorkoutsOfEveryWeekOfThatMesocycleOnly()
+    {
+        // Arrange
+        var mesocycleId = Id.From(SeedData.MesocycleId);
+
+        // Act
+        var workouts = (await Factory.WithScope(services =>
+            services.GetRequiredService<IWorkoutRepository>().GetAllByMesocycleId(mesocycleId, CancellationToken.None)))
+            .ToList();
+
+        // Assert
+        workouts.Select(workout => workout.Id.Value)
+            .Should().BeEquivalentTo([SeedData.TrainedWorkoutId, SeedData.PrescribedStartedWorkoutId]);
+        workouts.Select(workout => workout.MesocycleWeekNumber!.Value).Should().BeEquivalentTo([1, 2]);
+        workouts.Single(workout => workout.Id.Value == SeedData.TrainedWorkoutId).Exercises.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAllByMesocycleId_ShouldReturnNothingForAMesocycleWithoutWorkouts()
+    {
+        // Arrange
+        var unknown = Id.New();
+
+        // Act
+        var workouts = await Factory.WithScope(services =>
+            services.GetRequiredService<IWorkoutRepository>().GetAllByMesocycleId(unknown, CancellationToken.None));
+
+        // Assert
+        workouts.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ExistsByMesocycleWeek_ShouldFindTheWorkoutPlacedInASeededWeek()
     {
         // Arrange

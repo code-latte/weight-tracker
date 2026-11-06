@@ -85,5 +85,11 @@
       "NOT_FOUND": "Esta relación ya no está activa. Recarga la lista.",
       "CONFLICT": "Esta relación ya no está activa. Recarga la lista."
     }
+  },
+  "person": {
+    "role": {
+      "athlete": "Atleta",
+      "trainer": "Entrenador"
+    }
   }
 }

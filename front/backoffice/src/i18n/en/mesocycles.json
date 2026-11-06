@@ -23,6 +23,9 @@
     "back": "Back",
     "notFound": "We could not find this mesocycle.",
     "backToList": "Back to mesocycles",
+    "context": {
+      "label": "Mesocycle people"
+    },
     "saved": "Mesocycle saved.",
     "details": {
       "title": "General information",
@@ -36,10 +39,6 @@
       "startDate": "Start date",
       "duration": "Duration (weeks)",
       "objective": "General objective"
-    },
-    "duration": {
-      "decrease": "Decrease duration",
-      "increase": "Increase duration"
     },
     "validation": {
       "required": "This field is required.",
@@ -67,7 +66,17 @@
       "objective": "Objective",
       "cancel": "Cancel",
       "save": "Save"
-    }
+    },
+    "newWorkout": "New workout",
+    "workoutCount_one": "{{count}} workout",
+    "workoutCount_other": "{{count}} workouts",
+    "showWorkouts": "Show the workouts of week {{number}}",
+    "hideWorkouts": "Hide the workouts of week {{number}}",
+    "workoutsTable": {
+      "name": "Name",
+      "exercises": "Exercises"
+    },
+    "editWorkout": "Edit {{name}}"
   },
   "trainingWeekType": {
     "ADAPTATION": "Adaptation",
@@ -76,5 +85,16 @@
     "REALIZATION": "Realization",
     "DELOAD": "Deload",
     "RECOVERY": "Recovery"
+  },
+  "weekWorkout": {
+    "title": "New workout · Week {{number}}",
+    "fields": {
+      "name": "Name",
+      "description": "Description"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "create": "Create"
+    }
   }
 }

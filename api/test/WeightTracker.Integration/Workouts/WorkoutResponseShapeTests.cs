@@ -387,13 +387,46 @@ public class WorkoutResponseShapeTests : IntegrationTest
     }
 
     [Fact]
-    public async Task ListedWorkout_ShouldNotCarryThePlacement()
+    public async Task ListedPlacedWorkout_ShouldCarryItsMesocycleAndWeek()
     {
         // Arrange & Act
         var workout = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.TrainedWorkoutId);
 
         // Assert
-        workout.TryGetProperty("mesocycleId", out _).Should().BeFalse();
-        workout.TryGetProperty("mesocycleWeekNumber", out _).Should().BeFalse();
+        workout.GetProperty("mesocycleId").GetGuid().Should().Be(SeedData.MesocycleId);
+        workout.GetProperty("mesocycleWeekNumber").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ListedStandaloneWorkout_ShouldKeepAnExplicitNullPlacement()
+    {
+        // Arrange & Act
+        var workout = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.OwnedWorkoutId);
+
+        // Assert
+        workout.TryGetProperty("mesocycleId", out var mesocycleId).Should().BeTrue();
+        mesocycleId.ValueKind.Should().Be(JsonValueKind.Null);
+        workout.TryGetProperty("mesocycleWeekNumber", out var weekNumber).Should().BeTrue();
+        weekNumber.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task StandaloneList_ShouldKeepAnExplicitNullPlacementOnEveryItem()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await client.GetAsync("/workouts?standalone=true");
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        var workouts = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        workouts.GetArrayLength().Should().BePositive();
+        foreach (var workout in workouts.EnumerateArray())
+        {
+            workout.GetProperty("mesocycleId").ValueKind.Should().Be(JsonValueKind.Null);
+            workout.GetProperty("mesocycleWeekNumber").ValueKind.Should().Be(JsonValueKind.Null);
+        }
     }
 }

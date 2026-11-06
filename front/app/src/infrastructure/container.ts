@@ -15,6 +15,7 @@ import {
   GetExerciseFavoritesUseCase,
   GetExercisesUseCase,
   GetMesocycleByIdUseCase,
+  GetMesocycleWorkoutsUseCase,
   GetMesocyclesUseCase,
   GetMyAthletesUseCase,
   GetMyProfileUseCase,
@@ -111,6 +112,8 @@ const container = new Container<Dependencies>({
     new ReorderWorkoutExercisesUseCase(c.resolve("workoutRepository")),
   getMesocyclesUseCase: (c) => new GetMesocyclesUseCase(c.resolve("mesocycleRepository")),
   getMesocycleByIdUseCase: (c) => new GetMesocycleByIdUseCase(c.resolve("mesocycleRepository")),
+  getMesocycleWorkoutsUseCase: (c) =>
+    new GetMesocycleWorkoutsUseCase(c.resolve("mesocycleRepository")),
   getAthleteMesocyclesUseCase: (c) =>
     new GetAthleteMesocyclesUseCase(c.resolve("mesocycleRepository")),
   createMesocycleUseCase: (c) => new CreateMesocycleUseCase(c.resolve("mesocycleRepository")),

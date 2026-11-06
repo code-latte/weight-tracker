@@ -2,15 +2,25 @@
 
 import AddOutlined from "@mui/icons-material/AddOutlined";
 import Box from "@mui/material/Box";
-import type { MesocycleWeek } from "@weight-tracker/core/domain";
+import type { DomainErrorCode, MesocycleWeek, WorkoutListItem } from "@weight-tracker/core/domain";
 import { useTranslation } from "react-i18next";
 import Button from "@/presentation/common/components/atoms/button";
 import Card from "@/presentation/common/components/atoms/card";
 import CardContent from "@/presentation/common/components/atoms/card-content";
 import List from "@/presentation/common/components/atoms/list";
+import LoadError from "@/presentation/common/components/molecules/load-error";
 import Typography from "@/presentation/common/components/atoms/typography";
 import MesocycleWeekListItem from "@/presentation/mesocycles/components/molecules/mesocycle-week-list-item";
+import MesocycleWeekWorkoutsTable from "@/presentation/mesocycles/components/molecules/mesocycle-week-workouts-table";
 import { weekNumberOf } from "@/presentation/mesocycles/weeks";
+
+/** The mesocycle's workouts as read: grouped by week once loaded, with the way to read them again. */
+interface WeeksCardWorkouts {
+  status: "loading" | "loaded" | "failed";
+  byWeek: ReadonlyMap<number, WorkoutListItem[]>;
+  errorCode: DomainErrorCode | null;
+  reload: () => void;
+}
 
 interface MesocycleWeeksCardProps {
   titleId: string;
@@ -22,9 +32,15 @@ interface MesocycleWeeksCardProps {
   canAdd: boolean;
   onAdd: () => void;
   onEdit: (week: MesocycleWeek) => void;
+  /** The mesocycle's workouts; absent while the mesocycle does not exist. */
+  workouts?: WeeksCardWorkouts;
+  onCreateWorkout?: (weekNumber: number) => void;
 }
 
-/** The mesocycle's weeks under a "Planificación semanal" header, with the action that defines the next one. */
+/**
+ * The mesocycle's weeks under a "Planificación semanal" header, with the action that defines the next one. Once the
+ * mesocycle's workouts are read, each week lists its own and offers to create one.
+ */
 export default function MesocycleWeeksCard({
   titleId,
   weeks,
@@ -32,6 +48,8 @@ export default function MesocycleWeeksCard({
   canAdd,
   onAdd,
   onEdit,
+  workouts,
+  onCreateWorkout,
 }: MesocycleWeeksCardProps) {
   const { t } = useTranslation("mesocycles");
 
@@ -46,6 +64,7 @@ export default function MesocycleWeeksCard({
       <List sx={{ display: "flex", flexDirection: "column", gap: 1, p: 0 }}>
         {weeks.map((week) => {
           const number = weekNumberOf(week);
+          const entries = workouts?.byWeek.get(number) ?? [];
 
           return (
             <MesocycleWeekListItem
@@ -55,7 +74,31 @@ export default function MesocycleWeeksCard({
               objective={week.objective}
               editLabel={t("weeks.edit", { number })}
               onEdit={() => onEdit(week)}
-            />
+              workouts={
+                workouts?.status === "loaded" && onCreateWorkout
+                  ? {
+                      hasEntries: entries.length > 0,
+                      countLabel: t("weeks.workoutCount", { count: entries.length }),
+                      showLabel: t("weeks.showWorkouts", { number }),
+                      hideLabel: t("weeks.hideWorkouts", { number }),
+                      createLabel: t("weeks.newWorkout"),
+                      onCreate: () => onCreateWorkout(number),
+                    }
+                  : undefined
+              }
+            >
+              <MesocycleWeekWorkoutsTable
+                rows={entries.map((workout) => ({
+                  id: workout.id,
+                  name: workout.name,
+                  exerciseCount: workout.exercises.length,
+                  href: `/workout?id=${encodeURIComponent(workout.id)}`,
+                  editLabel: t("weeks.editWorkout", { name: workout.name }),
+                }))}
+                nameLabel={t("weeks.workoutsTable.name")}
+                exercisesLabel={t("weeks.workoutsTable.exercises")}
+              />
+            </MesocycleWeekListItem>
           );
         })}
       </List>
@@ -92,6 +135,11 @@ export default function MesocycleWeeksCard({
             {t("weeks.add")}
           </Button>
         </Box>
+        {workouts?.status === "failed" && workouts.errorCode && (
+          <Box sx={{ mb: 2 }}>
+            <LoadError code={workouts.errorCode} onRetry={workouts.reload} />
+          </Box>
+        )}
         {body()}
       </CardContent>
     </Card>

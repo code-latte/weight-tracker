@@ -7,6 +7,7 @@ import {
   type ReorderWorkoutExercisesRequest,
   type UpdateWorkoutRequest,
   type Workout,
+  type WorkoutById,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
@@ -60,6 +61,13 @@ const workoutExercise: WorkoutExerciseDetail = {
 const workoutDetail: WorkoutDetail = {
   ...workout,
   exercises: [workoutExercise],
+};
+
+const workoutById: WorkoutById = {
+  ...workoutDetail,
+  trainerId: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
+  athlete: listedPerson,
+  trainer: { ...listedPerson, id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d", role: "TRAINER" },
 };
 
 const createRequest: CreateWorkoutRequest = {
@@ -213,7 +221,7 @@ describe("WorkoutRepository", () => {
   describe("getById", () => {
     it("gets /workouts/{id} without a body", async () => {
       // Arrange
-      const httpClient = new FakeHttpClient(async () => workoutDetail);
+      const httpClient = new FakeHttpClient(async () => workoutById);
       const repository = new WorkoutRepository(httpClient);
 
       // Act
@@ -223,15 +231,15 @@ describe("WorkoutRepository", () => {
       expect(httpClient.requests).toEqual([{ method: "GET", path: `/workouts/${workout.id}` }]);
     });
 
-    it("returns the workout with its exercises on success", async () => {
+    it("returns the workout with its exercises, athlete and trainer on success", async () => {
       // Arrange
-      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutDetail));
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutById));
 
       // Act
       const result = await repository.getById(workout.id);
 
       // Assert
-      expect(result).toEqual(ok(workoutDetail));
+      expect(result).toEqual(ok(workoutById));
     });
 
     it.each([
@@ -290,6 +298,26 @@ describe("WorkoutRepository", () => {
       expect(httpClient.requests).toEqual([
         { method: "POST", path: "/workouts", body: placedRequest },
       ]);
+    });
+
+    it("sends a placed workout without a date when none is given", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => placedWorkout);
+      const repository = new WorkoutRepository(httpClient);
+      const placedRequest: CreateWorkoutRequest = {
+        name: "Pierna",
+        userId: workout.userId,
+        ...placement,
+      };
+
+      // Act
+      await repository.create(placedRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "POST", path: "/workouts", body: placedRequest },
+      ]);
+      expect(httpClient.requests[0]?.body).not.toHaveProperty("workoutDate");
     });
 
     it("sends no mesocycle placement when it is omitted", async () => {

@@ -10,9 +10,11 @@ import {
   type MesocycleWeekFormValues,
   validateCreateMesocycleForm,
   validateMesocycleDetailsForm,
+  type WeekWorkoutFormValues,
 } from "@weight-tracker/core/application";
 import type {
   CreateMesocycleRequest,
+  CreateWorkoutRequest,
   Mesocycle,
   MesocycleWeek,
   TrainingWeekType,
@@ -24,16 +26,22 @@ import { useTranslation } from "react-i18next";
 import Link from "@/presentation/common/components/atoms/link";
 import Typography from "@/presentation/common/components/atoms/typography";
 import { fullNameOf } from "@/presentation/common/full-name";
+import { initialsOf } from "@/presentation/common/initials";
+import type { PersonCardProps } from "@/presentation/common/components/molecules/person-card";
 import HomeSkeleton from "@/presentation/common/components/molecules/home-skeleton";
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import AppShell from "@/presentation/common/components/organisms/app-shell";
 import useAssignees from "@/presentation/common/hooks/use-assignees";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
+import CreateWeekWorkoutDialog from "@/presentation/mesocycles/components/organisms/create-week-workout-dialog";
+import MesocycleContextStrip from "@/presentation/mesocycles/components/organisms/mesocycle-context-strip";
 import MesocycleDetailsCard from "@/presentation/mesocycles/components/organisms/mesocycle-details-card";
 import MesocycleWeekDialog from "@/presentation/mesocycles/components/organisms/mesocycle-week-dialog";
 import MesocycleWeeksCard from "@/presentation/mesocycles/components/organisms/mesocycle-weeks-card";
 import useCreateMesocycle from "@/presentation/mesocycles/hooks/use-create-mesocycle";
+import useCreateWeekWorkout from "@/presentation/mesocycles/hooks/use-create-week-workout";
 import useMesocycle from "@/presentation/mesocycles/hooks/use-mesocycle";
+import useMesocycleWorkouts from "@/presentation/mesocycles/hooks/use-mesocycle-workouts";
 import useSaveMesocycleWeek from "@/presentation/mesocycles/hooks/use-save-mesocycle-week";
 import useUpdateMesocycle from "@/presentation/mesocycles/hooks/use-update-mesocycle";
 import { nextFreeWeekOf, sortedWeeks, weekNumberOf } from "@/presentation/mesocycles/weeks";
@@ -53,6 +61,11 @@ const emptyValues: CreateMesocycleFormValues = {
 /** The person's full name, or their email when they have no name. */
 function displayNameOf(person: Mesocycle["athlete"]): string {
   return fullNameOf(person) ?? person.email;
+}
+
+/** The person as their card in the strip shows them. */
+function personCardOf(person: Mesocycle["athlete"], role: string): PersonCardProps {
+  return { name: displayNameOf(person), initials: initialsOf(person), role };
 }
 
 /** The form values of a stored mesocycle; who it is for is not edited. */
@@ -94,6 +107,32 @@ function toUpdate(id: string, values: CreateMesocycleFormValues): UpdateMesocycl
     startDate: values.startDate,
     durationInWeeks: Number(values.durationInWeeks.trim()),
   };
+}
+
+/**
+ * Builds a workout creation placed in one week of the mesocycle: who it is for comes from the mesocycle, the trainer
+ * only when the caller chooses one, and no date, since the API dates it from the week.
+ */
+function toWeekWorkoutRequest(
+  mesocycle: Mesocycle,
+  weekNumber: number,
+  values: WeekWorkoutFormValues,
+  withTrainer: boolean,
+): CreateWorkoutRequest {
+  const request: CreateWorkoutRequest = {
+    name: values.name,
+    userId: mesocycle.athleteId,
+    mesocycleId: mesocycle.id,
+    mesocycleWeekNumber: weekNumber,
+  };
+
+  if (values.description !== "") {
+    request.description = values.description;
+  }
+  if (withTrainer) {
+    request.trainerId = mesocycle.trainerId;
+  }
+  return request;
 }
 
 /** The page heading, its line and the way back to the list. */
@@ -226,11 +265,12 @@ function CreateMesocycle({ role }: { role: Role }) {
   );
 }
 
-/** The week dialog open over the screen: a new week to define, or a stored one to redefine. */
+/** The dialog open over the screen: a new week to define, a stored one to redefine, or a workout for a week. */
 type OpenDialog =
   | { kind: "none" }
   | { kind: "define"; weekNumber: number }
-  | { kind: "redefine"; week: MesocycleWeek };
+  | { kind: "redefine"; week: MesocycleWeek }
+  | { kind: "workout"; weekNumber: number };
 
 /** Edit mode once the mesocycle is read: its form, its save, its weeks and the open week dialog. */
 function LoadedMesocycle({
@@ -242,8 +282,12 @@ function LoadedMesocycle({
   role: Role;
   onReplace: (mesocycle: Mesocycle) => void;
 }) {
+  const router = useRouter();
+  const { t: tc } = useTranslation();
   const { saving, errorCode, saved, save, clearSaved } = useUpdateMesocycle();
   const week = useSaveMesocycleWeek();
+  const workouts = useMesocycleWorkouts(mesocycle.id);
+  const weekWorkout = useCreateWeekWorkout();
   const [values, setValues] = useState<CreateMesocycleFormValues>(() => valuesOf(mesocycle));
   const [errors, setErrors] = useState<CreateMesocycleFormViolations>({});
   const [dialog, setDialog] = useState<OpenDialog>({ kind: "none" });
@@ -272,11 +316,21 @@ function LoadedMesocycle({
 
   function closeDialog() {
     week.reset();
+    weekWorkout.reset();
     setDialog({ kind: "none" });
   }
 
+  async function handleWorkoutCreate(weekNumber: number, workoutValues: WeekWorkoutFormValues) {
+    // Mirrors whom the API requires a trainer from; the API keeps the rule.
+    const request = toWeekWorkoutRequest(mesocycle, weekNumber, workoutValues, role === "ADMIN");
+    const workout = await weekWorkout.create(request);
+    if (workout) {
+      router.push(`/workout?id=${encodeURIComponent(workout.id)}`);
+    }
+  }
+
   async function handleWeekSave(weekValues: MesocycleWeekFormValues) {
-    if (dialog.kind === "none") {
+    if (dialog.kind !== "define" && dialog.kind !== "redefine") {
       return;
     }
     const body = {
@@ -298,6 +352,13 @@ function LoadedMesocycle({
   return (
     <>
       <MesocycleHeader creating={false} />
+      <MesocycleContextStrip
+        athlete={personCardOf(mesocycle.athlete, tc("person.role.athlete"))}
+        // Only an admin is shown who prepares the mesocycle.
+        trainer={
+          role === "ADMIN" ? personCardOf(mesocycle.trainer, tc("person.role.trainer")) : null
+        }
+      />
       <MesocycleCards
         details={(titleId) => (
           <MesocycleDetailsCard
@@ -307,13 +368,7 @@ function LoadedMesocycle({
             onChange={handleChange}
             onSave={() => void handleSave()}
             saving={saving}
-            people={{
-              kind: "names",
-              names: {
-                athlete: displayNameOf(mesocycle.athlete),
-                trainer: role === "ADMIN" ? displayNameOf(mesocycle.trainer) : null,
-              },
-            }}
+            people={{ kind: "none" }}
             errorCode={errorCode}
             saved={saved}
           />
@@ -326,10 +381,22 @@ function LoadedMesocycle({
             canAdd={nextWeek !== null}
             onAdd={() => nextWeek !== null && setDialog({ kind: "define", weekNumber: nextWeek })}
             onEdit={(stored) => setDialog({ kind: "redefine", week: stored })}
+            workouts={workouts}
+            onCreateWorkout={(weekNumber) => setDialog({ kind: "workout", weekNumber })}
           />
         )}
       />
-      {dialog.kind !== "none" && (
+      {dialog.kind === "workout" && (
+        // Mounted per opening, so each one starts empty.
+        <CreateWeekWorkoutDialog
+          weekNumber={dialog.weekNumber}
+          creating={weekWorkout.creating}
+          errorCode={weekWorkout.errorCode}
+          onCreate={(workoutValues) => void handleWorkoutCreate(dialog.weekNumber, workoutValues)}
+          onClose={closeDialog}
+        />
+      )}
+      {(dialog.kind === "define" || dialog.kind === "redefine") && (
         // Mounted per opening, so each one starts from the stored values.
         <MesocycleWeekDialog
           weekNumber={dialog.kind === "define" ? dialog.weekNumber : weekNumberOf(dialog.week)}

@@ -13,6 +13,10 @@ export type AddExerciseRequest = components["schemas"]["AddOrUpdateExerciseReque
 export type SetPrescription = components["schemas"]["SetPrescriptionRequest"];
 export type ReorderWorkoutExercisesRequest =
   components["schemas"]["ReorderWorkoutExercisesRequest"];
+export type CreateSuperSeriesRequest = components["schemas"]["CreateSuperSeriesRequest"];
+export type SuperSeries = components["schemas"]["SuperSeriesResponse"];
+/** The id that groups the members of a superseries, unique within its workout. */
+export type SuperSeriesId = NonNullable<WorkoutExerciseDetail["superSeriesId"]>;
 
 /** The workout id travels in the path, the rest of the input in the body. */
 export type UpdateWorkoutInput = UpdateWorkoutRequest & { id: string };
@@ -29,3 +33,7 @@ export type UpdateWorkoutExerciseInput = AddExerciseRequest & {
 };
 /** The workout id travels in the path; the body holds every catalog exercise id of the workout, in the new order. */
 export type ReorderWorkoutExercisesInput = ReorderWorkoutExercisesRequest & { workoutId: string };
+/** The workout id travels in the path; `exerciseIds` are workout entry ids, not catalog exercise ids. */
+export type CreateSuperSeriesInput = { workoutId: string; exerciseIds: string[] };
+/** Both ids travel in the path. */
+export type BreakSuperSeriesInput = { workoutId: string; superSeriesId: SuperSeriesId };

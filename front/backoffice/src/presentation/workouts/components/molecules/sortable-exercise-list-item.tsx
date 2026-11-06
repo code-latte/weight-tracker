@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import DragIndicator from "@mui/icons-material/DragIndicator";
+import Checkbox from "@/presentation/common/components/atoms/checkbox";
 import IconButton from "@/presentation/common/components/atoms/icon-button";
 import ExerciseListItem from "@/presentation/workouts/components/molecules/exercise-list-item";
 
@@ -18,14 +19,20 @@ type SortableExerciseListItemProps = Omit<
   handleLabel: string;
   /** Read by assistive technology in place of "button" while the handle is focused. */
   roleDescription: string;
+  /** A checkbox shown after the handle, such as the one that picks exercises to group. */
+  selection?: { checked: boolean; label: string; onChange: () => void };
 };
 
-/** An exercise that moves within a sortable list when dragged by the handle on its left. */
+/**
+ * An exercise that moves within a sortable list when dragged by the handle on its left, optionally followed by a
+ * checkbox.
+ */
 export default function SortableExerciseListItem({
   id,
   disabled = false,
   handleLabel,
   roleDescription,
+  selection,
   ...itemProps
 }: SortableExerciseListItemProps) {
   const {
@@ -49,18 +56,29 @@ export default function SortableExerciseListItem({
         zIndex: isDragging ? 1 : undefined,
       }}
       leading={
-        <IconButton
-          ref={setActivatorNodeRef}
-          {...attributes}
-          {...listeners}
-          aria-label={handleLabel}
-          disabled={disabled}
-          size="small"
-          edge="start"
-          sx={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
-        >
-          <DragIndicator fontSize="small" />
-        </IconButton>
+        <>
+          <IconButton
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            aria-label={handleLabel}
+            disabled={disabled}
+            size="small"
+            edge="start"
+            sx={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
+          >
+            <DragIndicator fontSize="small" />
+          </IconButton>
+          {selection && (
+            <Checkbox
+              size="small"
+              checked={selection.checked}
+              onChange={selection.onChange}
+              slotProps={{ input: { "aria-label": selection.label } }}
+              sx={{ p: 0.5 }}
+            />
+          )}
+        </>
       }
     />
   );

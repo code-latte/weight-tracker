@@ -12,6 +12,7 @@ import {
 } from "@weight-tracker/core/application";
 import type {
   Exercise,
+  SuperSeriesId,
   UpdateWorkoutInput,
   WorkoutById,
   WorkoutExerciseDetail,
@@ -29,6 +30,7 @@ import HomeSkeleton from "@/presentation/common/components/molecules/home-skelet
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import AppShell from "@/presentation/common/components/organisms/app-shell";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
+import BreakSuperSeriesDialog from "@/presentation/workouts/components/organisms/break-super-series-dialog";
 import ExerciseCatalogDialog from "@/presentation/workouts/components/organisms/exercise-catalog-dialog";
 import ExerciseConfigurationDialog from "@/presentation/workouts/components/organisms/exercise-configuration-dialog";
 import WorkoutDetailsCard from "@/presentation/workouts/components/organisms/workout-details-card";
@@ -37,6 +39,7 @@ import WorkoutContextStrip, {
   type WorkoutContextMesocycle,
 } from "@/presentation/workouts/components/organisms/workout-context-strip";
 import WorkoutExercisesList, {
+  unitsOf,
   type WorkoutExerciseItem,
 } from "@/presentation/workouts/components/organisms/workout-exercises-list";
 import useExerciseCatalogFilters from "@/presentation/workouts/hooks/use-exercise-catalog-filters";
@@ -46,6 +49,7 @@ import useExerciseFavorites, {
 import useExercises from "@/presentation/workouts/hooks/use-exercises";
 import useRemoveWorkoutExercise from "@/presentation/workouts/hooks/use-remove-workout-exercise";
 import useReorderWorkoutExercises from "@/presentation/workouts/hooks/use-reorder-workout-exercises";
+import useSuperSeries from "@/presentation/workouts/hooks/use-super-series";
 import useUpdateWorkout from "@/presentation/workouts/hooks/use-update-workout";
 import useWorkout from "@/presentation/workouts/hooks/use-workout";
 import useWorkoutMesocycle, {
@@ -186,6 +190,12 @@ function inOrderOf(entries: WorkoutExerciseDetail[], ids: string[]) {
   return [...entries].sort((a, b) => placeOf(a) - placeOf(b));
 }
 
+function withoutId(ids: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(ids);
+  next.delete(id);
+  return next;
+}
+
 /** The editor once both reads are in: it owns the workout's form, its save, the exercises and the open dialog. */
 function LoadedWorkout({
   workout,
@@ -215,6 +225,11 @@ function LoadedWorkout({
   const [savedExercises, setSavedExercises] = useState<WorkoutExerciseDetail[]>(workout.exercises);
   const removal = useRemoveWorkoutExercise();
   const reordering = useReorderWorkoutExercises();
+  const superSeries = useSuperSeries();
+  // The entries checked to be grouped in a superseries.
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  // The superseries whose break is being confirmed.
+  const [breakTarget, setBreakTarget] = useState<SuperSeriesId | null>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
   // The button that started an add flow is gone once it ends, so the focus goes back to Añadir ejercicio.
   const addFlowEnded = useRef(false);
@@ -270,22 +285,87 @@ function LoadedWorkout({
 
     if (await removal.remove(workout.id, id, exerciseId)) {
       setSavedExercises((current) => current.filter((other) => other.id !== id));
+      setSelectedIds((current) => withoutId(current, id));
+    }
+  }
+
+  function handleToggleSelected(id: string) {
+    setSelectedIds((current) =>
+      current.has(id) ? withoutId(current, id) : new Set(current).add(id),
+    );
+  }
+
+  /**
+   * The checked exercises are grouped through the API. On success they are brought together: the first keeps its place
+   * and the others follow it, in their order, and that order is sent. A refused order is put back by entry id; the
+   * superseries stays.
+   */
+  async function handleGroup() {
+    const members = savedExercises.filter((entry) => selectedIds.has(entry.id));
+    const superSeriesId = await superSeries.create(
+      workout.id,
+      members.map((entry) => entry.id),
+    );
+    if (superSeriesId === null) {
+      return;
+    }
+
+    const memberIds = new Set(members.map((entry) => entry.id));
+    const first = savedExercises.findIndex((entry) => memberIds.has(entry.id));
+    const previousIds = savedExercises.map((entry) => entry.id);
+    const next = [
+      ...savedExercises.slice(0, first),
+      ...members,
+      ...savedExercises.slice(first).filter((entry) => !memberIds.has(entry.id)),
+    ].map((entry) => (memberIds.has(entry.id) ? { ...entry, superSeriesId } : entry));
+    setSavedExercises(next);
+    setSelectedIds(new Set());
+
+    if (next.every((entry, index) => entry.id === previousIds[index])) {
+      return;
+    }
+    if (
+      !(await reordering.reorder(
+        workout.id,
+        next.map((entry) => entry.exerciseId),
+      ))
+    ) {
+      setSavedExercises((current) => inOrderOf(current, previousIds));
+    }
+  }
+
+  /** The confirmed superseries is broken through the API; on success its members stay where they are, ungrouped. */
+  async function handleBreak(superSeriesId: SuperSeriesId) {
+    const broken = await superSeries.breakUp(workout.id, superSeriesId);
+    setBreakTarget(null);
+
+    if (broken) {
+      setSavedExercises((current) =>
+        current.map((entry) =>
+          String(entry.superSeriesId) === String(superSeriesId)
+            ? { ...entry, superSeriesId: null }
+            : entry,
+        ),
+      );
     }
   }
 
   /**
-   * The dropped exercise moves at once and the full saved order is sent. A refused order is put back by entry id, so
-   * an exercise saved or removed while the request was in flight is kept as it is.
+   * The dropped unit, an exercise or a whole superseries, moves at once and the full saved order is sent. A refused
+   * order is put back by entry id, so an exercise saved or removed while the request was in flight is kept as it is.
    */
   async function handleReorder(activeId: string, overId: string) {
-    const from = savedExercises.findIndex((entry) => entry.id === activeId);
-    const to = savedExercises.findIndex((entry) => entry.id === overId);
+    const units = unitsOf(savedExercises);
+    const from = units.findIndex((unit) => unit.id === activeId);
+    const to = units.findIndex((unit) => unit.id === overId);
     if (from === -1 || to === -1 || from === to) {
       return;
     }
 
     const previousIds = savedExercises.map((entry) => entry.id);
-    const next = arrayMove(savedExercises, from, to);
+    const next = arrayMove(units, from, to).flatMap(({ start, length }) =>
+      savedExercises.slice(start, start + length),
+    );
     setSavedExercises(next);
 
     if (
@@ -367,6 +447,12 @@ function LoadedWorkout({
               onReorder={(activeId, overId) => void handleReorder(activeId, overId)}
               reordering={reordering.reordering}
               reorderErrorCode={reordering.errorCode}
+              selectedIds={selectedIds}
+              onToggleSelected={handleToggleSelected}
+              onGroup={() => void handleGroup()}
+              grouping={superSeries.pending || reordering.reordering}
+              superSeriesError={superSeries.error}
+              onBreak={setBreakTarget}
             />
           </WorkoutExercisesCard>
         </Box>
@@ -386,6 +472,16 @@ function LoadedWorkout({
           setDialog({ kind: "configure", item: newItemOf(exercise), adding: true })
         }
         onClose={closeDialog}
+      />
+      <BreakSuperSeriesDialog
+        open={breakTarget !== null}
+        pending={superSeries.pending}
+        onCancel={() => setBreakTarget(null)}
+        onConfirm={() => {
+          if (breakTarget !== null) {
+            void handleBreak(breakTarget);
+          }
+        }}
       />
       {dialog.kind === "configure" && (
         // Mounted per opening and keyed by the item, so each one starts from the stored values.

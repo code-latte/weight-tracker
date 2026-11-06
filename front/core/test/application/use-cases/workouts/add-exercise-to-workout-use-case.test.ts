@@ -7,6 +7,7 @@ import {
   ok,
   type AddExerciseRequest,
   type Result,
+  type SuperSeries,
   type Workout,
   type WorkoutById,
   type WorkoutDetail,
@@ -86,6 +87,16 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
   }
 
   async reorderExercises(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async createSuperSeries(): Promise<Result<SuperSeries, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async breakSuperSeries(): Promise<Result<void, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }

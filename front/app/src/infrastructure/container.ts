@@ -2,9 +2,11 @@ import {
   AcceptAthleteInvitationUseCase,
   ActivateUserUseCase,
   AddExerciseToWorkoutUseCase,
+  BreakSuperSeriesUseCase,
   CreateExerciseUseCase,
   CreateMesocycleUseCase,
   CreateUserUseCase,
+  CreateSuperSeriesUseCase,
   CreateWorkoutUseCase,
   DeactivateUserUseCase,
   DefineMesocycleWeekUseCase,
@@ -110,6 +112,8 @@ const container = new Container<Dependencies>({
     new RemoveExerciseFromWorkoutUseCase(c.resolve("workoutRepository")),
   reorderWorkoutExercisesUseCase: (c) =>
     new ReorderWorkoutExercisesUseCase(c.resolve("workoutRepository")),
+  createSuperSeriesUseCase: (c) => new CreateSuperSeriesUseCase(c.resolve("workoutRepository")),
+  breakSuperSeriesUseCase: (c) => new BreakSuperSeriesUseCase(c.resolve("workoutRepository")),
   getMesocyclesUseCase: (c) => new GetMesocyclesUseCase(c.resolve("mesocycleRepository")),
   getMesocycleByIdUseCase: (c) => new GetMesocycleByIdUseCase(c.resolve("mesocycleRepository")),
   getMesocycleWorkoutsUseCase: (c) =>

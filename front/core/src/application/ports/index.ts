@@ -8,6 +8,7 @@ export type { default as NotificationServiceInterface } from "./notification-ser
 export type { default as UseCaseInterface } from "./use-case-interface";
 export type { default as UserRepositoryInterface } from "./user-repository-interface";
 export type { default as WorkoutRepositoryInterface } from "./workout-repository-interface";
+export type { default as WorkoutTemplateRepositoryInterface } from "./workout-template-repository-interface";
 export type { default as MesocycleRepositoryInterface } from "./mesocycle-repository-interface";
 export type { default as ExerciseRepositoryInterface } from "./exercise-repository-interface";
 export type { default as ExerciseFavoriteRepositoryInterface } from "./exercise-favorite-repository-interface";

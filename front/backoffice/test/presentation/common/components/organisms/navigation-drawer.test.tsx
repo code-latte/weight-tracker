@@ -185,6 +185,44 @@ describe("NavigationDrawer", () => {
     expect(screen.getByRole("link", { name: "Mesociclos" })).not.toHaveClass("Mui-selected");
   });
 
+  it("links Plantillas de entrenamiento to its screen, not selected elsewhere", async () => {
+    // Arrange & Act
+    await renderWithProviders(<NavigationDrawer />);
+
+    // Assert
+    const entry = screen.getByRole("link", { name: "Plantillas de entrenamiento" });
+    expect(entry).toHaveAttribute("href", "/workout-templates");
+    expect(entry).not.toHaveClass("Mui-selected");
+  });
+
+  it("selects Plantillas de entrenamiento and no other entry on its screen", async () => {
+    // Arrange
+    navigation.pathname = "/workout-templates";
+
+    // Act
+    await renderWithProviders(<NavigationDrawer />);
+
+    // Assert
+    const nav = screen.getByRole("navigation", { name: "Menú principal" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .filter((link) => link.classList.contains("Mui-selected"))
+        .map((link) => link.textContent),
+    ).toEqual(["Plantillas de entrenamiento"]);
+  });
+
+  it("shows Plantillas de entrenamiento in English", async () => {
+    // Arrange
+    await renderWithProviders(<NavigationDrawer />);
+
+    // Act
+    await act(() => i18n.changeLanguage("en"));
+
+    // Assert
+    expect(screen.getByRole("link", { name: "Workout templates" })).toBeInTheDocument();
+  });
+
   it("keeps every other item without a link", async () => {
     // Arrange & Act
     await renderWithProviders(<NavigationDrawer />);
@@ -201,6 +239,7 @@ describe("NavigationDrawer", () => {
       "Invitaciones",
       "Mesociclos",
       "Entrenamientos",
+      "Plantillas de entrenamiento",
       "Catálogo de ejercicios",
     ]);
   });

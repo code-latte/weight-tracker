@@ -21,6 +21,7 @@ import type {
   WorkoutById,
   WorkoutDetail,
   WorkoutExerciseDetail,
+  WorkoutTemplate,
 } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
 import theme from "@/presentation/common/theme";
@@ -247,6 +248,15 @@ const setSummaries = () =>
 const emptyWorkout: WorkoutById = { ...workout, exercises: [] };
 const withoutExercises = async () => ok(emptyWorkout);
 
+/** What the API answers when the workout is saved as a template. */
+const savedTemplate: WorkoutTemplate = {
+  id: "wt-9",
+  name: "Pierna",
+  description: "Día 1",
+  trainerId: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
+  exercises: [],
+};
+
 function favoriteOf(exerciseId: string): ExerciseFavorite {
   return { exerciseId, createdAtUtc: "2026-11-03T09:30:00Z" };
 }
@@ -267,7 +277,9 @@ function renderWorkout({
   unmarkFavorite = async () => ok(undefined),
   getMesocycle = async () => fail(new DomainError("UNEXPECTED", "Not used")),
   profile = completeProfile,
+  saveAsTemplate = async () => ok(savedTemplate),
 }: {
+  saveAsTemplate?: () => Promise<Result<WorkoutTemplate, DomainError>>;
   getWorkout?: () => Promise<Result<WorkoutById, DomainError>>;
   getExercises?: () => Promise<Result<Exercise[], DomainError>>;
   getFavorites?: () => Promise<Result<ExerciseFavorite[], DomainError>>;
@@ -307,6 +319,7 @@ function renderWorkout({
     reorderExercises: vi.fn(reorderExercises),
     createSuperSeries: vi.fn(createSuperSeries),
     breakSuperSeries: vi.fn(breakSuperSeries),
+    saveAsTemplate: vi.fn(saveAsTemplate),
   };
 
   return {
@@ -332,6 +345,7 @@ function renderWorkout({
       reorderWorkoutExercisesUseCase: () => ({ execute: mutations.reorderExercises }),
       createSuperSeriesUseCase: () => ({ execute: mutations.createSuperSeries }),
       breakSuperSeriesUseCase: () => ({ execute: mutations.breakSuperSeries }),
+      createWorkoutTemplateFromWorkoutUseCase: () => ({ execute: mutations.saveAsTemplate }),
     }),
   };
 }
@@ -4022,6 +4036,116 @@ describe("WorkoutView", () => {
       expect(
         within(english).getByRole("navigation", { name: "Mesocycle and week" }),
       ).toHaveTextContent("Hipertrofia/Week 2");
+    });
+  });
+
+  describe("Guardar como plantilla", () => {
+    const saveAsTemplateButton = () =>
+      within(propertiesSection()).getByRole("button", { name: "Guardar como plantilla" });
+
+    it("shows an outlined Guardar como plantilla right before Guardar", async () => {
+      // Arrange & Act
+      await renderWorkout().rendered;
+      await loaded();
+
+      // Assert
+      const buttons = within(propertiesSection())
+        .getAllByRole("button")
+        .map((button) => button.textContent);
+      const index = buttons.indexOf("Guardar como plantilla");
+      expect(index).toBeGreaterThan(-1);
+      expect(buttons[index + 1]).toBe("Guardar");
+      expect(saveAsTemplateButton()).toHaveClass("MuiButton-outlined");
+      expect(saveAsTemplateButton()).toBeEnabled();
+    });
+
+    it("is disabled with its hint while the properties have unsaved edits", async () => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.type(within(propertiesSection()).getByRole("textbox", { name: "Nombre" }), " B");
+
+      // Assert
+      expect(saveAsTemplateButton()).toBeDisabled();
+      expect(
+        within(propertiesSection()).getByLabelText(
+          "Guarda los cambios antes de crear la plantilla.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("is enabled again once the edits are saved", async () => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.type(within(propertiesSection()).getByRole("textbox", { name: "Nombre" }), " B");
+
+      // Act
+      await user.click(within(propertiesSection()).getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      await screen.findByText("Entrenamiento guardado.");
+      expect(saveAsTemplateButton()).toBeEnabled();
+    });
+
+    it("creates a template from the workout once, without updating it, and links to it", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(saveAsTemplateButton());
+
+      // Assert
+      expect(await screen.findByText("Plantilla creada.")).toBeInTheDocument();
+      expect(mutations.saveAsTemplate).toHaveBeenCalledTimes(1);
+      expect(mutations.saveAsTemplate).toHaveBeenCalledWith({ workoutId: "w-1" });
+      expect(mutations.update).not.toHaveBeenCalled();
+      expect(screen.getByRole("link", { name: "Ver plantilla" })).toHaveAttribute(
+        "href",
+        "/workout-template?id=wt-9",
+      );
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("shows the error and leaves the workout as it was when the API refuses it", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({
+        saveAsTemplate: async () => fail(new DomainError("VALIDATION", "")),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(saveAsTemplateButton());
+
+      // Assert
+      expect(await screen.findByRole("alert")).toBeInTheDocument();
+      expect(screen.queryByText("Plantilla creada.")).not.toBeInTheDocument();
+      expect(mutations.update).not.toHaveBeenCalled();
+    });
+
+    it("reads in English", async () => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+
+      // Act
+      await act(() => i18n.changeLanguage("en"));
+
+      // Assert
+      expect(
+        within(screen.getByRole("region", { name: "Workout properties" })).getByRole("button", {
+          name: "Save as template",
+        }),
+      ).toBeInTheDocument();
     });
   });
 });

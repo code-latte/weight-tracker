@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { DomainErrorCode } from "@weight-tracker/core/domain";
 import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
+import type { ExercisesOwner } from "@/presentation/workouts/exercises-owner";
 
 interface RemoveWorkoutExerciseState {
   /** The workout entry being removed, while its request is in progress. */
@@ -11,7 +12,10 @@ interface RemoveWorkoutExerciseState {
   remove: (workoutId: string, entryId: string, exerciseId: string) => Promise<boolean>;
 }
 
-export default function useRemoveWorkoutExercise(): RemoveWorkoutExerciseState {
+/** Removes through the workout or the template use case, by `owner`; the owner id is passed as `workoutId`. */
+export default function useRemoveWorkoutExercise(
+  owner: ExercisesOwner = "workout",
+): RemoveWorkoutExerciseState {
   const container = useContainer();
   const { runWithSession } = useSession();
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -22,7 +26,11 @@ export default function useRemoveWorkoutExercise(): RemoveWorkoutExerciseState {
     setErrorCode(null);
 
     const result = await runWithSession(() =>
-      container.resolve("removeExerciseFromWorkoutUseCase").execute({ workoutId, exerciseId }),
+      owner === "template"
+        ? container
+            .resolve("removeExerciseFromWorkoutTemplateUseCase")
+            .execute({ templateId: workoutId, exerciseId })
+        : container.resolve("removeExerciseFromWorkoutUseCase").execute({ workoutId, exerciseId }),
     );
 
     setRemovingId(null);

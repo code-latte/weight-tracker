@@ -3,6 +3,19 @@ import {
   ActivateUserUseCase,
   AddExerciseToWorkoutUseCase,
   BreakSuperSeriesUseCase,
+  GetWorkoutTemplatesUseCase,
+  GetWorkoutTemplateByIdUseCase,
+  CreateWorkoutTemplateUseCase,
+  UpdateWorkoutTemplateUseCase,
+  DeleteWorkoutTemplateUseCase,
+  AddExerciseToWorkoutTemplateUseCase,
+  UpdateWorkoutTemplateExerciseUseCase,
+  RemoveExerciseFromWorkoutTemplateUseCase,
+  ReorderWorkoutTemplateExercisesUseCase,
+  CreateWorkoutTemplateSuperSeriesUseCase,
+  BreakWorkoutTemplateSuperSeriesUseCase,
+  CreateWorkoutFromTemplateUseCase,
+  CreateWorkoutTemplateFromWorkoutUseCase,
   CreateExerciseUseCase,
   CreateMesocycleUseCase,
   CreateUserUseCase,
@@ -59,6 +72,7 @@ import {
   TrainerAthleteRepository,
   UserRepository,
   WorkoutRepository,
+  WorkoutTemplateRepository,
 } from "@weight-tracker/core/infrastructure";
 import NoOpNotificationService from "./no-op-notification-service";
 import SqliteKeyValueStore from "./sqlite-key-value-store";
@@ -78,6 +92,7 @@ const container = new Container<Dependencies>({
   authRepository: (c) => new AuthRepository(c.resolve("httpClient")),
   userRepository: (c) => new UserRepository(c.resolve("httpClient")),
   workoutRepository: (c) => new WorkoutRepository(c.resolve("httpClient")),
+  workoutTemplateRepository: (c) => new WorkoutTemplateRepository(c.resolve("httpClient")),
   mesocycleRepository: (c) => new MesocycleRepository(c.resolve("httpClient")),
   exerciseRepository: (c) => new ExerciseRepository(c.resolve("httpClient")),
   exerciseFavoriteRepository: (c) => new ExerciseFavoriteRepository(c.resolve("httpClient")),
@@ -114,6 +129,32 @@ const container = new Container<Dependencies>({
     new ReorderWorkoutExercisesUseCase(c.resolve("workoutRepository")),
   createSuperSeriesUseCase: (c) => new CreateSuperSeriesUseCase(c.resolve("workoutRepository")),
   breakSuperSeriesUseCase: (c) => new BreakSuperSeriesUseCase(c.resolve("workoutRepository")),
+  getWorkoutTemplatesUseCase: (c) =>
+    new GetWorkoutTemplatesUseCase(c.resolve("workoutTemplateRepository")),
+  getWorkoutTemplateByIdUseCase: (c) =>
+    new GetWorkoutTemplateByIdUseCase(c.resolve("workoutTemplateRepository")),
+  createWorkoutTemplateUseCase: (c) =>
+    new CreateWorkoutTemplateUseCase(c.resolve("workoutTemplateRepository")),
+  updateWorkoutTemplateUseCase: (c) =>
+    new UpdateWorkoutTemplateUseCase(c.resolve("workoutTemplateRepository")),
+  deleteWorkoutTemplateUseCase: (c) =>
+    new DeleteWorkoutTemplateUseCase(c.resolve("workoutTemplateRepository")),
+  addExerciseToWorkoutTemplateUseCase: (c) =>
+    new AddExerciseToWorkoutTemplateUseCase(c.resolve("workoutTemplateRepository")),
+  updateWorkoutTemplateExerciseUseCase: (c) =>
+    new UpdateWorkoutTemplateExerciseUseCase(c.resolve("workoutTemplateRepository")),
+  removeExerciseFromWorkoutTemplateUseCase: (c) =>
+    new RemoveExerciseFromWorkoutTemplateUseCase(c.resolve("workoutTemplateRepository")),
+  reorderWorkoutTemplateExercisesUseCase: (c) =>
+    new ReorderWorkoutTemplateExercisesUseCase(c.resolve("workoutTemplateRepository")),
+  createWorkoutTemplateSuperSeriesUseCase: (c) =>
+    new CreateWorkoutTemplateSuperSeriesUseCase(c.resolve("workoutTemplateRepository")),
+  breakWorkoutTemplateSuperSeriesUseCase: (c) =>
+    new BreakWorkoutTemplateSuperSeriesUseCase(c.resolve("workoutTemplateRepository")),
+  createWorkoutFromTemplateUseCase: (c) =>
+    new CreateWorkoutFromTemplateUseCase(c.resolve("workoutTemplateRepository")),
+  createWorkoutTemplateFromWorkoutUseCase: (c) =>
+    new CreateWorkoutTemplateFromWorkoutUseCase(c.resolve("workoutTemplateRepository")),
   getMesocyclesUseCase: (c) => new GetMesocyclesUseCase(c.resolve("mesocycleRepository")),
   getMesocycleByIdUseCase: (c) => new GetMesocycleByIdUseCase(c.resolve("mesocycleRepository")),
   getMesocycleWorkoutsUseCase: (c) =>

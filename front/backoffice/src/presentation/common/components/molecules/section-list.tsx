@@ -7,30 +7,27 @@ import ListItemButton from "@/presentation/common/components/atoms/list-item-but
 import ListItemIcon from "@/presentation/common/components/atoms/list-item-icon";
 import ListItemText from "@/presentation/common/components/atoms/list-item-text";
 
-/** The slices of the catalog the user can switch between. */
-export type ExerciseSection = "ALL" | "MINE" | "FAVORITES";
-
-export interface ExerciseSectionOption {
-  value: ExerciseSection;
+export interface SectionOption<T extends string> {
+  value: T;
   label: string;
   icon: ReactNode;
   disabled?: boolean;
 }
 
-interface ExerciseSectionListProps {
-  sections: ExerciseSectionOption[];
-  selected: ExerciseSection;
-  onChange: (section: ExerciseSection) => void;
+interface SectionListProps<T extends string> {
+  sections: SectionOption<T>[];
+  selected: T;
+  onChange: (section: T) => void;
   "aria-label": string;
 }
 
 /** A vertical list of sections, each an icon and a name, with exactly one selected. */
-export default function ExerciseSectionList({
+export default function SectionList<T extends string>({
   sections,
   selected,
   onChange,
   "aria-label": ariaLabel,
-}: ExerciseSectionListProps) {
+}: SectionListProps<T>) {
   return (
     <List aria-label={ariaLabel} disablePadding>
       {sections.map((section) => (

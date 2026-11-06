@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ExerciseSection } from "@/presentation/workouts/components/molecules/exercise-section-list";
+import type { ExerciseSection } from "@/presentation/workouts/catalog";
 
 export interface ExerciseCatalogFilters {
   /** The section of the catalog shown; it narrows the exercises before the other filters apply. */

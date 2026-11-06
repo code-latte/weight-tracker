@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { DomainErrorCode } from "@weight-tracker/core/domain";
 import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
+import type { ExercisesOwner } from "@/presentation/workouts/exercises-owner";
 
 interface ReorderWorkoutExercisesState {
   /** Whether a reorder request is in progress. */
@@ -11,7 +12,10 @@ interface ReorderWorkoutExercisesState {
   reorder: (workoutId: string, exerciseIds: string[]) => Promise<boolean>;
 }
 
-export default function useReorderWorkoutExercises(): ReorderWorkoutExercisesState {
+/** Reorders through the workout or the template use case, by `owner`; the owner id is passed as `workoutId`. */
+export default function useReorderWorkoutExercises(
+  owner: ExercisesOwner = "workout",
+): ReorderWorkoutExercisesState {
   const container = useContainer();
   const { runWithSession } = useSession();
   const [reordering, setReordering] = useState(false);
@@ -21,8 +25,12 @@ export default function useReorderWorkoutExercises(): ReorderWorkoutExercisesSta
     setReordering(true);
     setErrorCode(null);
 
-    const result = await runWithSession(() =>
-      container.resolve("reorderWorkoutExercisesUseCase").execute({ workoutId, exerciseIds }),
+    const result = await runWithSession<unknown>(() =>
+      owner === "template"
+        ? container
+            .resolve("reorderWorkoutTemplateExercisesUseCase")
+            .execute({ templateId: workoutId, exerciseIds })
+        : container.resolve("reorderWorkoutExercisesUseCase").execute({ workoutId, exerciseIds }),
     );
 
     setReordering(false);

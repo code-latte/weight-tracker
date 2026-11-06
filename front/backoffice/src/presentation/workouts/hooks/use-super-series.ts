@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { DomainErrorCode, SuperSeriesId } from "@weight-tracker/core/domain";
 import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
+import type { ExercisesOwner } from "@/presentation/workouts/exercises-owner";
 
 /** Why the last create or break failed, and which of the two it was. */
 export interface SuperSeriesError {
@@ -19,7 +20,8 @@ interface SuperSeriesState {
   breakUp: (workoutId: string, superSeriesId: SuperSeriesId) => Promise<boolean>;
 }
 
-export default function useSuperSeries(): SuperSeriesState {
+/** Groups and breaks through the workout or the template use cases, by `owner`; the owner id is passed as `workoutId`. */
+export default function useSuperSeries(owner: ExercisesOwner = "workout"): SuperSeriesState {
   const container = useContainer();
   const { runWithSession } = useSession();
   const [pending, setPending] = useState(false);
@@ -30,7 +32,11 @@ export default function useSuperSeries(): SuperSeriesState {
     setError(null);
 
     const result = await runWithSession(() =>
-      container.resolve("createSuperSeriesUseCase").execute({ workoutId, exerciseIds }),
+      owner === "template"
+        ? container
+            .resolve("createWorkoutTemplateSuperSeriesUseCase")
+            .execute({ templateId: workoutId, exerciseIds })
+        : container.resolve("createSuperSeriesUseCase").execute({ workoutId, exerciseIds }),
     );
 
     setPending(false);
@@ -46,7 +52,11 @@ export default function useSuperSeries(): SuperSeriesState {
     setError(null);
 
     const result = await runWithSession(() =>
-      container.resolve("breakSuperSeriesUseCase").execute({ workoutId, superSeriesId }),
+      owner === "template"
+        ? container
+            .resolve("breakWorkoutTemplateSuperSeriesUseCase")
+            .execute({ templateId: workoutId, superSeriesId })
+        : container.resolve("breakSuperSeriesUseCase").execute({ workoutId, superSeriesId }),
     );
 
     setPending(false);

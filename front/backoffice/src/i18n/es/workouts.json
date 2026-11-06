@@ -185,7 +185,11 @@
       "label": "Datos del entrenamiento",
       "week": "Semana {{number}}",
       "breadcrumb": "Mesociclo y semana"
-    }
+    },
+    "saveAsTemplate": "Guardar como plantilla",
+    "saveAsTemplateHint": "Guarda los cambios antes de crear la plantilla.",
+    "savedAsTemplate": "Plantilla creada.",
+    "viewTemplate": "Ver plantilla"
   },
   "muscles": {
     "ABDOMINALS": "Abdominales",
@@ -256,5 +260,47 @@
       "MIDHIGH": "Intenso",
       "HIGH": "Muy intenso"
     }
+  },
+  "workoutTemplates": {
+    "title": "Plantillas de entrenamiento",
+    "new": "Nueva plantilla",
+    "columns": {
+      "name": "Nombre",
+      "description": "Descripción",
+      "exercises": "Ejercicios",
+      "trainer": "Entrenador"
+    },
+    "edit": "Editar {{name}}",
+    "empty": "Todavía no hay plantillas.",
+    "unknownTrainer": "—"
+  },
+  "createTemplate": {
+    "title": "Nueva plantilla",
+    "fields": {
+      "name": "Nombre",
+      "description": "Descripción",
+      "trainerId": "Entrenador"
+    },
+    "actions": {
+      "cancel": "Cancelar",
+      "create": "Crear"
+    }
+  },
+  "workoutTemplate": {
+    "title": "Editar plantilla",
+    "back": "Volver",
+    "details": {
+      "title": "Propiedades de la plantilla",
+      "saved": "Plantilla guardada."
+    },
+    "delete": "Eliminar plantilla",
+    "deleteConfirm": {
+      "title": "¿Eliminar esta plantilla?",
+      "body": "Los entrenamientos creados desde ella no cambian.",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar"
+    },
+    "notFound": "No hemos encontrado esta plantilla.",
+    "backToList": "Volver a plantillas"
   }
 }

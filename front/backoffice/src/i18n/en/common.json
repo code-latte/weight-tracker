@@ -91,5 +91,18 @@
       "athlete": "Athlete",
       "trainer": "Trainer"
     }
+  },
+  "workoutTemplatePicker": {
+    "sectionsLabel": "Workout source",
+    "sections": {
+      "scratch": "From scratch",
+      "template": "From template"
+    },
+    "listLabel": "Templates",
+    "exerciseCount_one": "{{count}} exercise",
+    "exerciseCount_other": "{{count}} exercises",
+    "empty": "No templates available.",
+    "pickTrainer": "Choose a trainer to see their templates.",
+    "required": "Choose a template."
   }
 }

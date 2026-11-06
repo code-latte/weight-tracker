@@ -555,7 +555,7 @@ test("sends the Wednesday of the week chosen on the workout screen", async ({ pa
   );
 
   // Act
-  await page.getByRole("button", { name: "Guardar" }).click();
+  await page.getByRole("button", { name: "Guardar", exact: true }).click();
 
   // Assert
   expect((await update).postDataJSON()).toMatchObject({ workoutDate: "2026-10-28" });
@@ -572,7 +572,7 @@ test("saves a workout's data and shows it after a reload", async ({ page }) => {
   await name.fill("Empuje B");
 
   // Act
-  await page.getByRole("button", { name: "Guardar" }).click();
+  await page.getByRole("button", { name: "Guardar", exact: true }).click();
 
   // Assert
   await expect(page.getByText("Entrenamiento guardado.")).toBeVisible();

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Box from "@mui/material/Box";
 import {
   WORKOUT_DESCRIPTION_MAX_LENGTH,
@@ -26,6 +27,12 @@ interface WorkoutDetailsCardProps {
   onSave: () => void;
   onChange: (field: keyof WorkoutDetailsFormValues, value: string) => void;
   titleId: string;
+  /** The card title; the workout's properties unless stated. */
+  title?: string;
+  /** Whether the week field is shown: a template has no week. */
+  showWeek?: boolean;
+  /** An action shown right before the save button, such as saving the workout as a template. */
+  secondaryAction?: ReactNode;
 }
 
 const maxLengthOf: Partial<Record<keyof WorkoutDetailsFormValues, number>> = {
@@ -34,7 +41,7 @@ const maxLengthOf: Partial<Record<keyof WorkoutDetailsFormValues, number>> = {
 };
 
 /**
- * The workout's properties: its own data in editable fields with their save action. The screen owns and saves the
+ * The properties of a workout, or of a template without its week: its own data in editable fields with their save action. The screen owns and saves the
  * values.
  */
 export default function WorkoutDetailsCard({
@@ -46,6 +53,9 @@ export default function WorkoutDetailsCard({
   onSave,
   onChange,
   titleId,
+  title,
+  showWeek = true,
+  secondaryAction,
 }: WorkoutDetailsCardProps) {
   const { t } = useTranslation("workouts");
 
@@ -68,28 +78,33 @@ export default function WorkoutDetailsCard({
     <Card variant="outlined">
       <CardContent>
         <Typography id={titleId} variant="h6" component="h2" sx={{ mb: 2 }}>
-          {t("workout.properties.title")}
+          {title ?? t("workout.properties.title")}
         </Typography>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) auto" },
+              gridTemplateColumns: { xs: "1fr", sm: showWeek ? "minmax(0, 1fr) auto" : "1fr" },
               gap: 2,
             }}
           >
             <TextField {...field("name")} />
-            <WeekField
-              value={values.workoutDate}
-              onChange={(monday) => onChange("workoutDate", monday)}
-              disabled={disabled || weekLocked}
-              error={
-                errors.workoutDate ? t(`createWorkout.validation.${errors.workoutDate}`) : undefined
-              }
-            />
+            {showWeek && (
+              <WeekField
+                value={values.workoutDate}
+                onChange={(monday) => onChange("workoutDate", monday)}
+                disabled={disabled || weekLocked}
+                error={
+                  errors.workoutDate
+                    ? t(`createWorkout.validation.${errors.workoutDate}`)
+                    : undefined
+                }
+              />
+            )}
           </Box>
           <TextField {...field("description")} multiline minRows={2} />
-          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+            {secondaryAction}
             <Button variant="contained" disabled={saving} onClick={onSave}>
               {t("workout.details.save")}
             </Button>

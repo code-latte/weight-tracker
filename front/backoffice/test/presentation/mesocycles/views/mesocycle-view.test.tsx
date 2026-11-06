@@ -15,6 +15,9 @@ import type {
   UserSummary,
   Workout,
   WorkoutListItem,
+  WorkoutTemplate,
+  CreateWorkoutFromTemplateInput,
+  GetWorkoutTemplatesInput,
 } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
 import MesocycleView from "@/presentation/mesocycles/views/mesocycle-view";
@@ -155,6 +158,10 @@ function createdWorkout(request: CreateWorkoutRequest): Workout {
 
 type Answer<T> = Promise<Result<T, DomainError>>;
 
+const weekTemplates: WorkoutTemplate[] = [
+  { id: "wt-1", name: "Pierna A", description: "Fuerza", trainerId, exercises: [] },
+];
+
 function renderMesocycle({
   search = "",
   profile = completeProfile,
@@ -197,6 +204,8 @@ function renderMesocycle({
   getUsers = async () => ok(users),
   getWorkouts = async () => ok([]),
   createWorkout = async (request: CreateWorkoutRequest) => ok(createdWorkout(request)),
+  getTemplates = async () => ok(weekTemplates),
+  createFromTemplate = async () => ok({ ...createdWorkout({ name: "Pierna A" }), id: "w-9" }),
 }: {
   search?: string;
   profile?: UserProfile;
@@ -209,6 +218,8 @@ function renderMesocycle({
   getUsers?: () => Answer<UserSummary[]>;
   getWorkouts?: () => Answer<WorkoutListItem[]>;
   createWorkout?: (request: CreateWorkoutRequest) => Answer<Workout>;
+  getTemplates?: (input: GetWorkoutTemplatesInput) => Answer<WorkoutTemplate[]>;
+  createFromTemplate?: (input: CreateWorkoutFromTemplateInput) => Answer<Workout>;
 } = {}) {
   navigation.search = search;
   const fakes = {
@@ -221,6 +232,8 @@ function renderMesocycle({
     getUsers: vi.fn(getUsers),
     getWorkouts: vi.fn(getWorkouts),
     createWorkout: vi.fn(createWorkout),
+    getTemplates: vi.fn(getTemplates),
+    createFromTemplate: vi.fn(createFromTemplate),
   };
 
   return {
@@ -239,6 +252,8 @@ function renderMesocycle({
       getUsersUseCase: () => ({ execute: fakes.getUsers }),
       getMesocycleWorkoutsUseCase: () => ({ execute: fakes.getWorkouts }),
       createWorkoutUseCase: () => ({ execute: fakes.createWorkout }),
+      getWorkoutTemplatesUseCase: () => ({ execute: fakes.getTemplates }),
+      createWorkoutFromTemplateUseCase: () => ({ execute: fakes.createFromTemplate }),
     }),
   };
 }
@@ -1192,6 +1207,167 @@ describe("MesocycleView", () => {
       // Assert
       expect(await within(weekRow(1)).findByText("1 entrenamiento")).toBeInTheDocument();
       expect(getWorkouts).toHaveBeenCalledTimes(2);
+    });
+
+    describe("from a template", () => {
+      const templateSection = (dialog: HTMLElement) =>
+        within(dialog).getByRole("button", { name: "Desde plantilla" });
+      const templateRow = (dialog: HTMLElement, name: string) =>
+        within(within(dialog).getByRole("list", { name: "Plantillas" }))
+          .getAllByRole("button")
+          .find((row) => within(row).queryByText(name) !== null)!;
+
+      async function openTemplates(user: ReturnType<typeof userEvent.setup>) {
+        await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+        const dialog = await openWorkoutDialog(user, 3);
+        await user.click(templateSection(dialog));
+        await within(dialog).findByText("Pierna A");
+        return dialog;
+      }
+
+      it("opens on Desde cero and reads no templates until Desde plantilla is shown", async () => {
+        // Arrange
+        const { getTemplates, rendered } = renderMesocycle({ search: "id=m-1" });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+
+        // Act
+        const dialog = await openWorkoutDialog(user, 3);
+
+        // Assert
+        expect(within(dialog).getByRole("button", { name: "Desde cero" })).toHaveAttribute(
+          "aria-current",
+          "true",
+        );
+        expect(templateSection(dialog)).toBeInTheDocument();
+        expect(within(dialog).getByRole("textbox", { name: "Nombre" })).toBeInTheDocument();
+        expect(getTemplates).not.toHaveBeenCalled();
+      });
+
+      it("lists a trainer's own templates without a name, an athlete or a date", async () => {
+        // Arrange
+        const { getTemplates, rendered } = renderMesocycle({ search: "id=m-1" });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+
+        // Act
+        const dialog = await openTemplates(user);
+
+        // Assert
+        expect(getTemplates).toHaveBeenCalledTimes(1);
+        expect(getTemplates).toHaveBeenCalledWith({});
+        expect(within(dialog).queryByRole("textbox", { name: "Nombre" })).toBeNull();
+        expect(within(dialog).queryByRole("combobox")).toBeNull();
+        expect(within(dialog).getByText("0 ejercicios")).toBeInTheDocument();
+      });
+
+      it("lists the mesocycle trainer's templates to an admin", async () => {
+        // Arrange
+        const { getTemplates, rendered } = renderMesocycle({
+          search: "id=m-1",
+          profile: adminProfile,
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+
+        // Act
+        await openTemplates(user);
+
+        // Assert
+        expect(getTemplates).toHaveBeenCalledTimes(1);
+        expect(getTemplates).toHaveBeenCalledWith({ trainerId });
+      });
+
+      it("shows the empty message when there are no templates", async () => {
+        // Arrange
+        const { rendered } = renderMesocycle({
+          search: "id=m-1",
+          getTemplates: async () => ok([]),
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        await within(weekRow(3)).findByRole("button", { name: "Nuevo entrenamiento" });
+        const dialog = await openWorkoutDialog(user, 3);
+
+        // Act
+        await user.click(templateSection(dialog));
+
+        // Assert
+        expect(
+          await within(dialog).findByText("No hay plantillas disponibles."),
+        ).toBeInTheDocument();
+      });
+
+      it("asks for a template and sends nothing without one", async () => {
+        // Arrange
+        const { createFromTemplate, createWorkout, rendered } = renderMesocycle({
+          search: "id=m-1",
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        const dialog = await openTemplates(user);
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+
+        // Assert
+        expect(within(dialog).getByText("Elige una plantilla.")).toBeInTheDocument();
+        expect(createFromTemplate).not.toHaveBeenCalled();
+        expect(createWorkout).not.toHaveBeenCalled();
+      });
+
+      it("creates the week's workout from the template for the mesocycle's athlete and opens it", async () => {
+        // Arrange
+        const { createFromTemplate, createWorkout, rendered } = renderMesocycle({
+          search: "id=m-1",
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        const dialog = await openTemplates(user);
+        await user.click(templateRow(dialog, "Pierna A"));
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+
+        // Assert
+        await waitFor(() => expect(push).toHaveBeenCalledWith("/workout?id=w-9"));
+        expect(createFromTemplate).toHaveBeenCalledTimes(1);
+        expect(createFromTemplate).toHaveBeenCalledWith({
+          templateId: "wt-1",
+          userId: athleteId,
+          mesocycleId: "m-1",
+          mesocycleWeekNumber: 3,
+        });
+        expect(createWorkout).not.toHaveBeenCalled();
+      });
+
+      it("keeps the dialog and the selection when the creation is refused", async () => {
+        // Arrange
+        const { rendered } = renderMesocycle({
+          search: "id=m-1",
+          createFromTemplate: async () => fail(new DomainError("CONFLICT", "")),
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        const dialog = await openTemplates(user);
+        await user.click(templateRow(dialog, "Pierna A"));
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Crear" }));
+
+        // Assert
+        expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+        expect(templateRow(dialog, "Pierna A")).toHaveAttribute("aria-pressed", "true");
+        expect(push).not.toHaveBeenCalled();
+      });
     });
   });
 

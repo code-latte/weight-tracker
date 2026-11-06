@@ -11,6 +11,9 @@ import type {
   UserProfile,
   UserSummary,
   Workout,
+  WorkoutTemplate,
+  CreateWorkoutFromTemplateInput,
+  GetWorkoutTemplatesInput,
 } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
 import CreateWorkoutDialog from "@/presentation/workouts/components/organisms/create-workout-dialog";
@@ -79,6 +82,33 @@ const users = [
   userOf("m-1", "ADMIN", "Marta", "Gil", "marta@example.com"),
 ];
 
+function templateOf(id: string, name: string, description: string | null, exercises: number) {
+  const exercise = {
+    id: `${id}-e`,
+    exerciseId: "ex-squat",
+    effort: "HIGH",
+    perSide: false,
+    restMinutes: null,
+    sets: [],
+    superSeriesId: null,
+  };
+  return {
+    id,
+    name,
+    description,
+    trainerId,
+    exercises: Array.from({ length: exercises }, (_, index) => ({
+      ...exercise,
+      id: `${id}-e${index}`,
+    })),
+  } satisfies WorkoutTemplate;
+}
+
+const templates = [
+  templateOf("wt-1", "Pierna A", "Fuerza", 3),
+  templateOf("wt-2", "Torso", null, 1),
+];
+
 /** Stands in for the workouts screen: owns the open state and can open the dialog again. */
 function Harness() {
   const [open, setOpen] = useState(true);
@@ -98,20 +128,32 @@ function renderDialog({
   createWorkout = async () => ok(created),
   getMyAthletes = async () => ok(myAthletes),
   getUsers = async () => ok(users),
+  getTemplates = async () => ok(templates),
+  createFromTemplate = async () => ok({ ...created, id: "w-9" }),
 }: {
   profile?: UserProfile;
   createWorkout?: (request: CreateWorkoutRequest) => Promise<Result<Workout, DomainError>>;
   getMyAthletes?: () => Promise<Result<TrainerAthlete[], DomainError>>;
   getUsers?: () => Promise<Result<UserSummary[], DomainError>>;
+  getTemplates?: (
+    input: GetWorkoutTemplatesInput,
+  ) => Promise<Result<WorkoutTemplate[], DomainError>>;
+  createFromTemplate?: (
+    input: CreateWorkoutFromTemplateInput,
+  ) => Promise<Result<Workout, DomainError>>;
 } = {}) {
   const execute = vi.fn(createWorkout);
   const myAthletesExecute = vi.fn(getMyAthletes);
   const usersExecute = vi.fn(getUsers);
+  const templatesExecute = vi.fn(getTemplates);
+  const fromTemplateExecute = vi.fn(createFromTemplate);
 
   return {
     execute,
     getMyAthletes: myAthletesExecute,
     getUsers: usersExecute,
+    getTemplates: templatesExecute,
+    createFromTemplate: fromTemplateExecute,
     rendered: renderWithProviders(<Harness />, {
       getSessionUseCase: () => ({
         execute: async () => ok({ accessToken: "a", refreshToken: "r" }),
@@ -120,6 +162,8 @@ function renderDialog({
       createWorkoutUseCase: () => ({ execute }),
       getMyAthletesUseCase: () => ({ execute: myAthletesExecute }),
       getUsersUseCase: () => ({ execute: usersExecute }),
+      getWorkoutTemplatesUseCase: () => ({ execute: templatesExecute }),
+      createWorkoutFromTemplateUseCase: () => ({ execute: fromTemplateExecute }),
     }),
   };
 }
@@ -733,6 +777,208 @@ describe("CreateWorkoutDialog", () => {
           expect.objectContaining({ workoutDate: "2026-12-30" }),
         ),
       );
+    });
+  });
+
+  describe("sections", () => {
+    const templateSection = () => screen.getByRole("button", { name: "Desde plantilla" });
+    const templateList = () => screen.getByRole("list", { name: "Plantillas" });
+    const templateRow = (name: string) =>
+      within(templateList())
+        .getAllByRole("button")
+        .find((row) => within(row).queryByText(name) !== null)!;
+
+    it("opens on Desde cero, with both sections on the left and today's form", async () => {
+      // Arrange & Act
+      const { getTemplates, rendered } = renderDialog();
+      await rendered;
+
+      // Assert
+      const dialog = await openedDialog();
+      const sections = within(dialog).getByRole("list", { name: "Origen del entrenamiento" });
+      expect(
+        within(sections)
+          .getAllByRole("button")
+          .map((section) => section.textContent),
+      ).toEqual(["Desde cero", "Desde plantilla"]);
+      expect(within(sections).getByRole("button", { name: "Desde cero" })).toHaveAttribute(
+        "aria-current",
+        "true",
+      );
+      expect(screen.getByRole("textbox", { name: "Nombre" })).toBeInTheDocument();
+      expect(getTemplates).not.toHaveBeenCalled();
+    });
+
+    it("lists a trainer's templates with their description and exercise count, without a name field", async () => {
+      // Arrange
+      const { getTemplates, rendered } = renderDialog();
+      await rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(templateSection());
+
+      // Assert
+      await screen.findByText("Pierna A");
+      expect(getTemplates).toHaveBeenCalledTimes(1);
+      expect(getTemplates).toHaveBeenCalledWith({});
+      expect(within(templateRow("Pierna A")).getByText("Fuerza")).toBeInTheDocument();
+      expect(within(templateRow("Pierna A")).getByText("3 ejercicios")).toBeInTheDocument();
+      expect(within(templateRow("Torso")).getByText("1 ejercicio")).toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: "Nombre" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: "Descripción" })).not.toBeInTheDocument();
+      expect(athleteField()).toBeInTheDocument();
+      expect(weekField()).toBeInTheDocument();
+    });
+
+    it("keeps only one template selected", async () => {
+      // Arrange
+      await renderDialog().rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+      await user.click(templateSection());
+      await screen.findByText("Pierna A");
+      await user.click(templateRow("Pierna A"));
+
+      // Act
+      await user.click(templateRow("Torso"));
+
+      // Assert
+      expect(templateRow("Torso")).toHaveAttribute("aria-pressed", "true");
+      expect(templateRow("Pierna A")).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("asks an admin to choose a trainer first, then reads that trainer's templates", async () => {
+      // Arrange
+      const { getTemplates, rendered } = renderDialog({ profile: adminProfile });
+      await rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+      await user.click(templateSection());
+      expect(
+        await screen.findByText("Elige un entrenador para ver sus plantillas."),
+      ).toBeInTheDocument();
+      expect(getTemplates).not.toHaveBeenCalled();
+
+      // Act
+      await choose(user, trainerField, luis);
+
+      // Assert
+      await screen.findByText("Pierna A");
+      expect(getTemplates).toHaveBeenCalledTimes(1);
+      expect(getTemplates).toHaveBeenCalledWith({ trainerId });
+    });
+
+    it("shows the empty message when there are no templates", async () => {
+      // Arrange
+      await renderDialog({ getTemplates: async () => ok([]) }).rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(templateSection());
+
+      // Assert
+      expect(await screen.findByText("No hay plantillas disponibles.")).toBeInTheDocument();
+    });
+
+    it("shows a failed read and reads the templates again on Reintentar", async () => {
+      // Arrange
+      const getTemplates = vi
+        .fn<() => Promise<Result<WorkoutTemplate[], DomainError>>>()
+        .mockResolvedValueOnce(fail(new DomainError("NETWORK", "")))
+        .mockResolvedValueOnce(ok(templates));
+      const { getTemplates: execute, rendered } = renderDialog({ getTemplates });
+      await rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+      await user.click(templateSection());
+      await screen.findByText("No hay conexión con el servidor.");
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Reintentar" }));
+
+      // Assert
+      expect(await screen.findByText("Pierna A")).toBeInTheDocument();
+      expect(execute).toHaveBeenCalledTimes(2);
+    });
+
+    it("asks for a template and an athlete and sends nothing without them", async () => {
+      // Arrange
+      const { createFromTemplate, rendered } = renderDialog();
+      await rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+      await user.click(templateSection());
+      await screen.findByText("Pierna A");
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Crear" }));
+
+      // Assert
+      expect(screen.getByText("Elige una plantilla.")).toBeInTheDocument();
+      expect(screen.getByText("Selecciona un atleta.")).toBeInTheDocument();
+      expect(createFromTemplate).not.toHaveBeenCalled();
+    });
+
+    it("creates the workout from the template once, for the athlete and the week, and opens it", async () => {
+      // Arrange
+      const { execute, createFromTemplate, rendered } = renderDialog();
+      await rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+      await user.click(templateSection());
+      await screen.findByText("Pierna A");
+      await user.click(templateRow("Pierna A"));
+      await choose(user, athleteField, ana);
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Crear" }));
+
+      // Assert
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/workout?id=w-9"));
+      expect(createFromTemplate).toHaveBeenCalledTimes(1);
+      expect(createFromTemplate).toHaveBeenCalledWith({
+        templateId: "wt-1",
+        userId: athleteId,
+        workoutDate: "2026-10-28",
+      });
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it("keeps the dialog and the selection when the creation from a template is refused", async () => {
+      // Arrange
+      await renderDialog({
+        createFromTemplate: async () => fail(new DomainError("FORBIDDEN", "")),
+      }).rendered;
+      await openedDialog();
+      const user = userEvent.setup();
+      await user.click(templateSection());
+      await screen.findByText("Pierna A");
+      await user.click(templateRow("Pierna A"));
+      await choose(user, athleteField, ana);
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Crear" }));
+
+      // Assert
+      expect(await screen.findByText(/permiso/i)).toBeInTheDocument();
+      expect(templateRow("Pierna A")).toHaveAttribute("aria-pressed", "true");
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("names the sections in English", async () => {
+      // Arrange
+      await renderDialog().rendered;
+      await openedDialog();
+
+      // Act
+      await act(() => i18n.changeLanguage("en"));
+
+      // Assert
+      expect(screen.getByRole("button", { name: "From scratch" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "From template" })).toBeInTheDocument();
     });
   });
 });

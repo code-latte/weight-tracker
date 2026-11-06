@@ -19,9 +19,10 @@ import Typography from "@/presentation/common/components/atoms/typography";
 import ExerciseListItem, {
   EXERCISE_GRID_COLUMNS,
 } from "@/presentation/workouts/components/molecules/exercise-list-item";
-import ExerciseSectionList, {
-  type ExerciseSectionOption,
-} from "@/presentation/workouts/components/molecules/exercise-section-list";
+import SectionList, {
+  type SectionOption,
+} from "@/presentation/common/components/molecules/section-list";
+import type { ExerciseSection } from "@/presentation/workouts/catalog";
 import LabelFilter from "@/presentation/workouts/components/molecules/label-filter";
 import type { ExerciseCatalogFilters } from "@/presentation/workouts/hooks/use-exercise-catalog-filters";
 import useExerciseLabels, {
@@ -175,7 +176,7 @@ export default function ExerciseCatalogBrowser({
     [typeLabel, typeColor],
   );
 
-  const sections: ExerciseSectionOption[] = [
+  const sections: SectionOption<ExerciseSection>[] = [
     { value: "ALL", label: t("workout.catalog.sections.ALL"), icon: <AppsOutlined /> },
     { value: "MINE", label: t("workout.catalog.sections.MINE"), icon: <PersonOutlined /> },
     {
@@ -199,7 +200,7 @@ export default function ExerciseCatalogBrowser({
       }}
     >
       <Box sx={{ width: { md: 200 }, flexShrink: 0, mb: { xs: 2, md: 0 } }}>
-        <ExerciseSectionList
+        <SectionList
           aria-label={t("workout.catalog.sections.label")}
           sections={sections}
           selected={selectedSection}

@@ -185,7 +185,11 @@
       "label": "Workout details",
       "week": "Week {{number}}",
       "breadcrumb": "Mesocycle and week"
-    }
+    },
+    "saveAsTemplate": "Save as template",
+    "saveAsTemplateHint": "Save your changes before creating the template.",
+    "savedAsTemplate": "Template created.",
+    "viewTemplate": "View template"
   },
   "muscles": {
     "ABDOMINALS": "Abdominals",
@@ -256,5 +260,47 @@
       "MIDHIGH": "Intense",
       "HIGH": "Very intense"
     }
+  },
+  "workoutTemplates": {
+    "title": "Workout templates",
+    "new": "New template",
+    "columns": {
+      "name": "Name",
+      "description": "Description",
+      "exercises": "Exercises",
+      "trainer": "Trainer"
+    },
+    "edit": "Edit {{name}}",
+    "empty": "No workout templates yet.",
+    "unknownTrainer": "—"
+  },
+  "createTemplate": {
+    "title": "New template",
+    "fields": {
+      "name": "Name",
+      "description": "Description",
+      "trainerId": "Trainer"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "create": "Create"
+    }
+  },
+  "workoutTemplate": {
+    "title": "Edit template",
+    "back": "Back",
+    "details": {
+      "title": "Template properties",
+      "saved": "Template saved."
+    },
+    "delete": "Delete template",
+    "deleteConfirm": {
+      "title": "Delete this template?",
+      "body": "Workouts created from it do not change.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "notFound": "We couldn't find this template.",
+    "backToList": "Back to templates"
   }
 }

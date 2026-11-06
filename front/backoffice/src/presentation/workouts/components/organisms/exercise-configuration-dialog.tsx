@@ -38,6 +38,7 @@ import ExerciseVideo from "@/presentation/workouts/components/molecules/exercise
 import type { WorkoutExerciseItem } from "@/presentation/workouts/components/organisms/workout-exercises-list";
 import useExerciseLabels from "@/presentation/workouts/hooks/use-exercise-labels";
 import useSaveWorkoutExercise from "@/presentation/workouts/hooks/use-save-workout-exercise";
+import type { ExercisesOwner } from "@/presentation/workouts/exercises-owner";
 
 type Effort = NonNullable<AddExerciseRequest["effort"]>;
 
@@ -57,7 +58,10 @@ interface ExerciseConfigurationDialogProps {
   item: WorkoutExerciseItem;
   /** The item was chosen from the catalog and is not in the workout yet: Guardar adds it instead of replacing it. */
   adding: boolean;
+  /** The id of the workout, or of the template when `owner` is `template`. */
   workoutId: string;
+  /** What the exercise is saved to; a workout unless stated. */
+  owner?: ExercisesOwner;
   /** Called with the entry the API answered with, after a successful save. */
   onSaved: (entry: WorkoutExerciseDetail) => void;
   onClose: () => void;
@@ -107,6 +111,7 @@ export default function ExerciseConfigurationDialog({
   item,
   adding,
   workoutId,
+  owner = "workout",
   onSaved,
   onClose,
 }: ExerciseConfigurationDialogProps) {
@@ -121,7 +126,7 @@ export default function ExerciseConfigurationDialog({
     targetTypeLabel,
     setSummary,
   } = useExerciseLabels();
-  const { saving, errorCode, save } = useSaveWorkoutExercise();
+  const { saving, errorCode, save } = useSaveWorkoutExercise(owner);
   const titleId = useId();
   const perSideLabelId = useId();
   const [effort, setEffort] = useState(item.workoutExercise.effort);

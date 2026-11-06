@@ -100,7 +100,11 @@ const sections: { title: string; items: MenuItemDefinition[] }[] = [
   {
     title: "menu.library.title",
     items: [
-      { label: "menu.library.workoutTemplates", icon: DescriptionOutlined },
+      {
+        label: "menu.library.workoutTemplates",
+        icon: DescriptionOutlined,
+        href: "/workout-templates",
+      },
       {
         label: "menu.library.exerciseCatalog",
         icon: FitnessCenterOutlined,

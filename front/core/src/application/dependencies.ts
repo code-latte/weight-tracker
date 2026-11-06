@@ -43,6 +43,20 @@ import type {
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
+  AddExerciseToWorkoutTemplateInput,
+  BreakWorkoutTemplateSuperSeriesInput,
+  CreateWorkoutFromTemplateInput,
+  CreateWorkoutTemplateFromWorkoutInput,
+  CreateWorkoutTemplateRequest,
+  CreateWorkoutTemplateSuperSeriesInput,
+  DeleteWorkoutTemplateInput,
+  GetWorkoutTemplateByIdInput,
+  GetWorkoutTemplatesInput,
+  RemoveExerciseFromWorkoutTemplateInput,
+  ReorderWorkoutTemplateExercisesInput,
+  UpdateWorkoutTemplateExerciseInput,
+  UpdateWorkoutTemplateInput,
+  WorkoutTemplate,
 } from "../domain";
 import type {
   AthleteInvitationRepositoryInterface,
@@ -57,6 +71,7 @@ import type {
   UseCaseInterface,
   UserRepositoryInterface,
   WorkoutRepositoryInterface,
+  WorkoutTemplateRepositoryInterface,
 } from "./ports";
 
 /** Every port and use case a front's container must register, by key. */
@@ -67,6 +82,7 @@ export default interface Dependencies {
   authRepository: AuthRepositoryInterface;
   userRepository: UserRepositoryInterface;
   workoutRepository: WorkoutRepositoryInterface;
+  workoutTemplateRepository: WorkoutTemplateRepositoryInterface;
   mesocycleRepository: MesocycleRepositoryInterface;
   exerciseRepository: ExerciseRepositoryInterface;
   exerciseFavoriteRepository: ExerciseFavoriteRepositoryInterface;
@@ -97,6 +113,40 @@ export default interface Dependencies {
   reorderWorkoutExercisesUseCase: UseCaseInterface<ReorderWorkoutExercisesInput, WorkoutDetail>;
   createSuperSeriesUseCase: UseCaseInterface<CreateSuperSeriesInput, SuperSeries>;
   breakSuperSeriesUseCase: UseCaseInterface<BreakSuperSeriesInput, void>;
+  getWorkoutTemplatesUseCase: UseCaseInterface<GetWorkoutTemplatesInput, WorkoutTemplate[]>;
+  getWorkoutTemplateByIdUseCase: UseCaseInterface<GetWorkoutTemplateByIdInput, WorkoutTemplate>;
+  createWorkoutTemplateUseCase: UseCaseInterface<CreateWorkoutTemplateRequest, WorkoutTemplate>;
+  updateWorkoutTemplateUseCase: UseCaseInterface<UpdateWorkoutTemplateInput, WorkoutTemplate>;
+  deleteWorkoutTemplateUseCase: UseCaseInterface<DeleteWorkoutTemplateInput, void>;
+  addExerciseToWorkoutTemplateUseCase: UseCaseInterface<
+    AddExerciseToWorkoutTemplateInput,
+    WorkoutExerciseDetail
+  >;
+  updateWorkoutTemplateExerciseUseCase: UseCaseInterface<
+    UpdateWorkoutTemplateExerciseInput,
+    WorkoutExerciseDetail
+  >;
+  removeExerciseFromWorkoutTemplateUseCase: UseCaseInterface<
+    RemoveExerciseFromWorkoutTemplateInput,
+    void
+  >;
+  reorderWorkoutTemplateExercisesUseCase: UseCaseInterface<
+    ReorderWorkoutTemplateExercisesInput,
+    WorkoutTemplate
+  >;
+  createWorkoutTemplateSuperSeriesUseCase: UseCaseInterface<
+    CreateWorkoutTemplateSuperSeriesInput,
+    SuperSeries
+  >;
+  breakWorkoutTemplateSuperSeriesUseCase: UseCaseInterface<
+    BreakWorkoutTemplateSuperSeriesInput,
+    void
+  >;
+  createWorkoutFromTemplateUseCase: UseCaseInterface<CreateWorkoutFromTemplateInput, Workout>;
+  createWorkoutTemplateFromWorkoutUseCase: UseCaseInterface<
+    CreateWorkoutTemplateFromWorkoutInput,
+    WorkoutTemplate
+  >;
   getMesocyclesUseCase: UseCaseInterface<void, Mesocycle[]>;
   getMesocycleByIdUseCase: UseCaseInterface<GetMesocycleByIdInput, Mesocycle>;
   getMesocycleWorkoutsUseCase: UseCaseInterface<GetMesocycleWorkoutsInput, WorkoutListItem[]>;

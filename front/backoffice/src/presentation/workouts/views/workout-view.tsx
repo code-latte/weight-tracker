@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
-import { arrayMove } from "@dnd-kit/sortable";
+import { Suspense, useId, useState } from "react";
 import ArrowBackOutlined from "@mui/icons-material/ArrowBackOutlined";
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
@@ -10,17 +9,13 @@ import {
   type WorkoutDetailsFormValues,
   type WorkoutDetailsFormViolations,
 } from "@weight-tracker/core/application";
-import type {
-  Exercise,
-  SuperSeriesId,
-  UpdateWorkoutInput,
-  WorkoutById,
-  WorkoutExerciseDetail,
-} from "@weight-tracker/core/domain";
+import type { Exercise, UpdateWorkoutInput, WorkoutById } from "@weight-tracker/core/domain";
 import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import Alert from "@/presentation/common/components/atoms/alert";
+import Button from "@/presentation/common/components/atoms/button";
+import Tooltip from "@/presentation/common/components/atoms/tooltip";
 import Link from "@/presentation/common/components/atoms/link";
 import Typography from "@/presentation/common/components/atoms/typography";
 import { fullNameOf } from "@/presentation/common/full-name";
@@ -30,32 +25,22 @@ import HomeSkeleton from "@/presentation/common/components/molecules/home-skelet
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import AppShell from "@/presentation/common/components/organisms/app-shell";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
-import BreakSuperSeriesDialog from "@/presentation/workouts/components/organisms/break-super-series-dialog";
-import ExerciseCatalogDialog from "@/presentation/workouts/components/organisms/exercise-catalog-dialog";
-import ExerciseConfigurationDialog from "@/presentation/workouts/components/organisms/exercise-configuration-dialog";
 import WorkoutDetailsCard from "@/presentation/workouts/components/organisms/workout-details-card";
-import WorkoutExercisesCard from "@/presentation/workouts/components/organisms/workout-exercises-card";
 import WorkoutContextStrip, {
   type WorkoutContextMesocycle,
 } from "@/presentation/workouts/components/organisms/workout-context-strip";
-import WorkoutExercisesList, {
-  unitsOf,
-  type WorkoutExerciseItem,
-} from "@/presentation/workouts/components/organisms/workout-exercises-list";
-import useExerciseCatalogFilters from "@/presentation/workouts/hooks/use-exercise-catalog-filters";
+import WorkoutExercisesEditor from "@/presentation/workouts/components/organisms/workout-exercises-editor";
 import useExerciseFavorites, {
   type ExerciseFavoritesState,
 } from "@/presentation/workouts/hooks/use-exercise-favorites";
 import useExercises from "@/presentation/workouts/hooks/use-exercises";
-import useRemoveWorkoutExercise from "@/presentation/workouts/hooks/use-remove-workout-exercise";
-import useReorderWorkoutExercises from "@/presentation/workouts/hooks/use-reorder-workout-exercises";
-import useSuperSeries from "@/presentation/workouts/hooks/use-super-series";
+import useExercisesEditor from "@/presentation/workouts/hooks/use-exercises-editor";
+import useSaveWorkoutAsTemplate from "@/presentation/workouts/hooks/use-save-workout-as-template";
 import useUpdateWorkout from "@/presentation/workouts/hooks/use-update-workout";
 import useWorkout from "@/presentation/workouts/hooks/use-workout";
 import useWorkoutMesocycle, {
   type WorkoutMesocycleState,
 } from "@/presentation/workouts/hooks/use-workout-mesocycle";
-import { singleMuscleBodyPartsOf } from "@/presentation/workouts/catalog";
 import { weekMiddleOf, weekStartOf } from "@/presentation/workouts/week";
 
 function WorkoutNotFound() {
@@ -156,46 +141,6 @@ function toUpdate(workout: WorkoutById, values: WorkoutDetailsFormValues): Updat
   return input;
 }
 
-/** The dialog open over the screen. Only one at a time: choosing from the catalog hands over to the configuration. */
-type OpenDialog =
-  | { kind: "none" }
-  | { kind: "catalog" }
-  | { kind: "configure"; item: WorkoutExerciseItem; adding: boolean };
-
-/**
- * A catalog exercise chosen to be added: no effort, no rest, not per side and no sets yet; they are defined in the
- * configuration dialog.
- */
-function newItemOf(exercise: Exercise): WorkoutExerciseItem {
-  return {
-    workoutExercise: {
-      id: `new-${exercise.id}`,
-      exerciseId: exercise.id,
-      effort: "",
-      perSide: false,
-      restMinutes: null,
-      sets: [],
-      superSeriesId: null,
-    },
-    exercise,
-  };
-}
-
-/** The entries sorted by their place in `ids`; any entry not in `ids` goes last, in its current order. */
-function inOrderOf(entries: WorkoutExerciseDetail[], ids: string[]) {
-  const placeOf = (entry: WorkoutExerciseDetail) => {
-    const index = ids.indexOf(entry.id);
-    return index === -1 ? ids.length : index;
-  };
-  return [...entries].sort((a, b) => placeOf(a) - placeOf(b));
-}
-
-function withoutId(ids: ReadonlySet<string>, id: string): ReadonlySet<string> {
-  const next = new Set(ids);
-  next.delete(id);
-  return next;
-}
-
 /** The editor once both reads are in: it owns the workout's form, its save, the exercises and the open dialog. */
 function LoadedWorkout({
   workout,
@@ -218,169 +163,20 @@ function LoadedWorkout({
     description: workout.description ?? "",
     workoutDate: weekStartOf(workout.workoutDate),
   });
+  // The values as last stored: a template copies the stored workout, so it waits until the edits are saved.
+  const [storedValues, setStoredValues] = useState(values);
+  const asTemplate = useSaveWorkoutAsTemplate();
+  const unsaved =
+    values.name !== storedValues.name ||
+    values.description !== storedValues.description ||
+    values.workoutDate !== storedValues.workoutDate;
   const [errors, setErrors] = useState<WorkoutDetailsFormViolations>({});
-  const filters = useExerciseCatalogFilters();
-  const [dialog, setDialog] = useState<OpenDialog>({ kind: "none" });
-  // The workout's saved exercises, kept up to date with what each exercise save answers.
-  const [savedExercises, setSavedExercises] = useState<WorkoutExerciseDetail[]>(workout.exercises);
-  const removal = useRemoveWorkoutExercise();
-  const reordering = useReorderWorkoutExercises();
-  const superSeries = useSuperSeries();
-  // The entries checked to be grouped in a superseries.
-  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
-  // The superseries whose break is being confirmed.
-  const [breakTarget, setBreakTarget] = useState<SuperSeriesId | null>(null);
-  const addButtonRef = useRef<HTMLButtonElement>(null);
-  // The button that started an add flow is gone once it ends, so the focus goes back to Añadir ejercicio.
-  const addFlowEnded = useRef(false);
-
-  useEffect(() => {
-    if (dialog.kind === "none" && addFlowEnded.current) {
-      addFlowEnded.current = false;
-      addButtonRef.current?.focus();
-    }
-  }, [dialog]);
-
-  const catalogById = useMemo(
-    () => new Map<string, Exercise>(exercises.map((exercise) => [exercise.id, exercise])),
-    [exercises],
-  );
-  const singleMuscleBodyParts = useMemo(() => singleMuscleBodyPartsOf(exercises), [exercises]);
-  const items = useMemo<WorkoutExerciseItem[]>(
-    () =>
-      savedExercises.map((workoutExercise) => ({
-        workoutExercise,
-        exercise: catalogById.get(workoutExercise.exerciseId),
-      })),
-    [savedExercises, catalogById],
-  );
-  // An exercise already in the workout leaves the catalog: it cannot be added twice.
-  const available = useMemo(() => {
-    const inWorkout = new Set(savedExercises.map((entry) => entry.exerciseId));
-    return exercises.filter((exercise) => !inWorkout.has(exercise.id));
-  }, [exercises, savedExercises]);
-
-  function closeDialog() {
-    if (dialog.kind === "configure" && dialog.adding) {
-      addFlowEnded.current = true;
-    }
-    setDialog({ kind: "none" });
-  }
-
-  /** An added exercise joins the end of the list; an edited one replaces its entry. Either way the dialog closes. */
-  function handleExerciseSaved(entry: WorkoutExerciseDetail, adding: boolean) {
-    if (adding) {
-      setSavedExercises((current) => [...current, entry]);
-    } else {
-      setSavedExercises((current) =>
-        current.map((other) => (other.exerciseId === entry.exerciseId ? entry : other)),
-      );
-    }
-    closeDialog();
-  }
-
-  /** The exercise is removed through the API; on success it returns to the catalog. */
-  async function handleRemove(item: WorkoutExerciseItem) {
-    const { id, exerciseId } = item.workoutExercise;
-
-    if (await removal.remove(workout.id, id, exerciseId)) {
-      setSavedExercises((current) => current.filter((other) => other.id !== id));
-      setSelectedIds((current) => withoutId(current, id));
-    }
-  }
-
-  function handleToggleSelected(id: string) {
-    setSelectedIds((current) =>
-      current.has(id) ? withoutId(current, id) : new Set(current).add(id),
-    );
-  }
-
-  /**
-   * The checked exercises are grouped through the API. On success they are brought together: the first keeps its place
-   * and the others follow it, in their order, and that order is sent. A refused order is put back by entry id; the
-   * superseries stays.
-   */
-  async function handleGroup() {
-    const members = savedExercises.filter((entry) => selectedIds.has(entry.id));
-    const superSeriesId = await superSeries.create(
-      workout.id,
-      members.map((entry) => entry.id),
-    );
-    if (superSeriesId === null) {
-      return;
-    }
-
-    const memberIds = new Set(members.map((entry) => entry.id));
-    const first = savedExercises.findIndex((entry) => memberIds.has(entry.id));
-    const previousIds = savedExercises.map((entry) => entry.id);
-    const next = [
-      ...savedExercises.slice(0, first),
-      ...members,
-      ...savedExercises.slice(first).filter((entry) => !memberIds.has(entry.id)),
-    ].map((entry) => (memberIds.has(entry.id) ? { ...entry, superSeriesId } : entry));
-    setSavedExercises(next);
-    setSelectedIds(new Set());
-
-    if (next.every((entry, index) => entry.id === previousIds[index])) {
-      return;
-    }
-    if (
-      !(await reordering.reorder(
-        workout.id,
-        next.map((entry) => entry.exerciseId),
-      ))
-    ) {
-      setSavedExercises((current) => inOrderOf(current, previousIds));
-    }
-  }
-
-  /** The confirmed superseries is broken through the API; on success its members stay where they are, ungrouped. */
-  async function handleBreak(superSeriesId: SuperSeriesId) {
-    const broken = await superSeries.breakUp(workout.id, superSeriesId);
-    setBreakTarget(null);
-
-    if (broken) {
-      setSavedExercises((current) =>
-        current.map((entry) =>
-          String(entry.superSeriesId) === String(superSeriesId)
-            ? { ...entry, superSeriesId: null }
-            : entry,
-        ),
-      );
-    }
-  }
-
-  /**
-   * The dropped unit, an exercise or a whole superseries, moves at once and the full saved order is sent. A refused
-   * order is put back by entry id, so an exercise saved or removed while the request was in flight is kept as it is.
-   */
-  async function handleReorder(activeId: string, overId: string) {
-    const units = unitsOf(savedExercises);
-    const from = units.findIndex((unit) => unit.id === activeId);
-    const to = units.findIndex((unit) => unit.id === overId);
-    if (from === -1 || to === -1 || from === to) {
-      return;
-    }
-
-    const previousIds = savedExercises.map((entry) => entry.id);
-    const next = arrayMove(units, from, to).flatMap(({ start, length }) =>
-      savedExercises.slice(start, start + length),
-    );
-    setSavedExercises(next);
-
-    if (
-      !(await reordering.reorder(
-        workout.id,
-        next.map((entry) => entry.exerciseId),
-      ))
-    ) {
-      setSavedExercises((current) => inOrderOf(current, previousIds));
-    }
-  }
+  const editor = useExercisesEditor("workout", workout.id, workout.exercises, exercises);
 
   function handleChange(field: keyof WorkoutDetailsFormValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
     clearSaved();
+    asTemplate.clear();
   }
 
   async function handleSave() {
@@ -390,8 +186,25 @@ function LoadedWorkout({
       return;
     }
 
-    await save(toUpdate(workout, values));
+    if (await save(toUpdate(workout, values))) {
+      setStoredValues(values);
+    }
   }
+
+  const saveAsTemplate = (
+    <Tooltip title={unsaved ? t("workout.saveAsTemplateHint") : ""}>
+      {/* A disabled button fires no events, so the hint hangs on its wrapper. */}
+      <span>
+        <Button
+          variant="outlined"
+          disabled={unsaved || asTemplate.saving || saving}
+          onClick={() => void asTemplate.save(workout.id)}
+        >
+          {t("workout.saveAsTemplate")}
+        </Button>
+      </span>
+    </Tooltip>
+  );
 
   return (
     <>
@@ -418,6 +231,29 @@ function LoadedWorkout({
           {t("workout.details.saved")}
         </Alert>
       )}
+      {asTemplate.errorCode && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {tc(`errors:${asTemplate.errorCode}`)}
+        </Alert>
+      )}
+      {asTemplate.createdId && (
+        <Alert
+          severity="success"
+          sx={{ mb: 3 }}
+          action={
+            <Button
+              component={NextLink}
+              href={`/workout-template?id=${encodeURIComponent(asTemplate.createdId)}`}
+              color="inherit"
+              size="small"
+            >
+              {t("workout.viewTemplate")}
+            </Button>
+          }
+        >
+          {t("workout.savedAsTemplate")}
+        </Alert>
+      )}
       <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 3 }}>
         <Box component="section" aria-labelledby={propertiesTitleId} sx={{ minWidth: 0 }}>
           <WorkoutDetailsCard
@@ -428,73 +264,17 @@ function LoadedWorkout({
             disabled={saving}
             weekLocked={Boolean(workout.mesocycleId)}
             onChange={handleChange}
+            secondaryAction={saveAsTemplate}
             titleId={propertiesTitleId}
           />
         </Box>
-        <Box component="section" aria-labelledby={exercisesTitleId} sx={{ minWidth: 0 }}>
-          <WorkoutExercisesCard
-            titleId={exercisesTitleId}
-            onAdd={() => setDialog({ kind: "catalog" })}
-            addButtonRef={addButtonRef}
-          >
-            <WorkoutExercisesList
-              items={items}
-              singleMuscleBodyParts={singleMuscleBodyParts}
-              onEdit={(item) => setDialog({ kind: "configure", item, adding: false })}
-              onRemove={(item) => void handleRemove(item)}
-              removingId={removal.removingId}
-              removeErrorCode={removal.errorCode}
-              onReorder={(activeId, overId) => void handleReorder(activeId, overId)}
-              reordering={reordering.reordering}
-              reorderErrorCode={reordering.errorCode}
-              selectedIds={selectedIds}
-              onToggleSelected={handleToggleSelected}
-              onGroup={() => void handleGroup()}
-              grouping={superSeries.pending || reordering.reordering}
-              superSeriesError={superSeries.error}
-              onBreak={setBreakTarget}
-            />
-          </WorkoutExercisesCard>
-        </Box>
-      </Box>
-      <ExerciseCatalogDialog
-        open={dialog.kind === "catalog"}
-        exercises={available}
-        filters={filters}
-        currentUserId={profile?.id ?? null}
-        singleMuscleBodyParts={singleMuscleBodyParts}
-        favoriteIds={favorites.favoriteIds}
-        favoritesStatus={favorites.status}
-        pendingFavoriteIds={favorites.pendingIds}
-        favoriteErrorCode={favorites.toggleErrorCode}
-        onToggleFavorite={(exerciseId) => void favorites.toggle(exerciseId)}
-        onChoose={(exercise) =>
-          setDialog({ kind: "configure", item: newItemOf(exercise), adding: true })
-        }
-        onClose={closeDialog}
-      />
-      <BreakSuperSeriesDialog
-        open={breakTarget !== null}
-        pending={superSeries.pending}
-        onCancel={() => setBreakTarget(null)}
-        onConfirm={() => {
-          if (breakTarget !== null) {
-            void handleBreak(breakTarget);
-          }
-        }}
-      />
-      {dialog.kind === "configure" && (
-        // Mounted per opening and keyed by the item, so each one starts from the stored values.
-        <ExerciseConfigurationDialog
-          key={dialog.item.workoutExercise.id}
-          open
-          item={dialog.item}
-          adding={dialog.adding}
-          workoutId={workout.id}
-          onSaved={(entry) => handleExerciseSaved(entry, dialog.adding)}
-          onClose={closeDialog}
+        <WorkoutExercisesEditor
+          editor={editor}
+          favorites={favorites}
+          currentUserId={profile?.id ?? null}
+          titleId={exercisesTitleId}
         />
-      )}
+      </Box>
     </>
   );
 }

@@ -91,5 +91,18 @@
       "athlete": "Atleta",
       "trainer": "Entrenador"
     }
+  },
+  "workoutTemplatePicker": {
+    "sectionsLabel": "Origen del entrenamiento",
+    "sections": {
+      "scratch": "Desde cero",
+      "template": "Desde plantilla"
+    },
+    "listLabel": "Plantillas",
+    "exerciseCount_one": "{{count}} ejercicio",
+    "exerciseCount_other": "{{count}} ejercicios",
+    "empty": "No hay plantillas disponibles.",
+    "pickTrainer": "Elige un entrenador para ver sus plantillas.",
+    "required": "Elige una plantilla."
   }
 }

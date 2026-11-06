@@ -4,6 +4,7 @@ export * from "./users";
 export * from "./exercises";
 export * from "./exercise-favorites";
 export * from "./workouts";
+export * from "./workout-templates";
 export * from "./mesocycles";
 export * from "./trainer-athletes";
 export * from "./athlete-invitations";

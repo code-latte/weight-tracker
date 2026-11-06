@@ -43,6 +43,24 @@ export type {
   WorkoutListItem,
 } from "./workouts/workout";
 export type {
+  AddExerciseToWorkoutTemplateInput,
+  BreakWorkoutTemplateSuperSeriesInput,
+  CreateWorkoutFromTemplateInput,
+  CreateWorkoutFromTemplateRequest,
+  CreateWorkoutTemplateFromWorkoutInput,
+  CreateWorkoutTemplateRequest,
+  CreateWorkoutTemplateSuperSeriesInput,
+  DeleteWorkoutTemplateInput,
+  GetWorkoutTemplateByIdInput,
+  GetWorkoutTemplatesInput,
+  RemoveExerciseFromWorkoutTemplateInput,
+  ReorderWorkoutTemplateExercisesInput,
+  UpdateWorkoutTemplateExerciseInput,
+  UpdateWorkoutTemplateInput,
+  UpdateWorkoutTemplateRequest,
+  WorkoutTemplate,
+} from "./workout-templates/workout-template";
+export type {
   CreateMesocycleRequest,
   DefineMesocycleWeekInput,
   DefineMesocycleWeekRequest,

@@ -6,6 +6,7 @@ import type {
 } from "@weight-tracker/core/domain";
 import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
+import type { ExercisesOwner } from "@/presentation/workouts/exercises-owner";
 
 interface SaveWorkoutExerciseState {
   saving: boolean;
@@ -14,6 +15,7 @@ interface SaveWorkoutExerciseState {
    * Adds an exercise chosen from the catalog to the workout, or replaces a saved one's effort and sets. Resolves to the
    * entry the API answers with, or `null` when it refused it.
    */
+  /** Resolves through the workout or the template use cases, by the hook's owner. */
   save: (
     workoutId: string,
     adding: boolean,
@@ -21,7 +23,9 @@ interface SaveWorkoutExerciseState {
   ) => Promise<WorkoutExerciseDetail | null>;
 }
 
-export default function useSaveWorkoutExercise(): SaveWorkoutExerciseState {
+export default function useSaveWorkoutExercise(
+  owner: ExercisesOwner = "workout",
+): SaveWorkoutExerciseState {
   const container = useContainer();
   const { runWithSession } = useSession();
   const [saving, setSaving] = useState(false);
@@ -35,11 +39,21 @@ export default function useSaveWorkoutExercise(): SaveWorkoutExerciseState {
     setSaving(true);
     setErrorCode(null);
 
-    const result = await runWithSession(() =>
-      adding
+    const result = await runWithSession(() => {
+      if (owner === "template") {
+        const templateId = workoutId;
+        return adding
+          ? container
+              .resolve("addExerciseToWorkoutTemplateUseCase")
+              .execute({ templateId, ...request })
+          : container
+              .resolve("updateWorkoutTemplateExerciseUseCase")
+              .execute({ templateId, ...request });
+      }
+      return adding
         ? container.resolve("addExerciseToWorkoutUseCase").execute({ workoutId, ...request })
-        : container.resolve("updateWorkoutExerciseUseCase").execute({ workoutId, ...request }),
-    );
+        : container.resolve("updateWorkoutExerciseUseCase").execute({ workoutId, ...request });
+    });
 
     setSaving(false);
     if (result.ok) {

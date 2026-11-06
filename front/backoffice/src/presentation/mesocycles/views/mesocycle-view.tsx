@@ -39,6 +39,7 @@ import MesocycleDetailsCard from "@/presentation/mesocycles/components/organisms
 import MesocycleWeekDialog from "@/presentation/mesocycles/components/organisms/mesocycle-week-dialog";
 import MesocycleWeeksCard from "@/presentation/mesocycles/components/organisms/mesocycle-weeks-card";
 import useCreateMesocycle from "@/presentation/mesocycles/hooks/use-create-mesocycle";
+import useCreateWorkoutFromTemplate from "@/presentation/common/hooks/use-create-workout-from-template";
 import useCreateWeekWorkout from "@/presentation/mesocycles/hooks/use-create-week-workout";
 import useMesocycle from "@/presentation/mesocycles/hooks/use-mesocycle";
 import useMesocycleWorkouts from "@/presentation/mesocycles/hooks/use-mesocycle-workouts";
@@ -288,6 +289,7 @@ function LoadedMesocycle({
   const week = useSaveMesocycleWeek();
   const workouts = useMesocycleWorkouts(mesocycle.id);
   const weekWorkout = useCreateWeekWorkout();
+  const fromTemplate = useCreateWorkoutFromTemplate();
   const [values, setValues] = useState<CreateMesocycleFormValues>(() => valuesOf(mesocycle));
   const [errors, setErrors] = useState<CreateMesocycleFormViolations>({});
   const [dialog, setDialog] = useState<OpenDialog>({ kind: "none" });
@@ -317,6 +319,7 @@ function LoadedMesocycle({
   function closeDialog() {
     week.reset();
     weekWorkout.reset();
+    fromTemplate.reset();
     setDialog({ kind: "none" });
   }
 
@@ -324,6 +327,19 @@ function LoadedMesocycle({
     // Mirrors whom the API requires a trainer from; the API keeps the rule.
     const request = toWeekWorkoutRequest(mesocycle, weekNumber, workoutValues, role === "ADMIN");
     const workout = await weekWorkout.create(request);
+    if (workout) {
+      router.push(`/workout?id=${encodeURIComponent(workout.id)}`);
+    }
+  }
+
+  /** The template's workout goes in the week for the mesocycle's athlete; its trainer is the template's. */
+  async function handleWorkoutFromTemplate(weekNumber: number, templateId: string) {
+    const workout = await fromTemplate.create({
+      templateId,
+      userId: mesocycle.athleteId,
+      mesocycleId: mesocycle.id,
+      mesocycleWeekNumber: weekNumber,
+    });
     if (workout) {
       router.push(`/workout?id=${encodeURIComponent(workout.id)}`);
     }
@@ -390,9 +406,14 @@ function LoadedMesocycle({
         // Mounted per opening, so each one starts empty.
         <CreateWeekWorkoutDialog
           weekNumber={dialog.weekNumber}
-          creating={weekWorkout.creating}
-          errorCode={weekWorkout.errorCode}
+          creating={weekWorkout.creating || fromTemplate.creating}
+          errorCode={weekWorkout.errorCode ?? fromTemplate.errorCode}
           onCreate={(workoutValues) => void handleWorkoutCreate(dialog.weekNumber, workoutValues)}
+          onCreateFromTemplate={(templateId) =>
+            void handleWorkoutFromTemplate(dialog.weekNumber, templateId)
+          }
+          // An admin is offered the templates of the mesocycle's trainer; a trainer gets their own.
+          templatesTrainerId={role === "ADMIN" ? mesocycle.trainerId : null}
           onClose={closeDialog}
         />
       )}

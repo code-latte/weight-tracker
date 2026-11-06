@@ -171,9 +171,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["WorkoutDetailResponse"];
-                        "application/json": components["schemas"]["WorkoutDetailResponse"];
-                        "text/json": components["schemas"]["WorkoutDetailResponse"];
+                        "text/plain": components["schemas"]["WorkoutByIdResponse"];
+                        "application/json": components["schemas"]["WorkoutByIdResponse"];
+                        "text/json": components["schemas"]["WorkoutByIdResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -2036,6 +2036,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mesocycles/{id}/workouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkoutListItemResponse"][];
+                        "application/json": components["schemas"]["WorkoutListItemResponse"][];
+                        "text/json": components["schemas"]["WorkoutListItemResponse"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mesocycles/{id}/weeks": {
         parameters: {
             query?: never;
@@ -2220,7 +2292,82 @@ export interface paths {
             };
         };
         post?: never;
-        delete?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    weekNumber: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -3416,7 +3563,7 @@ export interface components {
             name: null | string;
             description?: null | string;
             /** Format: date */
-            workoutDate: null | string;
+            workoutDate?: null | string;
             /** Format: uuid */
             mesocycleId?: null | string;
             /** Format: int32 */
@@ -3623,7 +3770,7 @@ export interface components {
             name: null | string;
             description?: null | string;
             /** Format: date */
-            workoutDate: null | string;
+            workoutDate?: null | string;
             /** Format: uuid */
             userId: null | string;
             /** Format: uuid */
@@ -3674,6 +3821,26 @@ export interface components {
             errors?: {
                 [key: string]: string[];
             };
+        };
+        WorkoutByIdResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: null | string;
+            /** Format: date */
+            workoutDate: string;
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            trainerId: null | string;
+            status: string;
+            exercises: components["schemas"]["WorkoutExerciseDetailResponse"][];
+            /** Format: uuid */
+            mesocycleId: null | string;
+            /** Format: int32 */
+            mesocycleWeekNumber: null | number | string;
+            athlete: components["schemas"]["UserProfileResponse"];
+            trainer: null | components["schemas"]["UserProfileResponse"];
         };
         WorkoutDetailResponse: {
             /** Format: uuid */
@@ -3738,6 +3905,10 @@ export interface components {
             exercises: components["schemas"]["WorkoutExerciseResponse"][];
             athlete: components["schemas"]["UserProfileResponse"];
             trainer: null | components["schemas"]["UserProfileResponse"];
+            /** Format: uuid */
+            mesocycleId: null | string;
+            /** Format: int32 */
+            mesocycleWeekNumber: null | number | string;
         };
         WorkoutResponse: {
             /** Format: uuid */

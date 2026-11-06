@@ -40,6 +40,8 @@ const workout: WorkoutListItem = {
   exercises: [],
   athlete,
   trainer: null,
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
 };
 
 const prescribed: WorkoutListItem = {

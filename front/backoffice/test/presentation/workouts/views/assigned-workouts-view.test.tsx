@@ -61,6 +61,8 @@ const legs: WorkoutListItem = {
   exercises: [exercise, { ...exercise, id: "e-2" }, { ...exercise, id: "e-3" }],
   athlete: ana,
   trainer: luis,
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
 };
 
 const pushDay: WorkoutListItem = {

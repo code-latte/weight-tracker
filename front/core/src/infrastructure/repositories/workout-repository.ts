@@ -1,12 +1,15 @@
 import type { HttpClientInterface, WorkoutRepositoryInterface } from "../../application";
 import {
   type AddExerciseRequest,
+  type CreateSuperSeriesRequest,
   type CreateWorkoutRequest,
   type DomainError,
   fail,
   ok,
   type ReorderWorkoutExercisesRequest,
   type Result,
+  type SuperSeries,
+  type SuperSeriesId,
   type UpdateWorkoutRequest,
   type Workout,
   type WorkoutById,
@@ -134,6 +137,39 @@ export default class WorkoutRepository implements WorkoutRepositoryInterface {
       });
 
       return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async createSuperSeries(
+    workoutId: string,
+    request: CreateSuperSeriesRequest,
+  ): Promise<Result<SuperSeries, DomainError>> {
+    try {
+      const response = await this.httpClient.request<SuperSeries>({
+        method: "POST",
+        path: `/workouts/${workoutId}/superseries`,
+        body: request,
+      });
+
+      return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async breakSuperSeries(
+    workoutId: string,
+    superSeriesId: SuperSeriesId,
+  ): Promise<Result<void, DomainError>> {
+    try {
+      await this.httpClient.request<void>({
+        method: "DELETE",
+        path: `/workouts/${workoutId}/superseries/${superSeriesId}`,
+      });
+
+      return ok(undefined);
     } catch (error) {
       return fail(mapHttpError(error));
     }

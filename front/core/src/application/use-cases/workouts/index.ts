@@ -1,4 +1,6 @@
 export { default as AddExerciseToWorkoutUseCase } from "./add-exercise-to-workout-use-case";
+export { default as BreakSuperSeriesUseCase } from "./break-super-series-use-case";
+export { default as CreateSuperSeriesUseCase } from "./create-super-series-use-case";
 export { default as CreateWorkoutUseCase } from "./create-workout-use-case";
 export { default as GetWorkoutByIdUseCase } from "./get-workout-by-id-use-case";
 export { default as GetWorkoutsUseCase } from "./get-workouts-use-case";

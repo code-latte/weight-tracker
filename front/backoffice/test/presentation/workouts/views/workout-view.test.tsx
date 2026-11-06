@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DomainError, fail, ok } from "@weight-tracker/core/domain";
 import type {
   AddExerciseToWorkoutInput,
+  BreakSuperSeriesInput,
+  CreateSuperSeriesInput,
   Exercise,
   ExerciseFavorite,
   Mesocycle,
@@ -11,6 +13,7 @@ import type {
   ReorderWorkoutExercisesInput,
   Result,
   Session,
+  SuperSeries,
   UpdateWorkoutExerciseInput,
   UpdateWorkoutInput,
   UserProfile,
@@ -257,6 +260,8 @@ function renderWorkout({
   updateExercise = async (input) => ok(entryOf(input, "we-1")),
   removeExercise = async () => ok(undefined),
   reorderExercises = async () => ok(workout),
+  createSuperSeries = async () => ok({ id: 7 }),
+  breakSuperSeries = async () => ok(undefined),
   getFavorites = async () => ok([]),
   markFavorite = async (exerciseId) => ok(favoriteOf(exerciseId)),
   unmarkFavorite = async () => ok(undefined),
@@ -282,6 +287,8 @@ function renderWorkout({
   reorderExercises?: (
     input: ReorderWorkoutExercisesInput,
   ) => Promise<Result<WorkoutDetail, DomainError>>;
+  createSuperSeries?: (input: CreateSuperSeriesInput) => Promise<Result<SuperSeries, DomainError>>;
+  breakSuperSeries?: (input: BreakSuperSeriesInput) => Promise<Result<void, DomainError>>;
 } = {}) {
   const readWorkout = vi.fn(getWorkout);
   const readCatalog = vi.fn(getExercises);
@@ -298,6 +305,8 @@ function renderWorkout({
     updateExercise: vi.fn(updateExercise),
     removeExercise: vi.fn(removeExercise),
     reorderExercises: vi.fn(reorderExercises),
+    createSuperSeries: vi.fn(createSuperSeries),
+    breakSuperSeries: vi.fn(breakSuperSeries),
   };
 
   return {
@@ -321,6 +330,8 @@ function renderWorkout({
       updateWorkoutExerciseUseCase: () => ({ execute: mutations.updateExercise }),
       removeExerciseFromWorkoutUseCase: () => ({ execute: mutations.removeExercise }),
       reorderWorkoutExercisesUseCase: () => ({ execute: mutations.reorderExercises }),
+      createSuperSeriesUseCase: () => ({ execute: mutations.createSuperSeries }),
+      breakSuperSeriesUseCase: () => ({ execute: mutations.breakSuperSeries }),
     }),
   };
 }
@@ -427,6 +438,50 @@ async function moveRight(user: ReturnType<typeof userEvent.setup>, from: number,
     await user.keyboard("[ArrowRight]");
   }
   await user.keyboard("[Space]");
+}
+
+/** A workout whose second and third exercises, Press de banca and Prensa de piernas, form superseries 1. */
+const groupedWorkout: WorkoutById = {
+  ...workout,
+  exercises: [
+    squatInWorkout,
+    { ...benchInWorkout, superSeriesId: 1 },
+    { ...pressInWorkout, superSeriesId: 1 },
+  ],
+};
+const withGroup = async () => ok(groupedWorkout);
+
+/** The exercise cards as their position and name, in the order listed, without the group cards around them. */
+function exerciseRows() {
+  return workoutItems()
+    .filter((item) => within(item).queryByRole("list") === null)
+    .map((item) =>
+      within(item)
+        .getAllByText(/./)
+        .slice(0, 2)
+        .map((text) => text.textContent),
+    );
+}
+
+/** The exercise card named `name`, inside a group card or not. */
+function exerciseItem(name: string) {
+  return workoutItems().find(
+    (item) => within(item).queryByRole("list") === null && within(item).queryByText(name) !== null,
+  )!;
+}
+
+const selectionBox = (name: string) =>
+  within(exerciseItem(name)).queryByRole("checkbox", { name: "Seleccionar para superserie" });
+
+const groupButton = () =>
+  within(exercisesSection()).queryByRole("button", { name: "Agrupar en superserie" });
+
+const breakDialog = () => screen.queryByRole("dialog", { name: "¿Romper superserie?" });
+
+async function check(user: ReturnType<typeof userEvent.setup>, ...names: string[]) {
+  for (const name of names) {
+    await user.click(selectionBox(name)!);
+  }
 }
 
 function mutationCalls(mutations: ReturnType<typeof renderWorkout>["mutations"]) {
@@ -1690,6 +1745,419 @@ describe("WorkoutView", () => {
       for (const handle of workoutButtons("Reordenar ejercicio")) {
         expect(handle).toBeDisabled();
       }
+    });
+  });
+
+  describe("superseries", () => {
+    it("shows a checkbox only on the exercises outside a superseries", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withGroup }).rendered;
+
+      // Act
+      await loaded();
+
+      // Assert
+      expect(selectionBox("Sentadilla")).toBeInTheDocument();
+      expect(selectionBox("Press de banca")).not.toBeInTheDocument();
+      expect(selectionBox("Prensa de piernas")).not.toBeInTheDocument();
+    });
+
+    it("treats an exercise whose superseries has no other member as outside one", async () => {
+      // Arrange
+      const lone: WorkoutById = {
+        ...workout,
+        exercises: [{ ...squatInWorkout, superSeriesId: 5 }, benchInWorkout, pressInWorkout],
+      };
+      await renderWorkout({ getWorkout: async () => ok(lone) }).rendered;
+
+      // Act
+      await loaded();
+
+      // Assert
+      expect(selectionBox("Sentadilla")).toBeInTheDocument();
+      expect(
+        within(exercisesSection()).queryByRole("button", { name: "Romper superserie" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("hides Agrupar en superserie with a single exercise checked", async () => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await check(user, "Sentadilla");
+
+      // Assert
+      expect(groupButton()).not.toBeInTheDocument();
+    });
+
+    it("shows Agrupar en superserie with two exercises checked", async () => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await check(user, "Sentadilla", "Press de banca");
+
+      // Assert
+      expect(groupButton()).toBeInTheDocument();
+    });
+
+    it("hides Agrupar en superserie again when one of two is unchecked", async () => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await check(user, "Sentadilla", "Press de banca");
+
+      // Act
+      await check(user, "Press de banca");
+
+      // Assert
+      expect(groupButton()).not.toBeInTheDocument();
+    });
+
+    it("groups the checked exercises and brings them together, sending the new order once", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await check(user, "Sentadilla", "Prensa de piernas");
+
+      // Act
+      await user.click(groupButton()!);
+
+      // Assert
+      await waitFor(() => expect(mutations.reorderExercises).toHaveBeenCalledTimes(1));
+      expect(mutations.createSuperSeries).toHaveBeenCalledTimes(1);
+      expect(mutations.createSuperSeries).toHaveBeenCalledWith({
+        workoutId: "w-1",
+        exerciseIds: ["we-1", "we-3"],
+      });
+      expect(mutations.reorderExercises).toHaveBeenCalledWith({
+        workoutId: "w-1",
+        exerciseIds: ["ex-squat", "ex-press", "ex-bench"],
+      });
+      expect(exerciseRows()).toEqual([
+        ["1", "Sentadilla"],
+        ["2", "Prensa de piernas"],
+        ["3", "Press de banca"],
+      ]);
+      expect(
+        within(exercisesSection()).getByRole("list", {
+          name: "superserie Sentadilla, Prensa de piernas",
+        }),
+      ).toBeInTheDocument();
+      expect(groupButton()).not.toBeInTheDocument();
+      expect(selectionBox("Press de banca")).not.toBeChecked();
+    });
+
+    it("sends no reorder when the grouped exercises are already together", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await check(user, "Sentadilla", "Press de banca");
+
+      // Act
+      await user.click(groupButton()!);
+
+      // Assert
+      expect(
+        await within(exercisesSection()).findByRole("button", { name: "Romper superserie" }),
+      ).toBeInTheDocument();
+      expect(mutations.createSuperSeries).toHaveBeenCalledTimes(1);
+      expect(mutations.reorderExercises).not.toHaveBeenCalled();
+      expect(exerciseRows().map(([, name]) => name)).toEqual([
+        "Sentadilla",
+        "Press de banca",
+        "Prensa de piernas",
+      ]);
+    });
+
+    it("keeps the list and the checked exercises when the API refuses the grouping", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({
+        createSuperSeries: async () => fail(new DomainError("VALIDATION", "")),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await check(user, "Sentadilla", "Prensa de piernas");
+
+      // Act
+      await user.click(groupButton()!);
+
+      // Assert
+      expect(
+        await within(exercisesSection()).findByText(
+          "Solo se pueden agrupar en superserie ejercicios con el mismo número total de series.",
+        ),
+      ).toBeInTheDocument();
+      expect(mutations.reorderExercises).not.toHaveBeenCalled();
+      expect(selectionBox("Sentadilla")).toBeChecked();
+      expect(selectionBox("Prensa de piernas")).toBeChecked();
+      expect(exerciseRows().map(([, name]) => name)).toEqual([
+        "Sentadilla",
+        "Press de banca",
+        "Prensa de piernas",
+      ]);
+    });
+
+    it("keeps the grouped exercises in their previous places when the reorder is refused", async () => {
+      // Arrange
+      await renderWorkout({ reorderExercises: async () => fail(new DomainError("CONFLICT", "")) })
+        .rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await check(user, "Sentadilla", "Prensa de piernas");
+
+      // Act
+      await user.click(groupButton()!);
+
+      // Assert
+      expect(
+        await within(exercisesSection()).findByText(
+          "La operación entra en conflicto con el estado actual.",
+        ),
+      ).toBeInTheDocument();
+      expect(exerciseRows()).toEqual([
+        ["1", "Sentadilla"],
+        ["2", "Press de banca"],
+        ["3", "Prensa de piernas"],
+      ]);
+      expect(selectionBox("Sentadilla")).not.toBeInTheDocument();
+      expect(selectionBox("Prensa de piernas")).not.toBeInTheDocument();
+      expect(selectionBox("Press de banca")).toBeInTheDocument();
+    });
+
+    it("shows the members of a superseries inside one group card with a single handle", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withGroup }).rendered;
+
+      // Act
+      await loaded();
+
+      // Assert
+      const group = within(exercisesSection()).getByRole("list", {
+        name: "superserie Press de banca, Prensa de piernas",
+      });
+      expect(within(group).getAllByRole("listitem")).toHaveLength(2);
+      expect(within(exercisesSection()).getByText("Superserie")).toBeInTheDocument();
+      expect(within(group).queryByRole("button", { name: "Reordenar ejercicio" })).toBeNull();
+      expect(workoutButtons("Romper superserie")).toHaveLength(1);
+      expect(workoutButtons("Reordenar superserie")).toHaveLength(1);
+      expect(workoutButtons("Reordenar ejercicio")).toHaveLength(1);
+      expect(exerciseRows()).toEqual([
+        ["1", "Sentadilla"],
+        ["2", "Press de banca"],
+        ["3", "Prensa de piernas"],
+      ]);
+    });
+
+    it("shows a group card per run when the members of a superseries are apart", async () => {
+      // Arrange
+      const apart: WorkoutById = {
+        ...workout,
+        exercises: [
+          { ...squatInWorkout, superSeriesId: 1 },
+          benchInWorkout,
+          { ...pressInWorkout, superSeriesId: 1 },
+        ],
+      };
+      await renderWorkout({ getWorkout: async () => ok(apart) }).rendered;
+
+      // Act
+      await loaded();
+
+      // Assert
+      expect(workoutButtons("Romper superserie")).toHaveLength(2);
+      expect(selectionBox("Press de banca")).toBeInTheDocument();
+    });
+
+    it("asks for confirmation before breaking a superseries", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({ getWorkout: withGroup });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(workoutButtons("Romper superserie")[0]!);
+
+      // Assert
+      expect(await screen.findByRole("dialog", { name: "¿Romper superserie?" })).toBeVisible();
+      expect(mutationCalls(mutations)).toBe(0);
+    });
+
+    it("closes the confirmation without a request on Cancelar", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({ getWorkout: withGroup });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(workoutButtons("Romper superserie")[0]!);
+      await screen.findByRole("dialog", { name: "¿Romper superserie?" });
+
+      // Act
+      await user.click(within(breakDialog()!).getByRole("button", { name: "Cancelar" }));
+
+      // Assert
+      await dialogsClosed();
+      expect(mutationCalls(mutations)).toBe(0);
+      expect(workoutButtons("Romper superserie")).toHaveLength(1);
+    });
+
+    it("breaks the superseries on confirmation and gives its members their checkbox back", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({ getWorkout: withGroup });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(workoutButtons("Romper superserie")[0]!);
+      await screen.findByRole("dialog", { name: "¿Romper superserie?" });
+
+      // Act
+      await user.click(within(breakDialog()!).getByRole("button", { name: "Romper" }));
+
+      // Assert
+      await dialogsClosed();
+      expect(mutations.breakSuperSeries).toHaveBeenCalledTimes(1);
+      expect(mutations.breakSuperSeries).toHaveBeenCalledWith({
+        workoutId: "w-1",
+        superSeriesId: 1,
+      });
+      expect(
+        within(exercisesSection()).queryByRole("button", { name: "Romper superserie" }),
+      ).not.toBeInTheDocument();
+      expect(selectionBox("Press de banca")).toBeInTheDocument();
+      expect(selectionBox("Prensa de piernas")).toBeInTheDocument();
+      expect(exerciseRows()).toEqual([
+        ["1", "Sentadilla"],
+        ["2", "Press de banca"],
+        ["3", "Prensa de piernas"],
+      ]);
+    });
+
+    it("keeps the group card and shows the error when the API refuses the break", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withGroup,
+        breakSuperSeries: async () => fail(new DomainError("NOT_FOUND", "")),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(workoutButtons("Romper superserie")[0]!);
+      await screen.findByRole("dialog", { name: "¿Romper superserie?" });
+
+      // Act
+      await user.click(within(breakDialog()!).getByRole("button", { name: "Romper" }));
+
+      // Assert
+      await dialogsClosed();
+      expect(
+        within(exercisesSection()).getByText("No hemos encontrado lo que buscas."),
+      ).toBeInTheDocument();
+      expect(workoutButtons("Romper superserie")).toHaveLength(1);
+    });
+
+    it("keeps the generic message when the API refuses a break as invalid", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withGroup,
+        breakSuperSeries: async () => fail(new DomainError("VALIDATION", "")),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(workoutButtons("Romper superserie")[0]!);
+      await screen.findByRole("dialog", { name: "¿Romper superserie?" });
+
+      // Act
+      await user.click(within(breakDialog()!).getByRole("button", { name: "Romper" }));
+
+      // Assert
+      await dialogsClosed();
+      expect(
+        await within(exercisesSection()).findByText("Revisa los datos introducidos."),
+      ).toBeInTheDocument();
+    });
+
+    it("disables Agrupar en superserie while the grouping is in progress", async () => {
+      // Arrange
+      await renderWorkout({ createSuperSeries: () => new Promise(() => {}) }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await check(user, "Sentadilla", "Press de banca");
+
+      // Act
+      await user.click(groupButton()!);
+
+      // Assert
+      expect(groupButton()).toBeDisabled();
+    });
+
+    it("disables the confirmation while the break is in progress", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: withGroup,
+        breakSuperSeries: () => new Promise(() => {}),
+      }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(workoutButtons("Romper superserie")[0]!);
+      await screen.findByRole("dialog", { name: "¿Romper superserie?" });
+
+      // Act
+      await user.click(within(breakDialog()!).getByRole("button", { name: "Romper" }));
+
+      // Assert
+      expect(within(breakDialog()!).getByRole("button", { name: "Romper" })).toBeDisabled();
+    });
+
+    describe("dragging a group", () => {
+      let rects: ReturnType<typeof stubListItemRects>;
+
+      beforeEach(() => {
+        rects = stubListItemRects();
+      });
+
+      afterEach(() => {
+        rects.mockRestore();
+      });
+
+      it("moves every member of the group together and sends the full order once", async () => {
+        // Arrange
+        const { mutations, rendered } = renderWorkout({
+          getWorkout: withGroup,
+          reorderExercises: () => new Promise(() => {}),
+        });
+        await rendered;
+        await loaded();
+        const user = userEvent.setup();
+        workoutButtons("Reordenar superserie")[0]!.focus();
+        await user.keyboard("[Space]");
+        await user.keyboard("[ArrowLeft]");
+
+        // Act
+        await user.keyboard("[Space]");
+
+        // Assert
+        expect(exerciseRows()).toEqual([
+          ["1", "Press de banca"],
+          ["2", "Prensa de piernas"],
+          ["3", "Sentadilla"],
+        ]);
+        expect(mutations.reorderExercises).toHaveBeenCalledTimes(1);
+        expect(mutations.reorderExercises).toHaveBeenCalledWith({
+          workoutId: "w-1",
+          exerciseIds: ["ex-bench", "ex-press", "ex-squat"],
+        });
+      });
     });
   });
 

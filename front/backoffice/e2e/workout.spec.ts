@@ -142,6 +142,10 @@ interface SentRequests {
   unmarks: string[];
   /** The bodies of the `POST /exercises` requests. */
   creations: SentNewExercise[];
+  /** The bodies of the `POST /workouts/{id}/superseries` requests. */
+  groupings: unknown[];
+  /** The paths of the `DELETE /workouts/{id}/superseries/{superSeriesId}` requests. */
+  breaks: string[];
 }
 
 interface SentNewExercise {
@@ -194,8 +198,8 @@ function entryOf(
 /**
  * Intercepts the workout and catalog endpoints. A `POST /workouts` stores what it receives as a new workout, a
  * `PUT /workouts/{id}` replaces that workout's data, a `POST` or `PUT` under `/workouts/{id}/exercises` adds or
- * replaces an exercise, and a `PUT /workouts/{id}/exercises/order` reorders them. Resolves to the bodies of the
- * exercise requests.
+ * replaces an exercise, a `PUT /workouts/{id}/exercises/order` reorders them, and `POST` and `DELETE` under
+ * `/workouts/{id}/superseries` group and ungroup them. Resolves to the bodies of the exercise requests.
  */
 async function mockWorkoutsApi(
   page: Page,
@@ -213,6 +217,8 @@ async function mockWorkoutsApi(
     marks: [],
     unmarks: [],
     creations: [],
+    groupings: [],
+    breaks: [],
   };
   // The catalog the API holds: creating an exercise adds one, owned by the signed-in user.
   const stored = [...exercises];
@@ -345,6 +351,51 @@ async function mockWorkoutsApi(
     const reordered = { ...workout, exercises: body.exerciseIds.map((id) => byExercise.get(id)) };
     workouts.set(workoutId, reordered);
     return route.fulfill(json(reordered));
+  });
+  await page.route(`${api}/workouts/*/superseries`, (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    const workoutId = new URL(request.url()).pathname.split("/")[2] ?? "";
+    const workout = workouts.get(workoutId);
+    const body = request.postDataJSON() as { exerciseIds: string[] };
+    sent.groupings.push(body);
+    if (!workout) {
+      return route.fulfill(json({ status: 404 }, 404));
+    }
+    const id = 1;
+    workouts.set(workoutId, {
+      ...workout,
+      exercises: workout.exercises.map((entry) =>
+        body.exerciseIds.includes((entry as { id: string }).id)
+          ? { ...(entry as object), superSeriesId: id }
+          : entry,
+      ),
+    });
+    return route.fulfill(json({ id }, 201));
+  });
+  await page.route(`${api}/workouts/*/superseries/*`, (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    const path = new URL(request.url()).pathname;
+    const [, , workoutId = "", , superSeriesId = ""] = path.split("/");
+    const workout = workouts.get(workoutId);
+    sent.breaks.push(path);
+    if (!workout) {
+      return route.fulfill(json({ status: 404 }, 404));
+    }
+    workouts.set(workoutId, {
+      ...workout,
+      exercises: workout.exercises.map((entry) =>
+        String((entry as { superSeriesId: unknown }).superSeriesId) === superSeriesId
+          ? { ...(entry as object), superSeriesId: null }
+          : entry,
+      ),
+    });
+    return route.fulfill({ status: 204, headers: cors });
   });
   await page.route(`${api}/exercises`, (route) => {
     const request = route.request();
@@ -842,6 +893,53 @@ test("puts the previous order back and shows the error when the reorder is refus
   await expect(items.nth(0)).toContainText("Sentadilla");
   await expect(items.nth(1)).toContainText("Press de banca");
   expect(reorders).toHaveLength(1);
+});
+
+test("groups two exercises in a superseries, brings them together and breaks the group", async ({
+  page,
+}) => {
+  // Arrange
+  const { groupings, reorders, breaks } = await signIn(page, {
+    exercises: [...catalog, benchPress, ...moreExercises],
+  });
+  await page.goto(`/workout?id=${crowded.id}`);
+  const exercisesCard = page.getByRole("region", { name: "Ejercicios" });
+  const exerciseCard = (name: string) =>
+    exercisesCard.getByRole("listitem").filter({ hasText: name }).last();
+  await expect(exerciseCard("Sentadilla")).toBeVisible();
+  await exerciseCard("Sentadilla")
+    .getByRole("checkbox", { name: "Seleccionar para superserie" })
+    .check();
+  await exerciseCard("Remo").getByRole("checkbox", { name: "Seleccionar para superserie" }).check();
+
+  // Act
+  await exercisesCard.getByRole("button", { name: "Agrupar en superserie" }).click();
+  const group = exercisesCard.getByRole("list", { name: "superserie Sentadilla, Remo" });
+  await expect(group).toBeVisible();
+  await exercisesCard.getByRole("button", { name: "Romper superserie" }).click();
+  await page
+    .getByRole("dialog", { name: "¿Romper superserie?" })
+    .getByRole("button", { name: "Romper" })
+    .click();
+
+  // Assert
+  await expect(exercisesCard.getByRole("button", { name: "Romper superserie" })).toHaveCount(0);
+  const [squatEntry, , rowEntry] = crowded.exercises as { id: string }[];
+  expect(groupings).toEqual([{ exerciseIds: [squatEntry!.id, rowEntry!.id] }]);
+  expect(reorders).toEqual([
+    {
+      exerciseIds: [
+        catalog[0]!.id,
+        moreExercises[0]!.id,
+        benchPress.id,
+        moreExercises[1]!.id,
+        moreExercises[2]!.id,
+      ],
+    },
+  ]);
+  expect(breaks).toEqual([`/workouts/${crowded.id}/superseries/1`]);
+  // Broken in place: Remo keeps the second position it took when grouped.
+  await expect(exercisesCard.getByRole("listitem").nth(1)).toContainText("Remo");
 });
 
 /** Opens the catalog dialog from the exercises card and resolves to it. */

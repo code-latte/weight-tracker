@@ -103,7 +103,8 @@
         "picked": "Has cogido {{name}}.",
         "over": "{{name}} está en la posición {{position}}.",
         "dropped": "{{name}} se ha soltado en la posición {{position}}.",
-        "cancelled": "Se ha cancelado el movimiento de {{name}}."
+        "cancelled": "Se ha cancelado el movimiento de {{name}}.",
+        "groupName": "superserie {{names}}"
       },
       "add": "Añadir ejercicio",
       "compactSummary": {
@@ -113,6 +114,22 @@
         "MaxReps": "{{series}} × máx",
         "Minutes": "{{series}} × {{value}} min",
         "other": "{{series}} × {{value}}"
+      }
+    },
+    "superSeries": {
+      "title": "Superserie",
+      "group": "Agrupar en superserie",
+      "select": "Seleccionar para superserie",
+      "break": "Romper superserie",
+      "reorder": "Reordenar superserie",
+      "breakDialog": {
+        "title": "¿Romper superserie?",
+        "message": "Los ejercicios seguirán en el entrenamiento, cada uno por separado.",
+        "confirm": "Romper",
+        "cancel": "Cancelar"
+      },
+      "errors": {
+        "VALIDATION": "Solo se pueden agrupar en superserie ejercicios con el mismo número total de series."
       }
     },
     "configuration": {

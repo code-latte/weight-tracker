@@ -103,7 +103,8 @@
         "picked": "Picked up {{name}}.",
         "over": "{{name}} is at position {{position}}.",
         "dropped": "{{name}} was dropped at position {{position}}.",
-        "cancelled": "Moving {{name}} was cancelled."
+        "cancelled": "Moving {{name}} was cancelled.",
+        "groupName": "superset {{names}}"
       },
       "add": "Add exercise",
       "compactSummary": {
@@ -113,6 +114,22 @@
         "MaxReps": "{{series}} × max",
         "Minutes": "{{series}} × {{value}} min",
         "other": "{{series}} × {{value}}"
+      }
+    },
+    "superSeries": {
+      "title": "Superset",
+      "group": "Group in superset",
+      "select": "Select for superset",
+      "break": "Break superset",
+      "reorder": "Reorder superset",
+      "breakDialog": {
+        "title": "Break superset?",
+        "message": "The exercises stay in the workout, each on its own.",
+        "confirm": "Break",
+        "cancel": "Cancel"
+      },
+      "errors": {
+        "VALIDATION": "Only exercises with the same total number of sets can be grouped in a superset."
       }
     },
     "configuration": {

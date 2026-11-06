@@ -1,10 +1,13 @@
 import type {
   AddExerciseRequest,
+  CreateSuperSeriesRequest,
   CreateWorkoutRequest,
   DomainError,
   GetWorkoutsInput,
   ReorderWorkoutExercisesRequest,
   Result,
+  SuperSeries,
+  SuperSeriesId,
   UpdateWorkoutRequest,
   Workout,
   WorkoutById,
@@ -32,4 +35,12 @@ export default interface WorkoutRepositoryInterface {
     workoutId: string,
     request: ReorderWorkoutExercisesRequest,
   ): Promise<Result<WorkoutDetail, DomainError>>;
+  createSuperSeries(
+    workoutId: string,
+    request: CreateSuperSeriesRequest,
+  ): Promise<Result<SuperSeries, DomainError>>;
+  breakSuperSeries(
+    workoutId: string,
+    superSeriesId: SuperSeriesId,
+  ): Promise<Result<void, DomainError>>;
 }

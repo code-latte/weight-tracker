@@ -21,6 +21,9 @@ export type {
 export type {
   AddExerciseRequest,
   AddExerciseToWorkoutInput,
+  BreakSuperSeriesInput,
+  CreateSuperSeriesInput,
+  CreateSuperSeriesRequest,
   CreateWorkoutRequest,
   GetWorkoutByIdInput,
   GetWorkoutsInput,
@@ -28,6 +31,8 @@ export type {
   ReorderWorkoutExercisesInput,
   ReorderWorkoutExercisesRequest,
   SetPrescription,
+  SuperSeries,
+  SuperSeriesId,
   UpdateWorkoutExerciseInput,
   UpdateWorkoutInput,
   UpdateWorkoutRequest,

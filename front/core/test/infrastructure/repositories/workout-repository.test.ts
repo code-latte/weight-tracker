@@ -3,6 +3,7 @@ import type { HttpClientInterface, HttpRequest } from "../../../src/application"
 import {
   ok,
   type AddExerciseRequest,
+  type CreateSuperSeriesRequest,
   type CreateWorkoutRequest,
   type ReorderWorkoutExercisesRequest,
   type UpdateWorkoutRequest,
@@ -98,6 +99,12 @@ const addExerciseRequest: AddExerciseRequest = {
 const reorderRequest: ReorderWorkoutExercisesRequest = {
   exerciseIds: [workoutExercise.exerciseId, "2a3b4c5d-6e7f-4809-9a1b-2c3d4e5f6a7b"],
 };
+
+const createSuperSeriesRequest: CreateSuperSeriesRequest = {
+  exerciseIds: [workoutExercise.id, "3b4c5d6e-7f80-4a1b-9c2d-3e4f5a6b7c8d"],
+};
+
+const superSeriesId = 3;
 
 class FakeHttpClient implements HttpClientInterface {
   readonly requests: HttpRequest[] = [];
@@ -735,6 +742,124 @@ describe("WorkoutRepository", () => {
 
       // Act
       const result = await repository.reorderExercises(workout.id, reorderRequest);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("createSuperSeries", () => {
+    it("posts the request to /workouts/{workoutId}/superseries unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => ({ id: superSeriesId }));
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.createSuperSeries(workout.id, createSuperSeriesRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "POST",
+          path: `/workouts/${workout.id}/superseries`,
+          body: createSuperSeriesRequest,
+        },
+      ]);
+    });
+
+    it("returns the created superseries on success", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(
+        new FakeHttpClient(async () => ({ id: superSeriesId })),
+      );
+
+      // Act
+      const result = await repository.createSuperSeries(workout.id, createSuperSeriesRequest);
+
+      // Assert
+      expect(result).toEqual(ok({ id: superSeriesId }));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.createSuperSeries(workout.id, createSuperSeriesRequest);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.createSuperSeries(workout.id, createSuperSeriesRequest);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("breakSuperSeries", () => {
+    it("deletes /workouts/{workoutId}/superseries/{superSeriesId} without a body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => undefined);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.breakSuperSeries(workout.id, superSeriesId);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "DELETE", path: `/workouts/${workout.id}/superseries/${superSeriesId}` },
+      ]);
+    });
+
+    it("returns an empty success when the API answers 204", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => undefined));
+
+      // Act
+      const result = await repository.breakSuperSeries(workout.id, superSeriesId);
+
+      // Assert
+      expect(result).toEqual(ok(undefined));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.breakSuperSeries(workout.id, superSeriesId);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.breakSuperSeries(workout.id, superSeriesId);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

@@ -93,6 +93,30 @@ public sealed class Workout : AggregateRoot
         };
     }
 
+    /// <summary>
+    /// Creates a draft workout for a user by copying the content of a template: name, description and every
+    /// exercise in order, with its effort, sets, per-side flag, rest and superseries. The template's trainer
+    /// prescribes the workout. Copied entries get new identifiers, so the workout never shares an entry with the template.
+    /// </summary>
+    /// <exception cref="TrainerCannotBeWorkoutOwnerException">When the template's trainer is the owner.</exception>
+    public static Workout CreateFromTemplate(WorkoutTemplate template, Id userId, DateTime workoutDate)
+    {
+        var workout = Create(userId, template.TrainerId, template.Name, template.Description, workoutDate);
+
+        foreach (var source in template.Exercises)
+        {
+            var copy = WorkoutExercise.Create(source.ExerciseId, source.Effort, source.Sets, source.PerSide, source.Rest);
+
+            // Superseries ids are unique within the template and the workout starts empty, so they are kept as they are
+            if (source.SuperSeriesId is not null)
+                copy.JoinSuperSeries(source.SuperSeriesId);
+
+            workout._exercises.Add(copy);
+        }
+
+        return workout;
+    }
+
     /// <exception cref="InvalidWorkoutStatusException">When the status is not a defined value.</exception>
     /// <exception cref="ExerciseAlreadyInWorkoutException">When two entries share the same exercise.</exception>
     /// <exception cref="SuperSeriesRequiresTwoExercisesException">When a stored superseries has a single member.</exception>

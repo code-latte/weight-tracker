@@ -30,6 +30,12 @@ public class WeightTrackerDbContext : DbContext
 
     public DbSet<WorkoutExerciseSetEntity> WorkoutExerciseSets => Set<WorkoutExerciseSetEntity>();
 
+    public DbSet<WorkoutTemplateEntity> WorkoutTemplates => Set<WorkoutTemplateEntity>();
+
+    public DbSet<WorkoutTemplateExerciseEntity> WorkoutTemplateExercises => Set<WorkoutTemplateExerciseEntity>();
+
+    public DbSet<WorkoutTemplateExerciseSetEntity> WorkoutTemplateExerciseSets => Set<WorkoutTemplateExerciseSetEntity>();
+
     public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
 
     public DbSet<TrainerAthleteEntity> TrainerAthletes => Set<TrainerAthleteEntity>();
@@ -167,6 +173,70 @@ public class WeightTrackerDbContext : DbContext
             entity.HasKey(set => set.Id);
             entity.Property(set => set.Id).HasColumnName("Id").ValueGeneratedNever();
             entity.Property(set => set.WorkoutExerciseId).HasColumnName("WorkoutExerciseId");
+            entity.Property(set => set.Position).HasColumnName("Position");
+            entity.Property(set => set.Count).HasColumnName("Count");
+            entity.Property(set => set.TargetType).HasColumnName("TargetType").HasMaxLength(20).IsRequired();
+            entity.Property(set => set.TargetValue).HasColumnName("TargetValue");
+            entity.Property(set => set.TargetMaxValue).HasColumnName("TargetMaxValue");
+            entity.Property(set => set.TargetMinutes).HasColumnName("TargetMinutes").HasPrecision(5, 2);
+        });
+
+        modelBuilder.Entity<WorkoutTemplateEntity>(entity =>
+        {
+            entity.ToTable("WorkoutTemplates");
+            entity.HasKey(template => template.Id);
+            entity.Property(template => template.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(template => template.TrainerId).HasColumnName("TrainerId");
+            entity.Property(template => template.Name).HasColumnName("Name").HasMaxLength(WorkoutName.MaxLength).IsRequired();
+            entity.Property(template => template.Description).HasColumnName("Description").HasMaxLength(WorkoutDescription.MaxLength);
+
+            // The User aggregate is referenced by identifier only: foreign key, no navigation
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(template => template.TrainerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(template => template.TrainerId);
+
+            entity.HasMany(template => template.Exercises)
+                .WithOne()
+                .HasForeignKey(templateExercise => templateExercise.WorkoutTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkoutTemplateExerciseEntity>(entity =>
+        {
+            entity.ToTable("WorkoutTemplateExercises");
+            entity.HasKey(templateExercise => templateExercise.Id);
+            entity.Property(templateExercise => templateExercise.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(templateExercise => templateExercise.WorkoutTemplateId).HasColumnName("WorkoutTemplateId");
+            entity.Property(templateExercise => templateExercise.ExerciseId).HasColumnName("ExerciseId");
+            entity.Property(templateExercise => templateExercise.Position).HasColumnName("Position");
+            entity.Property(templateExercise => templateExercise.Effort).HasColumnName("Effort");
+            entity.Property(templateExercise => templateExercise.PerSide).HasColumnName("PerSide");
+            entity.Property(templateExercise => templateExercise.RestMinutes).HasColumnName("RestMinutes").HasPrecision(5, 2);
+            entity.Property(templateExercise => templateExercise.SuperSeriesId).HasColumnName("SuperSeriesId");
+
+            entity.HasIndex(templateExercise => new { templateExercise.WorkoutTemplateId, templateExercise.ExerciseId }).IsUnique();
+
+            // Exercise is its own aggregate root: foreign key only, no navigation
+            entity.HasOne<ExerciseEntity>()
+                .WithMany()
+                .HasForeignKey(templateExercise => templateExercise.ExerciseId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(templateExercise => templateExercise.Sets)
+                .WithOne()
+                .HasForeignKey(set => set.WorkoutTemplateExerciseId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkoutTemplateExerciseSetEntity>(entity =>
+        {
+            entity.ToTable("WorkoutTemplateExerciseSets");
+            entity.HasKey(set => set.Id);
+            entity.Property(set => set.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(set => set.WorkoutTemplateExerciseId).HasColumnName("WorkoutTemplateExerciseId");
             entity.Property(set => set.Position).HasColumnName("Position");
             entity.Property(set => set.Count).HasColumnName("Count");
             entity.Property(set => set.TargetType).HasColumnName("TargetType").HasMaxLength(20).IsRequired();

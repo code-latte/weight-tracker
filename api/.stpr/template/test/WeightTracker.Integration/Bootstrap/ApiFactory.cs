@@ -118,6 +118,9 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 "TrainerInvitations",
                 "TrainerAthletes",
                 "RefreshTokens",
+                "WorkoutTemplateExerciseSets",
+                "WorkoutTemplateExercises",
+                "WorkoutTemplates",
                 "WorkoutExerciseSets",
                 "WorkoutExercises",
                 "Workouts",
@@ -130,7 +133,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>
-    /// Deletes a seeded user, and the workouts, mesocycles, trainer–athlete relationships, trainer invitations and
+    /// Deletes a seeded user, and the workouts, workout templates, mesocycles, trainer–athlete relationships, trainer invitations and
     /// favorite exercises they take part in, so a test can exercise a
     /// token whose user no longer exists. No endpoint removes users. The next
     /// <see cref="ResetDatabase"/> restores the baseline.
@@ -169,6 +172,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             DELETE FROM "Mesocycles"
             WHERE "AthleteId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
                OR "TrainerId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
+            """);
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            DELETE FROM "WorkoutTemplates"
+            WHERE "TrainerId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
             """);
 
         await context.Database.ExecuteSqlInterpolatedAsync(

@@ -183,5 +183,24 @@ public static class SeedData
 
     public static readonly Guid MesocycleDeloadWeekId = new("00000000-0000-0000-0000-000000000074");
 
+    /// <summary>
+    /// Workout template owned by the trainer: Sentadilla and Press Banca grouped in superseries
+    /// <see cref="SeededSuperSeries"/>, then Plancha on its own.
+    /// </summary>
+    public static readonly Guid TrainerTemplateId = new("00000000-0000-0000-0000-000000000081");
+
+    public const string TrainerTemplateName = "Full body A";
+
+    public const string TrainerTemplateDescription = "Compound lifts first, core to finish";
+
+    /// <summary>Sentadilla in the trainer template, 4 x 8 reps, per side, 2 minutes of rest.</summary>
+    public static readonly Guid TrainerTemplateSentadillaEntryId = new("00000000-0000-0000-0000-000000000082");
+
+    /// <summary>Press Banca in the trainer template, 4 x 8-12 reps.</summary>
+    public static readonly Guid TrainerTemplatePressBancaEntryId = new("00000000-0000-0000-0000-000000000083");
+
+    /// <summary>Plancha in the trainer template, 3 x 40 seconds.</summary>
+    public static readonly Guid TrainerTemplatePlanchaEntryId = new("00000000-0000-0000-0000-000000000084");
+
     public static readonly DateTime CreatedAt = new(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc);
 }

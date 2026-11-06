@@ -523,4 +523,22 @@ public class ExceptionMapperTests
         // Assert
         status.Should().Be(expected);
     }
+
+    public static TheoryData<Exception, int> WorkoutTemplateFailures() => new()
+    {
+        { new WorkoutTemplateNotFoundException(Id.New()), StatusCodes.Status404NotFound },
+        { new InvalidWorkoutTemplateTrainerException("not a trainer"), StatusCodes.Status400BadRequest },
+        { new WorkoutWithoutTrainerException(Id.New()), StatusCodes.Status400BadRequest },
+    };
+
+    [Theory]
+    [MemberData(nameof(WorkoutTemplateFailures))]
+    public void Map_ShouldMapEveryWorkoutTemplateFailure(Exception exception, int expected)
+    {
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(expected);
+    }
 }

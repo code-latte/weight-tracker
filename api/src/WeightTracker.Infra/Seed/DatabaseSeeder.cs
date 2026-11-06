@@ -47,6 +47,7 @@ public class DatabaseSeeder
         await SeedUsers(cancellationToken);
         await SeedMesocycles(cancellationToken);
         await SeedWorkouts(cancellationToken);
+        await SeedWorkoutTemplates(cancellationToken);
         await SeedTrainerAthletes(cancellationToken);
         await SeedTrainerInvitations(cancellationToken);
 
@@ -291,6 +292,30 @@ public class DatabaseSeeder
         };
 
         await _context.Workouts.AddRangeAsync(workouts.Select(WorkoutMapper.MapToEntity), cancellationToken);
+    }
+
+    private async Task SeedWorkoutTemplates(CancellationToken cancellationToken)
+    {
+        var superSeries = SuperSeriesId.From(SeedData.SeededSuperSeries);
+
+        var trainerTemplate = WorkoutTemplate.Rehydrate(
+            Id.From(SeedData.TrainerTemplateId),
+            Id.From(SeedData.TrainerId),
+            WorkoutName.From(SeedData.TrainerTemplateName),
+            WorkoutDescription.From(SeedData.TrainerTemplateDescription),
+            [
+                WorkoutExercise.Rehydrate(
+                    Id.From(SeedData.TrainerTemplateSentadillaEntryId), Id.From(SeedData.SentadillaId), Effort.HIGH,
+                    [new SetPrescription(4, new SetTarget.Reps(8))], superSeries, perSide: true, rest: TimeInMinutes.From(2m)),
+                WorkoutExercise.Rehydrate(
+                    Id.From(SeedData.TrainerTemplatePressBancaEntryId), Id.From(SeedData.PressBancaId), Effort.MIDHIGH,
+                    [new SetPrescription(4, new SetTarget.RepsRange(8, 12))], superSeries),
+                WorkoutExercise.Rehydrate(
+                    Id.From(SeedData.TrainerTemplatePlanchaEntryId), Id.From(SeedData.PlanchaId), Effort.LOW,
+                    [new SetPrescription(3, new SetTarget.Duration(40))]),
+            ]);
+
+        await _context.WorkoutTemplates.AddAsync(WorkoutTemplateMapper.MapToEntity(trainerTemplate), cancellationToken);
     }
 
     private static User BuildUser(

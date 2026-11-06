@@ -57,6 +57,8 @@ public class ExceptionMapper
             or InvalidWeekNumberException
             or InvalidTrainingWeekTypeException
             or InvalidMesocycleAssignmentException
+            or InvalidWorkoutTemplateTrainerException
+            or WorkoutWithoutTrainerException
             or IncompleteMesocyclePlacementException
             or MissingWorkoutDateException
             or PasswordNotStrongEnoughException => Problem(
@@ -85,7 +87,7 @@ public class ExceptionMapper
                 or SuperSeriesNotFoundException or WorkoutNotFoundException
                 or WorkoutExerciseNotInWorkoutException or TrainerAthleteNotFoundException
                 or TrainerInvitationNotFoundException or MesocycleWeekNotFoundException
-                or MesocycleNotFoundException => Problem(
+                or MesocycleNotFoundException or WorkoutTemplateNotFoundException => Problem(
                 StatusCodes.Status404NotFound,
                 exception.Message
             ),

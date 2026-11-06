@@ -82,7 +82,7 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         body.GetProperty("id").GetGuid().Should().Be(SeedData.TrainedWorkoutId);
         body.GetProperty("name").GetString().Should().Be(SeedData.TrainedWorkoutName);
         body.GetProperty("description").ValueKind.Should().Be(JsonValueKind.Null);
-        body.GetProperty("workoutDate").GetString().Should().Be("2026-10-03");
+        body.GetProperty("workoutDate").GetString().Should().Be($"{SeedData.TrainedWorkoutDate:yyyy-MM-dd}");
         body.GetProperty("userId").GetGuid().Should().Be(SeedData.UserId);
         body.GetProperty("trainerId").GetGuid().Should().Be(SeedData.TrainerId);
         var entries = body.GetProperty("exercises").EnumerateArray().ToList();

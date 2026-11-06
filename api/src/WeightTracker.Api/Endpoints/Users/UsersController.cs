@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using WeightTracker.Api.Common;
+using WeightTracker.Api.Endpoints.Mesocycles.Dtos;
 using WeightTracker.Api.Endpoints.Users.Dtos;
 using WeightTracker.Application.UseCases.Auth;
+using WeightTracker.Application.UseCases.Mesocycles;
 using WeightTracker.Application.UseCases.Users;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Users;
@@ -12,7 +14,8 @@ namespace WeightTracker.Api.Endpoints.Users;
 /// Users. The <c>me</c> routes act on the caller's own profile, the user the token belongs to;
 /// <c>GET /users</c> lets an administrator list every user, and <c>POST /users</c> lets an administrator
 /// create someone else's account. The <c>activate</c> and <c>deactivate</c> routes let an administrator
-/// switch another account on and off.
+/// switch another account on and off. <c>GET /users/{userId}/mesocycles</c> lets a trainer or an administrator
+/// list the mesocycles planned for one athlete.
 /// </summary>
 [ApiController]
 [Route("users")]
@@ -23,6 +26,7 @@ public class UsersController : AuthorizedController
     private readonly GetAllUsersUseCase _getAllUsers;
     private readonly ActivateUserUseCase _activateUser;
     private readonly DeactivateUserUseCase _deactivateUser;
+    private readonly GetUserMesocyclesUseCase _getUserMesocycles;
 
     public UsersController(
         UpdateMyProfileUseCase updateMyProfile,
@@ -30,6 +34,7 @@ public class UsersController : AuthorizedController
         GetAllUsersUseCase getAllUsers,
         ActivateUserUseCase activateUser,
         DeactivateUserUseCase deactivateUser,
+        GetUserMesocyclesUseCase getUserMesocycles,
         GetAuthenticatedUserUseCase getAuthenticatedUser,
         ExceptionMapper exceptionMapper) : base(getAuthenticatedUser, exceptionMapper)
     {
@@ -38,6 +43,7 @@ public class UsersController : AuthorizedController
         _getAllUsers = getAllUsers;
         _activateUser = activateUser;
         _deactivateUser = deactivateUser;
+        _getUserMesocycles = getUserMesocycles;
     }
 
     /// <summary>
@@ -174,6 +180,30 @@ public class UsersController : AuthorizedController
             var user = await _deactivateUser.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(id), cancellationToken);
 
             return Ok(UserSummaryResponse.From(user));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Lists the mesocycles planned for one athlete, latest start date first. A trainer gets the ones they prepare
+    /// for that athlete; an administrator gets all of them. Regular users may not call it, not even for themselves.
+    /// </summary>
+    [HttpGet("{userId:guid}/mesocycles")]
+    [RequireRole(Role.TRAINER, Role.ADMIN)]
+    [ProducesResponseType<IReadOnlyList<MesocycleResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMesocycles(Guid userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var views = await _getUserMesocycles.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(userId), cancellationToken);
+
+            return Ok(views.Select(MesocycleResponse.From).ToList());
         }
         catch (Exception exception)
         {

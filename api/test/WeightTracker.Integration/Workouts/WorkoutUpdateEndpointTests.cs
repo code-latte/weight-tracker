@@ -34,9 +34,16 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
     private static object OwnedWorkoutChange()
         => new { name = NewName, description = NewDescription, workoutDate = NewDate, userId = SeedData.UserId, trainerId = (Guid?)null };
 
-    /// <summary>New details for the trained workout, keeping its athlete and trainer.</summary>
+    /// <summary>
+    /// New details for the trained workout, keeping its athlete, its trainer and its placement in week 1 of the seeded
+    /// mesocycle, since the update replaces the placement too.
+    /// </summary>
     private static object TrainedWorkoutChange()
-        => new { name = NewName, description = NewDescription, workoutDate = NewDate, userId = SeedData.UserId, trainerId = SeedData.TrainerId };
+        => new
+        {
+            name = NewName, description = NewDescription, workoutDate = NewDate, userId = SeedData.UserId,
+            trainerId = SeedData.TrainerId, mesocycleId = SeedData.MesocycleId, mesocycleWeekNumber = 1,
+        };
 
     /// <summary>The workout as an admin reads it, so a call is checked independently of the caller.</summary>
     private async Task<JsonElement> StoredWorkout(Guid workoutId)
@@ -78,7 +85,7 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
 
         stored.GetProperty("name").GetString().Should().Be(SeedData.TrainedWorkoutName);
         stored.GetProperty("description").ValueKind.Should().Be(JsonValueKind.Null);
-        stored.GetProperty("workoutDate").GetString().Should().Be("2026-10-03");
+        stored.GetProperty("workoutDate").GetString().Should().Be($"{SeedData.TrainedWorkoutDate:yyyy-MM-dd}");
         stored.GetProperty("userId").GetGuid().Should().Be(SeedData.UserId);
         stored.GetProperty("trainerId").GetGuid().Should().Be(SeedData.TrainerId);
     }
@@ -190,14 +197,15 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
         var stored = await StoredWorkout(SeedData.TrainedWorkoutId);
         stored.GetProperty("name").GetString().Should().Be(NewName);
         stored.GetProperty("description").GetString().Should().Be(NewDescription);
-        stored.GetProperty("workoutDate").GetString().Should().Be(NewDate);
+        // Placed in week 1, so the sent date is ignored and the week dates it
+        stored.GetProperty("workoutDate").GetString().Should().Be($"{SeedData.TrainedWorkoutDate:yyyy-MM-dd}");
         stored.GetProperty("status").GetString().Should().Be("PUBLISHED");
         stored.GetProperty("exercises").EnumerateArray().Select(entry => entry.GetProperty("exerciseId").GetGuid())
             .Should().Equal(SeedData.SentadillaId, SeedData.PlanchaId);
     }
 
     [Fact]
-    public async Task PrescribingTrainer_ShouldKeepTheMesocyclePlacementWithoutExposingIt()
+    public async Task PrescribingTrainer_ShouldKeepTheMesocyclePlacementWhenSendingItBack()
     {
         // Arrange
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
@@ -208,8 +216,8 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-        body.TryGetProperty("mesocycleId", out _).Should().BeFalse();
-        body.TryGetProperty("mesocycleWeekNumber", out _).Should().BeFalse();
+        body.GetProperty("mesocycleId").GetGuid().Should().Be(SeedData.MesocycleId);
+        body.GetProperty("mesocycleWeekNumber").GetInt32().Should().Be(1);
         var stored = await Factory.WithScope(services => services.GetRequiredService<IWorkoutRepository>()
             .GetById(Id.From(SeedData.TrainedWorkoutId), CancellationToken.None));
         stored!.MesocycleId.Should().Be(Id.From(SeedData.MesocycleId));

@@ -33,11 +33,17 @@ public class GetAllWorkoutsUseCase
         _users = users;
     }
 
+    /// <param name="standaloneOnly">Keeps only the workouts that are not placed in a mesocycle.</param>
     /// <exception cref="UnauthorizedOperationException">When the caller's role may not list workouts.</exception>
     /// <exception cref="InvalidOperationException">When an owner or trainer of a listed workout does not exist.</exception>
-    public async Task<WorkoutListDTO> Execute(Id callerId, Role callerRole, CancellationToken cancellationToken)
+    public async Task<WorkoutListDTO> Execute(Id callerId, Role callerRole, bool standaloneOnly, CancellationToken cancellationToken)
     {
-        var workouts = await _visibility.VisibleTo(callerId, callerRole, cancellationToken);
+        var visible = await _visibility.VisibleTo(callerId, callerRole, cancellationToken);
+
+        // Narrows what the caller may already see, so the filter never widens visibility
+        var workouts = standaloneOnly
+            ? visible.Where(workout => workout.MesocycleId is null).ToList()
+            : visible;
 
         // Only exercises referenced by the scoped workouts, so the join never widens visibility
         var exerciseIds = workouts

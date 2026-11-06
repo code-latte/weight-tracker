@@ -45,6 +45,11 @@ public class WorkoutRepositoryTests : IntegrationTest
             return true;
         });
 
+    private Task<bool> ExistsByMesocycleWeek(Id mesocycleId, WeekNumber weekNumber)
+        => Factory.WithScope(services =>
+            services.GetRequiredService<IWorkoutRepository>()
+                .ExistsByMesocycleWeek(mesocycleId, weekNumber, CancellationToken.None));
+
     [Fact]
     public async Task Save_ShouldPersistANewAggregateAcrossItsThreeTables()
     {
@@ -540,7 +545,7 @@ public class WorkoutRepositoryTests : IntegrationTest
         {
             var mesocycles = services.GetRequiredService<IMesocycleRepository>();
             var mesocycle = await mesocycles.GetById(Id.From(SeedData.MesocycleId), CancellationToken.None);
-            mesocycle!.DefineWeek(WeekNumber.From(1), TrainingWeekType.RECOVERY, MesocycleObjective.From("Easy week"));
+            mesocycle!.RedefineWeek(WeekNumber.From(1), TrainingWeekType.RECOVERY, MesocycleObjective.From("Easy week"));
             await mesocycles.Save(mesocycle, CancellationToken.None);
             await services.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
 
@@ -553,5 +558,53 @@ public class WorkoutRepositoryTests : IntegrationTest
         // Assert
         workout!.MesocycleId.Should().Be(Id.From(SeedData.MesocycleId));
         workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
+    }
+
+    [Fact]
+    public async Task ExistsByMesocycleWeek_ShouldFindTheWorkoutPlacedInASeededWeek()
+    {
+        // Arrange
+        var mesocycleId = Id.From(SeedData.MesocycleId);
+
+        // Act
+        var exists = await ExistsByMesocycleWeek(mesocycleId, WeekNumber.From(1));
+
+        // Assert
+        exists.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExistsByMesocycleWeek_ShouldIgnoreAWeekWithoutWorkouts()
+    {
+        // Arrange
+        var mesocycleId = Id.From(SeedData.MesocycleId);
+
+        // Act
+        var exists = await ExistsByMesocycleWeek(mesocycleId, WeekNumber.From(4));
+
+        // Assert
+        exists.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExistsByMesocycleWeek_ShouldIgnoreTheSameWeekOfAnotherMesocycle()
+    {
+        // Arrange
+        var other = Mesocycle.Create(
+            Id.From(SeedData.TrainerId), Id.From(SeedData.UserId), MesocycleName.From("Strength block"),
+            MesocycleObjective.From("Get stronger"), new DateTime(2026, 11, 2), DurationInWeeks.From(4));
+        await Factory.WithScope(async services =>
+        {
+            await services.GetRequiredService<IMesocycleRepository>().Save(other, CancellationToken.None);
+            await services.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+
+            return true;
+        });
+
+        // Act
+        var exists = await ExistsByMesocycleWeek(other.Id, WeekNumber.From(1));
+
+        // Assert
+        exists.Should().BeFalse();
     }
 }

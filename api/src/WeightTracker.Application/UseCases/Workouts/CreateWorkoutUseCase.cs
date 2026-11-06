@@ -15,16 +15,20 @@ public class CreateWorkoutUseCase
 
     private WorkoutAssignmentValidator _assignment;
 
+    private MesocyclePlacementValidator _placement;
+
     private IUnitOfWork _unitOfWork;
 
     public CreateWorkoutUseCase(
         IWorkoutRepository workouts,
         WorkoutAssignmentValidator assignment,
+        MesocyclePlacementValidator placement,
         IUnitOfWork unitOfWork
     )
     {
         _workouts = workouts;
         _assignment = assignment;
+        _placement = placement;
         _unitOfWork = unitOfWork;
     }
 
@@ -35,11 +39,20 @@ public class CreateWorkoutUseCase
     /// <param name="userId">Requested owner. Optional for a user, required for a trainer or an admin.</param>
     /// <param name="trainerId">Requested trainer. Only an admin may send it.</param>
     /// <param name="description">Optional description, <c>null</c> when the workout has none.</param>
+    /// <param name="workoutDate">Day of a standalone workout. Ignored when the workout is placed, since its mesocycle week dates it.</param>
+    /// <param name="mesocycleId">Mesocycle to place the workout in, <c>null</c> for a standalone workout. Sent with <paramref name="mesocycleWeekNumber"/>.</param>
+    /// <param name="mesocycleWeekNumber">Week of the mesocycle to place the workout in, <c>null</c> for a standalone workout.</param>
     /// <returns>The created workout.</returns>
     /// <exception cref="InvalidWorkoutAssignmentException">When the requested owner or trainer is not allowed for the caller's role, or is deactivated.</exception>
     /// <exception cref="UserNotFoundException">When the requested owner does not exist.</exception>
     /// <exception cref="UnauthorizedOperationException">When a trainer names an owner who is not a regular user.</exception>
     /// <exception cref="TrainerCannotBeWorkoutOwnerException">When the trainer is the owner.</exception>
+    /// <exception cref="IncompleteMesocyclePlacementException">When only one of the mesocycle and the week is sent.</exception>
+    /// <exception cref="MissingWorkoutDateException">When the workout is not placed and no date is sent.</exception>
+    /// <exception cref="MesocycleNotFoundException">When the mesocycle does not exist.</exception>
+    /// <exception cref="MesocycleAthleteMismatchException">When the mesocycle is for another athlete.</exception>
+    /// <exception cref="MesocycleTrainerMismatchException">When the workout's trainer does not prepare the mesocycle.</exception>
+    /// <exception cref="MesocycleWeekOutOfRangeException">When the week is beyond the mesocycle's duration.</exception>
     public async Task<Workout> Execute(
         Id callerId,
         Role callerRole,
@@ -47,9 +60,14 @@ public class CreateWorkoutUseCase
         Id? trainerId,
         WorkoutName name,
         WorkoutDescription? description,
-        DateTime workoutDate,
+        DateTime? workoutDate,
+        Id? mesocycleId,
+        WeekNumber? mesocycleWeekNumber,
         CancellationToken cancellationToken)
     {
+        MesocyclePlacementValidator.EnsureComplete(mesocycleId, mesocycleWeekNumber);
+        MesocyclePlacementValidator.EnsureDateOrPlacement(mesocycleId, workoutDate);
+
         var (ownerId, prescriberId) = ResolveAssignment(callerId, callerRole, userId, trainerId);
 
         if (callerRole != Role.USER)
@@ -65,7 +83,17 @@ public class CreateWorkoutUseCase
         if (callerRole == Role.ADMIN && prescriberId is not null)
             await _assignment.EnsureCanTrain(prescriberId, cancellationToken);
 
-        var workout = Workout.Create(ownerId, prescriberId, name, description, workoutDate);
+        if (mesocycleId is not null)
+            await _placement.EnsureCanPlace(
+                ownerId, prescriberId, mesocycleId, mesocycleWeekNumber!, callerId, callerRole, "POST /workouts", cancellationToken);
+
+        var date = await _placement.ResolveWorkoutDate(mesocycleId, mesocycleWeekNumber, workoutDate, cancellationToken);
+
+        var workout = Workout.Create(ownerId, prescriberId, name, description, date);
+
+        // A new workout is a draft, so placing it is never refused by the lock
+        if (mesocycleId is not null)
+            workout.LinkToMesocycle(mesocycleId, mesocycleWeekNumber!);
 
         await _workouts.Save(workout, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

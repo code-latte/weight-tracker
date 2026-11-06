@@ -20,6 +20,11 @@ public interface IWorkoutRepository
 
     public Task<Workout?> GetById(Id workoutId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Whether any workout, whatever its status, is placed in the given week of the given mesocycle.
+    /// </summary>
+    public Task<bool> ExistsByMesocycleWeek(Id mesocycleId, WeekNumber weekNumber, CancellationToken cancellationToken);
+
     public Task Save(Workout workout, CancellationToken cancellationToken);
 
 }

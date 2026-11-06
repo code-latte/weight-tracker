@@ -27,6 +27,10 @@ public class WorkoutRepository : IWorkoutRepository
         => Query(workouts => workouts.Where(workout =>
             workout.UserId == id.Value || workout.TrainerId == id.Value), cancellationToken);
 
+    public Task<bool> ExistsByMesocycleWeek(Id mesocycleId, WeekNumber weekNumber, CancellationToken cancellationToken)
+        => _context.Workouts.AnyAsync(workout =>
+            workout.MesocycleId == mesocycleId.Value && workout.MesocycleWeekNumber == weekNumber.Value, cancellationToken);
+
     public async Task<Workout?> GetById(Id workoutId, CancellationToken cancellationToken)
     {
         var entity = await WithAggregateTables(_context.Workouts.AsNoTracking())

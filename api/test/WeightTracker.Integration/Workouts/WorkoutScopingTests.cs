@@ -18,11 +18,11 @@ public class WorkoutScopingTests : WorkoutEndpointTest
     public WorkoutScopingTests(ApiFactory factory) : base(factory)
     { }
 
-    private async Task<IReadOnlyList<Guid>> WorkoutIdsVisibleTo(string email)
+    private async Task<IReadOnlyList<Guid>> WorkoutIdsVisibleTo(string email, string route = "/workouts")
     {
         var client = await AuthenticatedClientFor(email);
 
-        var response = await client.GetAsync("/workouts");
+        var response = await client.GetAsync(route);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
@@ -146,6 +146,39 @@ public class WorkoutScopingTests : WorkoutEndpointTest
             SeedData.PrescribedDraftWorkoutId,
             SeedData.PrescribedStartedWorkoutId,
         });
+    }
+
+    [Fact]
+    public async Task Standalone_ShouldLeaveOutTheWorkoutsPlacedInAMesocycle()
+    {
+        // Arrange & Act
+        var visible = await WorkoutIdsVisibleTo(SeedCredentials.Admin, "/workouts?standalone=true");
+
+        // Assert
+        visible.Should().BeEquivalentTo(new[]
+        {
+            SeedData.OwnedWorkoutId,
+            SeedData.TrainerOwnWorkoutId,
+            SeedData.PrescribedPairWorkoutId,
+            SeedData.PrescribedSuperSeriesWorkoutId,
+            SeedData.SelfCreatedPairWorkoutId,
+            SeedData.SelfCreatedSuperSeriesWorkoutId,
+            SeedData.PrescribedDraftWorkoutId,
+        });
+    }
+
+    [Fact]
+    public async Task Standalone_ShouldNotWidenWhatATrainerSees()
+    {
+        // Arrange
+        var all = await WorkoutIdsVisibleTo(SeedCredentials.Trainer);
+
+        // Act
+        var standalone = await WorkoutIdsVisibleTo(SeedCredentials.Trainer, "/workouts?standalone=true");
+
+        // Assert
+        standalone.Should().BeSubsetOf(all);
+        standalone.Should().NotContain(new[] { SeedData.TrainedWorkoutId, SeedData.PrescribedStartedWorkoutId });
     }
 
     [Fact]

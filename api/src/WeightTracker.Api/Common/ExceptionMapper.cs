@@ -56,6 +56,9 @@ public class ExceptionMapper
             or InvalidDurationInWeeksException
             or InvalidWeekNumberException
             or InvalidTrainingWeekTypeException
+            or InvalidMesocycleAssignmentException
+            or IncompleteMesocyclePlacementException
+            or MissingWorkoutDateException
             or PasswordNotStrongEnoughException => Problem(
                 StatusCodes.Status400BadRequest,
                 exception.Message
@@ -81,7 +84,8 @@ public class ExceptionMapper
             UserNotFoundException or ExerciseNotInWorkoutException or ExerciseNotFoundException
                 or SuperSeriesNotFoundException or WorkoutNotFoundException
                 or WorkoutExerciseNotInWorkoutException or TrainerAthleteNotFoundException
-                or TrainerInvitationNotFoundException or MesocycleWeekNotFoundException => Problem(
+                or TrainerInvitationNotFoundException or MesocycleWeekNotFoundException
+                or MesocycleNotFoundException => Problem(
                 StatusCodes.Status404NotFound,
                 exception.Message
             ),
@@ -97,7 +101,8 @@ public class ExceptionMapper
                 or ExerciseNotUsableInWorkoutException or MesocycleTrainerIsAthleteException
                 or MesocycleWeekOutOfRangeException or DuplicateMesocycleWeekException
                 or MesocycleDurationTooShortException or WorkoutPlacementLockedException
-                or IncompleteWorkoutPlacementException => Problem(
+                or IncompleteWorkoutPlacementException or MesocycleAthleteMismatchException
+                or MesocycleTrainerMismatchException or MesocycleWeekHasWorkoutsException => Problem(
                 StatusCodes.Status409Conflict,
                 exception.Message
             ),

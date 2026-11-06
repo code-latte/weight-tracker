@@ -56,16 +56,17 @@ public class WorkoutsController : AuthorizedController
     /// <summary>
     /// Lists the workouts the caller is entitled to see, each with the public profiles of its athlete and trainer.
     /// The scoping rule itself lives in the use case; the controller only resolves who the caller is.
+    /// With <c>standalone=true</c> only the workouts not placed in a mesocycle are listed.
     /// </summary>
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<WorkoutListItemResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll([FromQuery] bool standalone, CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _getAllWorkouts.Execute(CurrentUser!.Id, CurrentUser.Role, cancellationToken);
+            var result = await _getAllWorkouts.Execute(CurrentUser!.Id, CurrentUser.Role, standalone, cancellationToken);
 
             return Ok(result.Workouts.Select(workout => WorkoutListItemResponse.From(workout, result.Exercises, result.Users)).ToList());
         }
@@ -101,7 +102,8 @@ public class WorkoutsController : AuthorizedController
     /// <summary>
     /// Creates a workout. A user creates it for themselves, a trainer prescribes it to a user
     /// (<c>userId</c> required) and an admin creates it for another user (<c>userId</c> required)
-    /// and may set <c>trainerId</c>.
+    /// and may set <c>trainerId</c>. The mesocycle's trainer or an admin may place it in a mesocycle week by sending
+    /// <c>mesocycleId</c> and <c>mesocycleWeekNumber</c> together.
     /// </summary>
     /// <remarks>
     /// The <c>Location</c> header points at <c>GET /workouts/{id}</c>.
@@ -112,6 +114,7 @@ public class WorkoutsController : AuthorizedController
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateWorkoutRequest request, CancellationToken cancellationToken)
     {
         try
@@ -123,7 +126,9 @@ public class WorkoutsController : AuthorizedController
                 request.TrainerId is null ? null : Id.From(request.TrainerId.Value),
                 WorkoutName.From(request.Name),
                 WorkoutDescription.From(request.Description),
-                request.WorkoutDate!.Value.ToDateTime(TimeOnly.MinValue),
+                request.WorkoutDate?.ToDateTime(TimeOnly.MinValue),
+                request.MesocycleId is null ? null : Id.From(request.MesocycleId.Value),
+                request.MesocycleWeekNumber is null ? null : WeekNumber.From(request.MesocycleWeekNumber.Value),
                 cancellationToken);
 
             return CreatedAtAction(
@@ -138,7 +143,8 @@ public class WorkoutsController : AuthorizedController
     /// <summary>
     /// Replaces the name, description and day of the workout, and its owner and trainer. Send back what
     /// <c>GET /workouts/{id}</c> returned with your changes: only an admin may change <c>userId</c> or
-    /// <c>trainerId</c>. Status and exercises are not changed here.
+    /// <c>trainerId</c>. The mesocycle placement is replaced too: omitting <c>mesocycleId</c> and
+    /// <c>mesocycleWeekNumber</c> takes the workout out of its mesocycle. Status and exercises are not changed here.
     /// </summary>
     [HttpPut("{id:guid}")]
     [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
@@ -157,9 +163,11 @@ public class WorkoutsController : AuthorizedController
                 Id.From(id),
                 WorkoutName.From(request.Name),
                 WorkoutDescription.From(request.Description),
-                request.WorkoutDate!.Value.ToDateTime(TimeOnly.MinValue),
+                request.WorkoutDate?.ToDateTime(TimeOnly.MinValue),
                 Id.From(request.UserId!.Value),
                 request.TrainerId is null ? null : Id.From(request.TrainerId.Value),
+                request.MesocycleId is null ? null : Id.From(request.MesocycleId.Value),
+                request.MesocycleWeekNumber is null ? null : WeekNumber.From(request.MesocycleWeekNumber.Value),
                 cancellationToken);
 
             return Ok(WorkoutDetailResponse.From(workout));

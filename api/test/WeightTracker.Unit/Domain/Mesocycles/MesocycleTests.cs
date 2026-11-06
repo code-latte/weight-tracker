@@ -17,6 +17,9 @@ public class MesocycleTests
     private static Mesocycle NewMesocycle(DurationInWeeks? duration = null)
         => Mesocycle.Create(Id.New(), Id.New(), Name, Objective, StartDate, duration ?? FourWeeks);
 
+    private static Mesocycle MesocycleStartingOn(DateTime startDate)
+        => Mesocycle.Create(Id.New(), Id.New(), Name, Objective, startDate, FourWeeks);
+
     private static MesocycleWeek StoredWeek(int number, TrainingWeekType type = TrainingWeekType.ACCUMULATION)
         => MesocycleWeek.Rehydrate(Id.New(), WeekNumber.From(number), type, WeekObjective);
 
@@ -178,7 +181,7 @@ public class MesocycleTests
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
 
         // Act
         mesocycle.Reschedule(new DateTime(2026, 11, 9, 8, 0, 0, DateTimeKind.Utc));
@@ -189,28 +192,28 @@ public class MesocycleTests
     }
 
     [Fact]
-    public void DefineWeek_ShouldAllowGapsAndAnyOrder()
+    public void AddWeek_ShouldAllowGapsAndAnyOrder()
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, WeekObjective);
 
         // Act
-        mesocycle.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
 
         // Assert
         mesocycle.Weeks.Select(week => week.WeekNumber.Value).Should().Equal(1, 3);
     }
 
     [Fact]
-    public void DefineWeek_ShouldKeepTheTypeAndTheObjective()
+    public void AddWeek_ShouldKeepTheTypeAndTheObjective()
     {
         // Arrange
         var mesocycle = NewMesocycle();
         var objective = MesocycleObjective.From("Heavy triples");
 
         // Act
-        mesocycle.DefineWeek(WeekNumber.From(2), TrainingWeekType.INTENSIFICATION, objective);
+        mesocycle.AddWeek(WeekNumber.From(2), TrainingWeekType.INTENSIFICATION, objective);
 
         // Assert
         var week = mesocycle.Weeks.Single();
@@ -221,27 +224,27 @@ public class MesocycleTests
     }
 
     [Fact]
-    public void DefineWeek_ShouldAcceptTheLastWeekOfTheDuration()
+    public void AddWeek_ShouldAcceptTheLastWeekOfTheDuration()
     {
         // Arrange
         var mesocycle = NewMesocycle();
 
         // Act
-        mesocycle.DefineWeek(WeekNumber.From(4), TrainingWeekType.DELOAD, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(4), TrainingWeekType.DELOAD, WeekObjective);
 
         // Assert
         mesocycle.Weeks.Should().ContainSingle(week => week.WeekNumber == WeekNumber.From(4));
     }
 
     [Fact]
-    public void DefineWeek_ShouldRejectAWeekBeyondTheDurationAndKeepTheWeeks()
+    public void AddWeek_ShouldRejectAWeekBeyondTheDurationAndKeepTheWeeks()
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
 
         // Act
-        var act = () => mesocycle.DefineWeek(WeekNumber.From(5), TrainingWeekType.DELOAD, WeekObjective);
+        var act = () => mesocycle.AddWeek(WeekNumber.From(5), TrainingWeekType.DELOAD, WeekObjective);
 
         // Assert
         act.Should().Throw<MesocycleWeekOutOfRangeException>();
@@ -249,13 +252,13 @@ public class MesocycleTests
     }
 
     [Fact]
-    public void DefineWeek_ShouldRejectAnUndefinedTypeAndKeepTheWeeks()
+    public void AddWeek_ShouldRejectAnUndefinedTypeAndKeepTheWeeks()
     {
         // Arrange
         var mesocycle = NewMesocycle();
 
         // Act
-        var act = () => mesocycle.DefineWeek(WeekNumber.From(1), (TrainingWeekType)99, WeekObjective);
+        var act = () => mesocycle.AddWeek(WeekNumber.From(1), (TrainingWeekType)99, WeekObjective);
 
         // Assert
         act.Should().Throw<InvalidTrainingWeekTypeException>();
@@ -263,33 +266,66 @@ public class MesocycleTests
     }
 
     [Fact]
-    public void DefineWeek_ShouldRedefineAnExistingWeekKeepingItsIdentity()
+    public void AddWeek_ShouldRejectAWeekAlreadyDefinedAndKeepIt()
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
+
+        // Act
+        var act = () => mesocycle.AddWeek(WeekNumber.From(2), TrainingWeekType.DELOAD, MesocycleObjective.From("Back off"));
+
+        // Assert
+        act.Should().Throw<DuplicateMesocycleWeekException>();
+        var week = mesocycle.Weeks.Single();
+        week.TrainingWeekType.Should().Be(TrainingWeekType.ACCUMULATION);
+        week.Objective.Should().Be(WeekObjective);
+    }
+
+    [Fact]
+    public void RedefineWeek_ShouldReplaceTheTypeAndObjectiveKeepingItsIdentity()
+    {
+        // Arrange
+        var mesocycle = NewMesocycle();
+        mesocycle.AddWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
         var original = mesocycle.Weeks.Single();
         var objective = MesocycleObjective.From("Back off");
 
         // Act
-        mesocycle.DefineWeek(WeekNumber.From(2), TrainingWeekType.DELOAD, objective);
+        mesocycle.RedefineWeek(WeekNumber.From(2), TrainingWeekType.DELOAD, objective);
 
         // Assert
         var week = mesocycle.Weeks.Single();
         week.Id.Should().Be(original.Id);
+        week.WeekNumber.Should().Be(WeekNumber.From(2));
         week.TrainingWeekType.Should().Be(TrainingWeekType.DELOAD);
         week.Objective.Should().Be(objective);
     }
 
     [Fact]
-    public void DefineWeek_ShouldRejectAnUndefinedTypeOnRedefinitionAndKeepTheWeek()
+    public void RedefineWeek_ShouldRejectAWeekThatIsNotDefinedAndNotCreateIt()
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
 
         // Act
-        var act = () => mesocycle.DefineWeek(WeekNumber.From(2), (TrainingWeekType)99, MesocycleObjective.From("Other"));
+        var act = () => mesocycle.RedefineWeek(WeekNumber.From(3), TrainingWeekType.DELOAD, WeekObjective);
+
+        // Assert
+        act.Should().Throw<MesocycleWeekNotFoundException>();
+        mesocycle.Weeks.Select(week => week.WeekNumber.Value).Should().Equal(1);
+    }
+
+    [Fact]
+    public void RedefineWeek_ShouldRejectAnUndefinedTypeAndKeepTheWeek()
+    {
+        // Arrange
+        var mesocycle = NewMesocycle();
+        mesocycle.AddWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
+
+        // Act
+        var act = () => mesocycle.RedefineWeek(WeekNumber.From(2), (TrainingWeekType)99, MesocycleObjective.From("Other"));
 
         // Assert
         act.Should().Throw<InvalidTrainingWeekTypeException>();
@@ -303,9 +339,9 @@ public class MesocycleTests
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
-        mesocycle.DefineWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
-        mesocycle.DefineWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, WeekObjective);
 
         // Act
         mesocycle.RemoveWeek(WeekNumber.From(3));
@@ -319,7 +355,7 @@ public class MesocycleTests
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
 
         // Act
         var act = () => mesocycle.RemoveWeek(WeekNumber.From(4));
@@ -330,12 +366,105 @@ public class MesocycleTests
     }
 
     [Fact]
+    public void DateOfWeek_ShouldBeTheWednesdayOfTheStartWeekWhenStartingOnMonday()
+    {
+        // Arrange
+        var mesocycle = MesocycleStartingOn(new DateTime(2026, 11, 2));
+
+        // Act
+        var date = mesocycle.DateOfWeek(WeekNumber.From(1));
+
+        // Assert
+        date.Should().Be(new DateTime(2026, 11, 4));
+    }
+
+    [Fact]
+    public void DateOfWeek_ShouldBeTheStartDateWhenStartingOnWednesday()
+    {
+        // Arrange
+        var mesocycle = MesocycleStartingOn(new DateTime(2026, 11, 4));
+
+        // Act
+        var date = mesocycle.DateOfWeek(WeekNumber.From(1));
+
+        // Assert
+        date.Should().Be(new DateTime(2026, 11, 4));
+    }
+
+    [Fact]
+    public void DateOfWeek_ShouldFallBeforeTheStartDateWhenStartingOnSunday()
+    {
+        // Arrange
+        var mesocycle = MesocycleStartingOn(new DateTime(2026, 11, 8));
+
+        // Act
+        var date = mesocycle.DateOfWeek(WeekNumber.From(1));
+
+        // Assert
+        date.Should().Be(new DateTime(2026, 11, 4));
+    }
+
+    [Fact]
+    public void DateOfWeek_ShouldAddOneWeekForEachFollowingWeek()
+    {
+        // Arrange
+        var mesocycle = MesocycleStartingOn(new DateTime(2026, 11, 2));
+
+        // Act
+        var date = mesocycle.DateOfWeek(WeekNumber.From(3));
+
+        // Assert
+        date.Should().Be(new DateTime(2026, 11, 18));
+    }
+
+    [Fact]
+    public void DateOfWeek_ShouldDateAnUndefinedWeekInsideTheDuration()
+    {
+        // Arrange
+        var mesocycle = MesocycleStartingOn(new DateTime(2026, 11, 2));
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+
+        // Act
+        var date = mesocycle.DateOfWeek(WeekNumber.From(4));
+
+        // Assert
+        date.Should().Be(new DateTime(2026, 11, 25));
+    }
+
+    [Fact]
+    public void DateOfWeek_ShouldRejectAWeekBeyondTheDuration()
+    {
+        // Arrange
+        var mesocycle = MesocycleStartingOn(new DateTime(2026, 11, 2));
+
+        // Act
+        var act = () => mesocycle.DateOfWeek(WeekNumber.From(5));
+
+        // Assert
+        act.Should().Throw<MesocycleWeekOutOfRangeException>();
+    }
+
+    [Fact]
+    public void DateOfWeek_ShouldFollowTheNewStartDateAfterRescheduling()
+    {
+        // Arrange
+        var mesocycle = MesocycleStartingOn(new DateTime(2026, 11, 2));
+        mesocycle.Reschedule(new DateTime(2026, 11, 9));
+
+        // Act
+        var date = mesocycle.DateOfWeek(WeekNumber.From(1));
+
+        // Assert
+        date.Should().Be(new DateTime(2026, 11, 11));
+    }
+
+    [Fact]
     public void ChangeDuration_ShouldAcceptADurationThatFitsTheDefinedWeeks()
     {
         // Arrange
         var mesocycle = NewMesocycle(DurationInWeeks.From(6));
         foreach (var number in Enumerable.Range(1, 4))
-            mesocycle.DefineWeek(WeekNumber.From(number), TrainingWeekType.ACCUMULATION, WeekObjective);
+            mesocycle.AddWeek(WeekNumber.From(number), TrainingWeekType.ACCUMULATION, WeekObjective);
 
         // Act
         mesocycle.ChangeDuration(FourWeeks);
@@ -365,7 +494,7 @@ public class MesocycleTests
         // Arrange
         var sixWeeks = DurationInWeeks.From(6);
         var mesocycle = NewMesocycle(sixWeeks);
-        mesocycle.DefineWeek(WeekNumber.From(5), TrainingWeekType.REALIZATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(5), TrainingWeekType.REALIZATION, WeekObjective);
 
         // Act
         var act = () => mesocycle.ChangeDuration(FourWeeks);
@@ -381,11 +510,11 @@ public class MesocycleTests
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, WeekObjective);
-        mesocycle.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
 
         // Act
-        mesocycle.DefineWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(2), TrainingWeekType.ACCUMULATION, WeekObjective);
 
         // Assert
         mesocycle.Weeks.Select(week => week.WeekNumber.Value).Should().Equal(1, 2, 3);
@@ -396,7 +525,7 @@ public class MesocycleTests
     {
         // Arrange
         var mesocycle = NewMesocycle();
-        mesocycle.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+        mesocycle.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
         var snapshot = (List<MesocycleWeek>)mesocycle.Weeks;
 
         // Act

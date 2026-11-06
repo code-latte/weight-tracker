@@ -32,8 +32,21 @@ public sealed record CreateWorkoutRequest
     public string? Description { get; init; }
 
     /// <summary>
-    /// Day of the workout, as <c>yyyy-MM-dd</c>. Time is not kept.
+    /// Day of the workout, as <c>yyyy-MM-dd</c>. Time is not kept. Required for a standalone workout. Ignored when
+    /// <c>mesocycleId</c> and <c>mesocycleWeekNumber</c> are sent: the workout then takes the Wednesday of its
+    /// mesocycle week.
     /// </summary>
-    [Required]
     public DateOnly? WorkoutDate { get; init; }
+
+    /// <summary>
+    /// Mesocycle to place the workout in. Sent together with <c>mesocycleWeekNumber</c>, or both omitted for a
+    /// standalone workout. Only the mesocycle's trainer or an admin may place a workout, and the workout must belong
+    /// to the mesocycle's athlete.
+    /// </summary>
+    public Guid? MesocycleId { get; init; }
+
+    /// <summary>
+    /// Week of the mesocycle to place the workout in, from 1 to its duration. The week does not need to be defined.
+    /// </summary>
+    public int? MesocycleWeekNumber { get; init; }
 }

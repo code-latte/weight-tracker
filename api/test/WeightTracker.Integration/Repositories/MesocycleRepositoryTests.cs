@@ -13,7 +13,7 @@ using Xunit;
 namespace WeightTracker.Integration.Repositories;
 
 /// <summary>
-/// Covers persistence of the Mesocycle aggregate across its two tables. No endpoint reaches it yet.
+/// Covers persistence of the Mesocycle aggregate across its two tables, and the list queries.
 /// </summary>
 public class MesocycleRepositoryTests : IntegrationTest
 {
@@ -26,6 +26,35 @@ public class MesocycleRepositoryTests : IntegrationTest
         => Mesocycle.Create(
             Id.From(SeedData.TrainerId), Id.From(athleteId), MesocycleName.From("Strength block"),
             MesocycleObjective.From("Peak strength"), new DateTime(2026, 11, 2), DurationInWeeks.From(4));
+
+    private static Mesocycle AMesocycle(Guid trainerId, Guid athleteId, DateTime startDate)
+        => Mesocycle.Create(
+            Id.From(trainerId), Id.From(athleteId), MesocycleName.From("Other block"),
+            MesocycleObjective.From("Other objective"), startDate, DurationInWeeks.From(4));
+
+    private Task<IReadOnlyList<Guid>> List(Func<IMesocycleRepository, Task<IEnumerable<Mesocycle>>> query)
+        => Factory.WithScope(async services =>
+            (IReadOnlyList<Guid>)(await query(services.GetRequiredService<IMesocycleRepository>()))
+                .Select(mesocycle => mesocycle.Id.Value)
+                .ToList());
+
+    /// <summary>
+    /// Stores two mesocycles next to the seeded one: from the admin to the user, and from the trainer to the admin.
+    /// The repository does not check roles, so the admin stands in for a second trainer and a second athlete.
+    /// </summary>
+    private async Task<(Mesocycle FromAdmin, Mesocycle ToAdmin)> StoreTwoMoreMesocycles()
+    {
+        var fromAdmin = AMesocycle(SeedData.AdminId, SeedData.UserId, new DateTime(2026, 12, 7));
+        var toAdmin = AMesocycle(SeedData.TrainerId, SeedData.AdminId, new DateTime(2026, 9, 7));
+
+        await Write(async repository =>
+        {
+            await repository.Save(fromAdmin, CancellationToken.None);
+            await repository.Save(toAdmin, CancellationToken.None);
+        });
+
+        return (fromAdmin, toAdmin);
+    }
 
     private Task<Mesocycle?> Read(Id mesocycleId)
         => Factory.WithScope(services =>
@@ -85,8 +114,8 @@ public class MesocycleRepositoryTests : IntegrationTest
     {
         // Arrange
         var original = AMesocycle(SeedData.UserId);
-        original.DefineWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, MesocycleObjective.From("Heavy triples"));
-        original.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+        original.AddWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, MesocycleObjective.From("Heavy triples"));
+        original.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
 
         await Write(repository => repository.Save(original, CancellationToken.None));
 
@@ -114,7 +143,7 @@ public class MesocycleRepositoryTests : IntegrationTest
         {
             mesocycle.Rename(MesocycleName.From("Renamed block"));
             mesocycle.Reschedule(new DateTime(2026, 10, 5));
-            mesocycle.DefineWeek(WeekNumber.From(1), TrainingWeekType.RECOVERY, objective);
+            mesocycle.RedefineWeek(WeekNumber.From(1), TrainingWeekType.RECOVERY, objective);
             mesocycle.RemoveWeek(WeekNumber.From(4));
             mesocycle.ChangeDuration(DurationInWeeks.From(3));
         });
@@ -146,7 +175,7 @@ public class MesocycleRepositoryTests : IntegrationTest
         await Update(mesocycleId, mesocycle =>
         {
             mesocycle.RemoveWeek(WeekNumber.From(2));
-            mesocycle.DefineWeek(WeekNumber.From(2), TrainingWeekType.INTENSIFICATION, WeekObjective);
+            mesocycle.AddWeek(WeekNumber.From(2), TrainingWeekType.INTENSIFICATION, WeekObjective);
         });
 
         // Act
@@ -170,5 +199,89 @@ public class MesocycleRepositoryTests : IntegrationTest
         // Assert
         await act.Should().ThrowAsync<DbUpdateException>();
         (await Read(mesocycle.Id)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldReturnEveryMesocycleLatestStartFirst()
+    {
+        // Arrange
+        var (fromAdmin, toAdmin) = await StoreTwoMoreMesocycles();
+
+        // Act
+        var ids = await List(repository => repository.GetAll(CancellationToken.None));
+
+        // Assert
+        ids.Should().Equal(fromAdmin.Id.Value, SeedData.MesocycleId, toAdmin.Id.Value);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldIncludeTheWeeks()
+    {
+        // Arrange
+        var mesocycleId = SeedData.MesocycleId;
+
+        // Act
+        var mesocycles = await Factory.WithScope(services =>
+            services.GetRequiredService<IMesocycleRepository>().GetAll(CancellationToken.None));
+
+        // Assert
+        mesocycles.Single(mesocycle => mesocycle.Id.Value == mesocycleId).Weeks
+            .Select(week => week.WeekNumber.Value).Should().Equal(1, 2, 4);
+    }
+
+    [Fact]
+    public async Task GetAllByTrainerId_ShouldReturnOnlyTheTrainersMesocycles()
+    {
+        // Arrange
+        var (fromAdmin, toAdmin) = await StoreTwoMoreMesocycles();
+
+        // Act
+        var ids = await List(repository => repository.GetAllByTrainerId(Id.From(SeedData.TrainerId), CancellationToken.None));
+
+        // Assert
+        ids.Should().Equal(SeedData.MesocycleId, toAdmin.Id.Value);
+        ids.Should().NotContain(fromAdmin.Id.Value);
+    }
+
+    [Fact]
+    public async Task GetAllByAthleteId_ShouldReturnOnlyTheAthletesMesocycles()
+    {
+        // Arrange
+        var (fromAdmin, toAdmin) = await StoreTwoMoreMesocycles();
+
+        // Act
+        var ids = await List(repository => repository.GetAllByAthleteId(Id.From(SeedData.UserId), CancellationToken.None));
+
+        // Assert
+        ids.Should().Equal(fromAdmin.Id.Value, SeedData.MesocycleId);
+        ids.Should().NotContain(toAdmin.Id.Value);
+    }
+
+    [Fact]
+    public async Task GetAllByTrainerIdAndAthleteId_ShouldReturnOnlyThatPair()
+    {
+        // Arrange
+        var (fromAdmin, toAdmin) = await StoreTwoMoreMesocycles();
+
+        // Act
+        var ids = await List(repository => repository.GetAllByTrainerIdAndAthleteId(
+            Id.From(SeedData.TrainerId), Id.From(SeedData.UserId), CancellationToken.None));
+
+        // Assert
+        ids.Should().Equal(SeedData.MesocycleId);
+        ids.Should().NotContain([fromAdmin.Id.Value, toAdmin.Id.Value]);
+    }
+
+    [Fact]
+    public async Task GetAllByTrainerId_ShouldReturnNothingForATrainerWithoutMesocycles()
+    {
+        // Arrange
+        var trainerId = Id.From(SeedData.AdminId);
+
+        // Act
+        var ids = await List(repository => repository.GetAllByTrainerId(trainerId, CancellationToken.None));
+
+        // Assert
+        ids.Should().BeEmpty();
     }
 }

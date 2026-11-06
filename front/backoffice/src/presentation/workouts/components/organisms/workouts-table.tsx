@@ -32,7 +32,7 @@ export default function WorkoutsTable({ workouts, showTrainer }: WorkoutsTablePr
   const weekLabelOf = useWeekLabel();
 
   if (workouts.length === 0) {
-    return <Typography color="text.secondary">{t("assignedPlans.empty")}</Typography>;
+    return <Typography color="text.secondary">{t("assignedWorkouts.empty")}</Typography>;
   }
 
   return (
@@ -40,11 +40,11 @@ export default function WorkoutsTable({ workouts, showTrainer }: WorkoutsTablePr
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell>{t("assignedPlans.columns.name")}</TableCell>
-            <TableCell>{t("assignedPlans.columns.date")}</TableCell>
-            <TableCell>{t("assignedPlans.columns.athlete")}</TableCell>
-            {showTrainer && <TableCell>{t("assignedPlans.columns.trainer")}</TableCell>}
-            <TableCell align="right">{t("assignedPlans.columns.exercises")}</TableCell>
+            <TableCell>{t("assignedWorkouts.columns.name")}</TableCell>
+            <TableCell>{t("assignedWorkouts.columns.date")}</TableCell>
+            <TableCell>{t("assignedWorkouts.columns.athlete")}</TableCell>
+            {showTrainer && <TableCell>{t("assignedWorkouts.columns.trainer")}</TableCell>}
+            <TableCell align="right">{t("assignedWorkouts.columns.exercises")}</TableCell>
             <TableCell />
           </TableRow>
         </TableHead>
@@ -56,7 +56,9 @@ export default function WorkoutsTable({ workouts, showTrainer }: WorkoutsTablePr
               <TableCell>{displayNameOf(workout.athlete)}</TableCell>
               {showTrainer && (
                 <TableCell>
-                  {workout.trainer ? displayNameOf(workout.trainer) : t("assignedPlans.noTrainer")}
+                  {workout.trainer
+                    ? displayNameOf(workout.trainer)
+                    : t("assignedWorkouts.noTrainer")}
                 </TableCell>
               )}
               <TableCell align="right">{workout.exercises.length}</TableCell>
@@ -64,7 +66,7 @@ export default function WorkoutsTable({ workouts, showTrainer }: WorkoutsTablePr
                 <IconButton
                   component={NextLink}
                   href={`/workout?id=${encodeURIComponent(workout.id)}`}
-                  aria-label={t("assignedPlans.edit", { name: workout.name })}
+                  aria-label={t("assignedWorkouts.edit", { name: workout.name })}
                 >
                   <EditOutlined />
                 </IconButton>

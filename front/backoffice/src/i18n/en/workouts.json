@@ -1,6 +1,6 @@
 {
-  "assignedPlans": {
-    "title": "Assigned plans",
+  "assignedWorkouts": {
+    "title": "Workouts",
     "newWorkout": "New workout",
     "columns": {
       "name": "Name",
@@ -9,7 +9,7 @@
       "trainer": "Trainer",
       "exercises": "Exercises"
     },
-    "empty": "No workouts assigned yet.",
+    "empty": "No workouts yet.",
     "edit": "Edit {{name}}",
     "noTrainer": "No trainer"
   },
@@ -151,7 +151,7 @@
       "cancel": "Cancel"
     },
     "notFound": "We could not find this workout.",
-    "backToList": "Back to assigned plans",
+    "backToList": "Back to workouts",
     "back": "Back",
     "editTitle": "Edit workout",
     "properties": {
@@ -162,6 +162,12 @@
       "previous": "Previous week",
       "next": "Next week",
       "pick": "Pick a week"
+    },
+    "context": {
+      "mesocycle": "Mesocycle",
+      "label": "Workout details",
+      "week": "Week {{number}}",
+      "breadcrumb": "Mesocycle and week"
     }
   },
   "muscles": {

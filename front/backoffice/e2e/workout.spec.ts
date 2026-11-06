@@ -236,7 +236,8 @@ async function mockWorkoutsApi(
           ]),
         ),
   );
-  await page.route(`${api}/workouts`, (route) => {
+  // The list is read as `?standalone=true`, so the query string is part of the match.
+  await page.route(new RegExp(`^${api}/workouts(\\?.*)?$`), (route) => {
     const request = route.request();
 
     if (request.method() === "OPTIONS") {
@@ -272,7 +273,8 @@ async function mockWorkoutsApi(
       workouts.set(id, updated);
       return route.fulfill(json(updated));
     }
-    return route.fulfill(json(workout));
+    // The read by id carries the athlete and the trainer, as the list does.
+    return route.fulfill(json({ ...workout, athlete, trainer: null }));
   });
   await page.route(`${api}/workouts/*/exercises`, (route) => {
     const request = route.request();
@@ -445,7 +447,7 @@ test("creates a workout from the dialog and lands on its screen", async ({ page 
   // Arrange
   await page.clock.setFixedTime(today);
   await signIn(page);
-  await page.goto("/assigned-plans");
+  await page.goto("/assigned-workouts");
   await page.getByRole("button", { name: "Nuevo entrenamiento" }).click();
   const dialog = page.getByRole("dialog", { name: "Nuevo entrenamiento" });
   await dialog.getByLabel("Nombre").fill("Pierna");
@@ -474,7 +476,7 @@ test("creates a workout from the dialog and lands on its screen", async ({ page 
 test("opens a workout from the table's edit action", async ({ page }) => {
   // Arrange
   await signIn(page);
-  await page.goto("/assigned-plans");
+  await page.goto("/assigned-workouts");
 
   // Act
   await page.getByRole("link", { name: "Editar Empuje" }).click();

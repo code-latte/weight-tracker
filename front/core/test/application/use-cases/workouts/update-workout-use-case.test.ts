@@ -8,6 +8,7 @@ import {
   type Result,
   type UpdateWorkoutRequest,
   type Workout,
+  type WorkoutById,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
@@ -21,8 +22,14 @@ const workout: Workout = {
   userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
   trainerId: null,
   status: "DRAFT",
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
   exercises: [],
 };
+
+const placement = { mesocycleId: "1d2c3b4a-5f6e-4d7c-8b9a-0f1e2d3c4b5a", mesocycleWeekNumber: 2 };
+
+const placedWorkout: Workout = { ...workout, ...placement };
 
 const body: UpdateWorkoutRequest = {
   name: "Pierna B",
@@ -42,7 +49,7 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
-  async getById(): Promise<Result<WorkoutDetail, DomainError>> {
+  async getById(): Promise<Result<WorkoutById, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
@@ -103,7 +110,43 @@ describe("UpdateWorkoutUseCase", () => {
     expect(repository.otherCalls).toBe(0);
   });
 
-  it.each(["VALIDATION", "FORBIDDEN", "NOT_FOUND"] as const)(
+  it("forwards the mesocycle placement unchanged", async () => {
+    // Arrange
+    const repository = new FakeWorkoutRepository(ok(placedWorkout));
+    const useCase = new UpdateWorkoutUseCase(repository);
+
+    // Act
+    await useCase.execute({ id: workout.id, ...body, ...placement });
+
+    // Assert
+    expect(repository.updates).toEqual([{ id: workout.id, request: { ...body, ...placement } }]);
+  });
+
+  it("adds no mesocycle placement when it is omitted", async () => {
+    // Arrange
+    const repository = new FakeWorkoutRepository(ok(workout));
+    const useCase = new UpdateWorkoutUseCase(repository);
+
+    // Act
+    await useCase.execute({ id: workout.id, ...body });
+
+    // Assert
+    expect(repository.updates[0]?.request).not.toHaveProperty("mesocycleId");
+    expect(repository.updates[0]?.request).not.toHaveProperty("mesocycleWeekNumber");
+  });
+
+  it("returns the mesocycle placement the repository answers with", async () => {
+    // Arrange
+    const useCase = new UpdateWorkoutUseCase(new FakeWorkoutRepository(ok(placedWorkout)));
+
+    // Act
+    const result = await useCase.execute({ id: workout.id, ...body, ...placement });
+
+    // Assert
+    expect(result).toEqual(ok(placedWorkout));
+  });
+
+  it.each(["VALIDATION", "FORBIDDEN", "NOT_FOUND", "CONFLICT"] as const)(
     "returns the repository failure %s unchanged",
     async (code) => {
       // Arrange

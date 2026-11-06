@@ -153,7 +153,7 @@ public class DatabaseSeeder
             Id.From(SeedData.TrainerId),
             WorkoutName.From(SeedData.TrainedWorkoutName),
             null,
-            new DateTime(2026, 10, 3, 0, 0, 0, DateTimeKind.Utc),
+            SeedData.TrainedWorkoutDate,
             WorkoutStatus.PUBLISHED,
             [
                 WorkoutExercise.Rehydrate(
@@ -273,7 +273,7 @@ public class DatabaseSeeder
             Id.From(SeedData.TrainerId),
             WorkoutName.From("Prescribed started"),
             null,
-            new DateTime(2026, 10, 17, 0, 0, 0, DateTimeKind.Utc),
+            SeedData.PrescribedStartedWorkoutDate,
             WorkoutStatus.STARTED,
             [
                 WorkoutExercise.Rehydrate(

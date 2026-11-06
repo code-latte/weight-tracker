@@ -82,7 +82,7 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         body.GetProperty("id").GetGuid().Should().Be(SeedData.TrainedWorkoutId);
         body.GetProperty("name").GetString().Should().Be(SeedData.TrainedWorkoutName);
         body.GetProperty("description").ValueKind.Should().Be(JsonValueKind.Null);
-        body.GetProperty("workoutDate").GetString().Should().Be("2026-10-03");
+        body.GetProperty("workoutDate").GetString().Should().Be($"{SeedData.TrainedWorkoutDate:yyyy-MM-dd}");
         body.GetProperty("userId").GetGuid().Should().Be(SeedData.UserId);
         body.GetProperty("trainerId").GetGuid().Should().Be(SeedData.TrainerId);
         var entries = body.GetProperty("exercises").EnumerateArray().ToList();
@@ -253,5 +253,64 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         // Assert
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         body.GetProperty("status").GetString().Should().Be("DRAFT");
+    }
+
+    private static readonly string[] PublicProfileProperties = ["id", "email", "name", "surname", "role"];
+
+    [Fact]
+    public async Task Get_ShouldCarryThePublicProfilesOfTheAthleteAndTrainerOfAPrescribedWorkout()
+    {
+        // Arrange & Act
+        var response = await Get(SeedCredentials.Admin, SeedData.TrainedWorkoutId);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var athlete = body.GetProperty("athlete");
+        var trainer = body.GetProperty("trainer");
+        athlete.GetProperty("id").GetGuid().Should().Be(body.GetProperty("userId").GetGuid());
+        athlete.GetProperty("email").GetString().Should().Be(SeedData.UserEmail);
+        trainer.GetProperty("id").GetGuid().Should().Be(body.GetProperty("trainerId").GetGuid());
+        trainer.GetProperty("email").GetString().Should().Be(SeedData.TrainerEmail);
+        athlete.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(PublicProfileProperties);
+        trainer.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(PublicProfileProperties);
+    }
+
+    [Fact]
+    public async Task Get_ShouldCarryTheAthleteAndANullTrainerOfASelfPlannedWorkout()
+    {
+        // Arrange & Act
+        var response = await Get(SeedCredentials.User, SeedData.OwnedWorkoutId);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("athlete").GetProperty("id").GetGuid().Should().Be(SeedData.UserId);
+        body.TryGetProperty("trainer", out var trainer).Should().BeTrue();
+        trainer.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Update_ShouldKeepItsResponseWithoutAthleteOrTrainer()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+
+        // Act
+        var response = await trainer.PutAsJsonAsync($"/workouts/{SeedData.TrainedWorkoutId}", new
+        {
+            name = "Renamed day",
+            workoutDate = "2026-10-03",
+            userId = SeedData.UserId,
+            trainerId = SeedData.TrainerId,
+            mesocycleId = SeedData.MesocycleId,
+            mesocycleWeekNumber = 1,
+        });
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.TryGetProperty("athlete", out _).Should().BeFalse();
+        body.TryGetProperty("trainer", out _).Should().BeFalse();
     }
 }

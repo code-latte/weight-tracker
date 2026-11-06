@@ -9,8 +9,10 @@ import {
   type Result,
   type UpdateWorkoutRequest,
   type Workout,
+  type WorkoutById,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
+  type GetWorkoutsInput,
   type WorkoutListItem,
 } from "../../domain";
 import { mapHttpError } from "../http";
@@ -18,11 +20,11 @@ import { mapHttpError } from "../http";
 export default class WorkoutRepository implements WorkoutRepositoryInterface {
   constructor(private readonly httpClient: HttpClientInterface) {}
 
-  async getAll(): Promise<Result<WorkoutListItem[], DomainError>> {
+  async getAll(query: GetWorkoutsInput = {}): Promise<Result<WorkoutListItem[], DomainError>> {
     try {
       const response = await this.httpClient.request<WorkoutListItem[]>({
         method: "GET",
-        path: "/workouts",
+        path: query.standalone ? "/workouts?standalone=true" : "/workouts",
       });
 
       return ok(response);
@@ -31,9 +33,9 @@ export default class WorkoutRepository implements WorkoutRepositoryInterface {
     }
   }
 
-  async getById(id: string): Promise<Result<WorkoutDetail, DomainError>> {
+  async getById(id: string): Promise<Result<WorkoutById, DomainError>> {
     try {
-      const response = await this.httpClient.request<WorkoutDetail>({
+      const response = await this.httpClient.request<WorkoutById>({
         method: "GET",
         path: `/workouts/${id}`,
       });

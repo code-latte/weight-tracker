@@ -23,6 +23,7 @@ export type {
   AddExerciseToWorkoutInput,
   CreateWorkoutRequest,
   GetWorkoutByIdInput,
+  GetWorkoutsInput,
   RemoveExerciseFromWorkoutInput,
   ReorderWorkoutExercisesInput,
   ReorderWorkoutExercisesRequest,
@@ -31,10 +32,26 @@ export type {
   UpdateWorkoutInput,
   UpdateWorkoutRequest,
   Workout,
+  WorkoutById,
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
 } from "./workouts/workout";
+export type {
+  CreateMesocycleRequest,
+  DefineMesocycleWeekInput,
+  DefineMesocycleWeekRequest,
+  GetAthleteMesocyclesInput,
+  GetMesocycleByIdInput,
+  GetMesocycleWorkoutsInput,
+  Mesocycle,
+  MesocycleWeek,
+  RedefineMesocycleWeekInput,
+  RedefineMesocycleWeekRequest,
+  TrainingWeekType,
+  UpdateMesocycleInput,
+  UpdateMesocycleRequest,
+} from "./mesocycles/mesocycle";
 export type { CreateExerciseRequest, Exercise } from "./exercises/exercise";
 export type { ExerciseFavorite } from "./exercise-favorites/exercise-favorite";
 export type {

@@ -13,7 +13,7 @@ import {
 import type {
   Exercise,
   UpdateWorkoutInput,
-  WorkoutDetail,
+  WorkoutById,
   WorkoutExerciseDetail,
 } from "@weight-tracker/core/domain";
 import NextLink from "next/link";
@@ -22,6 +22,9 @@ import { useTranslation } from "react-i18next";
 import Alert from "@/presentation/common/components/atoms/alert";
 import Link from "@/presentation/common/components/atoms/link";
 import Typography from "@/presentation/common/components/atoms/typography";
+import { fullNameOf } from "@/presentation/common/full-name";
+import { initialsOf } from "@/presentation/common/initials";
+import type { PersonCardProps } from "@/presentation/common/components/molecules/person-card";
 import HomeSkeleton from "@/presentation/common/components/molecules/home-skeleton";
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import AppShell from "@/presentation/common/components/organisms/app-shell";
@@ -30,6 +33,9 @@ import ExerciseCatalogDialog from "@/presentation/workouts/components/organisms/
 import ExerciseConfigurationDialog from "@/presentation/workouts/components/organisms/exercise-configuration-dialog";
 import WorkoutDetailsCard from "@/presentation/workouts/components/organisms/workout-details-card";
 import WorkoutExercisesCard from "@/presentation/workouts/components/organisms/workout-exercises-card";
+import WorkoutContextStrip, {
+  type WorkoutContextMesocycle,
+} from "@/presentation/workouts/components/organisms/workout-context-strip";
 import WorkoutExercisesList, {
   type WorkoutExerciseItem,
 } from "@/presentation/workouts/components/organisms/workout-exercises-list";
@@ -42,6 +48,9 @@ import useRemoveWorkoutExercise from "@/presentation/workouts/hooks/use-remove-w
 import useReorderWorkoutExercises from "@/presentation/workouts/hooks/use-reorder-workout-exercises";
 import useUpdateWorkout from "@/presentation/workouts/hooks/use-update-workout";
 import useWorkout from "@/presentation/workouts/hooks/use-workout";
+import useWorkoutMesocycle, {
+  type WorkoutMesocycleState,
+} from "@/presentation/workouts/hooks/use-workout-mesocycle";
 import { singleMuscleBodyPartsOf } from "@/presentation/workouts/catalog";
 import { weekMiddleOf, weekStartOf } from "@/presentation/workouts/week";
 
@@ -51,15 +60,22 @@ function WorkoutNotFound() {
   return (
     <Box sx={{ py: 2 }}>
       <Typography sx={{ mb: 1 }}>{t("workout.notFound")}</Typography>
-      <Link component={NextLink} href="/assigned-plans">
+      <Link component={NextLink} href="/assigned-workouts">
         {t("workout.backToList")}
       </Link>
     </Box>
   );
 }
 
-/** The page heading and the way back to the list. */
-function WorkoutHeader() {
+/** Where "Volver" leads: the mesocycle of a placed workout, or the list of workouts outside any mesocycle. */
+function backHrefOf(workout: WorkoutById): string {
+  return workout.mesocycleId
+    ? `/mesocycle?id=${encodeURIComponent(workout.mesocycleId)}`
+    : "/assigned-workouts";
+}
+
+/** The page heading and the way back to where the workout lives. */
+function WorkoutHeader({ backHref }: { backHref: string }) {
   const { t } = useTranslation("workouts");
 
   return (
@@ -69,7 +85,7 @@ function WorkoutHeader() {
       </Typography>
       <Link
         component={NextLink}
-        href="/assigned-plans"
+        href={backHref}
         underline="hover"
         sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, mt: 0.5 }}
       >
@@ -80,17 +96,55 @@ function WorkoutHeader() {
   );
 }
 
-/** Builds the update from valid values. The API replaces every editable property, so athlete and trainer go back as read. */
-function toUpdate(workout: WorkoutDetail, values: WorkoutDetailsFormValues): UpdateWorkoutInput {
+/** The person's full name, or their email when they have no name. */
+function displayNameOf(person: WorkoutById["athlete"]): string {
+  return fullNameOf(person) ?? person.email;
+}
+
+/** The person as their card in the strip shows them. */
+function personCardOf(person: WorkoutById["athlete"], role: string): PersonCardProps {
+  return { name: displayNameOf(person), initials: initialsOf(person), role };
+}
+
+/** The mesocycle entry of the strip: left out for a standalone workout or when its mesocycle cannot be read. */
+function mesocycleEntryOf(
+  workout: WorkoutById,
+  state: WorkoutMesocycleState,
+  weekLabel: (number: number) => string,
+): WorkoutContextMesocycle | null {
+  if (state.status === "loading") {
+    return "loading";
+  }
+  if (state.status !== "loaded" || !workout.mesocycleId) {
+    return null;
+  }
+  return {
+    name: state.mesocycle.name,
+    week: weekLabel(Number(workout.mesocycleWeekNumber)),
+  };
+}
+
+/**
+ * Builds the update from valid values. The API replaces every editable property, so athlete, trainer and placement go
+ * back as read: an omitted placement would leave the workout standalone. A placed workout is dated by its week, so it
+ * sends no date.
+ */
+function toUpdate(workout: WorkoutById, values: WorkoutDetailsFormValues): UpdateWorkoutInput {
   const input: UpdateWorkoutInput = {
     id: workout.id,
     name: values.name.trim(),
-    // The form holds the week's Monday; the week is sent as its Wednesday.
-    workoutDate: weekMiddleOf(values.workoutDate),
     userId: workout.userId,
     trainerId: workout.trainerId,
   };
   const description = values.description.trim();
+
+  if (workout.mesocycleId) {
+    input.mesocycleId = workout.mesocycleId;
+    input.mesocycleWeekNumber = workout.mesocycleWeekNumber;
+  } else {
+    // The form holds the week's Monday; the week is sent as its Wednesday.
+    input.workoutDate = weekMiddleOf(values.workoutDate);
+  }
 
   if (description !== "") {
     input.description = description;
@@ -138,7 +192,7 @@ function LoadedWorkout({
   exercises,
   favorites,
 }: {
-  workout: WorkoutDetail;
+  workout: WorkoutById;
   exercises: Exercise[];
   favorites: ExerciseFavoritesState;
 }) {
@@ -148,6 +202,7 @@ function LoadedWorkout({
   const propertiesTitleId = useId();
   const exercisesTitleId = useId();
   const { saving, errorCode, saved, save, clearSaved } = useUpdateWorkout();
+  const mesocycle = useWorkoutMesocycle(workout.mesocycleId);
   const [values, setValues] = useState<WorkoutDetailsFormValues>({
     name: workout.name,
     description: workout.description ?? "",
@@ -260,7 +315,19 @@ function LoadedWorkout({
 
   return (
     <>
-      <WorkoutHeader />
+      <WorkoutHeader backHref={backHrefOf(workout)} />
+      <WorkoutContextStrip
+        athlete={personCardOf(workout.athlete, tc("person.role.athlete"))}
+        // Only an admin is shown who prepares the workout.
+        trainer={
+          profile?.role === "ADMIN" && workout.trainer
+            ? personCardOf(workout.trainer, tc("person.role.trainer"))
+            : null
+        }
+        mesocycle={mesocycleEntryOf(workout, mesocycle, (number) =>
+          t("workout.context.week", { number }),
+        )}
+      />
       {errorCode && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {tc(`errors:${errorCode}`)}
@@ -279,6 +346,7 @@ function LoadedWorkout({
             saving={saving}
             onSave={() => void handleSave()}
             disabled={saving}
+            weekLocked={Boolean(workout.mesocycleId)}
             onChange={handleChange}
             titleId={propertiesTitleId}
           />

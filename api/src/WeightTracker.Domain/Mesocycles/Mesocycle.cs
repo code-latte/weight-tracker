@@ -152,25 +152,52 @@ public sealed class Mesocycle : AggregateRoot
     }
 
     /// <summary>
-    /// Defines a week, or redefines it when its number already exists. Weeks can be defined in any order and
-    /// leave gaps.
+    /// Day a week of the mesocycle is planned on: the Wednesday of the Monday-to-Sunday week that contains the
+    /// start date for week 1, and one more week for each following week. The week does not need to be defined.
     /// </summary>
+    /// <remarks>
+    /// When the mesocycle starts after a Wednesday, week 1 falls before the start date.
+    /// </remarks>
     /// <exception cref="MesocycleWeekOutOfRangeException">When the week is beyond the duration.</exception>
-    /// <exception cref="InvalidTrainingWeekTypeException">When the type is not a defined value.</exception>
-    public void DefineWeek(WeekNumber weekNumber, TrainingWeekType trainingWeekType, MesocycleObjective objective)
+    public DateTime DateOfWeek(WeekNumber weekNumber)
     {
         if (weekNumber.Value > DurationInWeeks.Value)
             throw new MesocycleWeekOutOfRangeException(weekNumber, DurationInWeeks.Value, this.Id);
 
-        var existing = _weeks.FirstOrDefault(week => week.WeekNumber == weekNumber);
+        var daysSinceMonday = ((int)_startDate.DayOfWeek + 6) % 7;
+        var firstWednesday = _startDate.AddDays(2 - daysSinceMonday);
 
-        if (existing is not null)
-        {
-            existing.Redefine(trainingWeekType, objective);
-            return;
-        }
+        return firstWednesday.AddDays(7 * (weekNumber.Value - 1));
+    }
+
+    /// <summary>
+    /// Defines a week that is not defined yet. Weeks can be defined in any order and leave gaps.
+    /// </summary>
+    /// <exception cref="MesocycleWeekOutOfRangeException">When the week is beyond the duration.</exception>
+    /// <exception cref="DuplicateMesocycleWeekException">When the week is already defined.</exception>
+    /// <exception cref="InvalidTrainingWeekTypeException">When the type is not a defined value.</exception>
+    public void AddWeek(WeekNumber weekNumber, TrainingWeekType trainingWeekType, MesocycleObjective objective)
+    {
+        if (weekNumber.Value > DurationInWeeks.Value)
+            throw new MesocycleWeekOutOfRangeException(weekNumber, DurationInWeeks.Value, this.Id);
+
+        if (_weeks.Any(week => week.WeekNumber == weekNumber))
+            throw new DuplicateMesocycleWeekException(weekNumber, this.Id);
 
         _weeks.Add(MesocycleWeek.Create(weekNumber, trainingWeekType, objective));
+    }
+
+    /// <summary>
+    /// Replaces the type and the objective of a defined week. The week keeps its number and identity.
+    /// </summary>
+    /// <exception cref="MesocycleWeekNotFoundException">When the week is not defined.</exception>
+    /// <exception cref="InvalidTrainingWeekTypeException">When the type is not a defined value.</exception>
+    public void RedefineWeek(WeekNumber weekNumber, TrainingWeekType trainingWeekType, MesocycleObjective objective)
+    {
+        var existing = _weeks.FirstOrDefault(week => week.WeekNumber == weekNumber)
+            ?? throw new MesocycleWeekNotFoundException(weekNumber, this.Id);
+
+        existing.Redefine(trainingWeekType, objective);
     }
 
     /// <summary>

@@ -2,18 +2,20 @@ import type {
   AddExerciseRequest,
   CreateWorkoutRequest,
   DomainError,
+  GetWorkoutsInput,
   ReorderWorkoutExercisesRequest,
   Result,
   UpdateWorkoutRequest,
   Workout,
+  WorkoutById,
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
 } from "../../domain";
 
 export default interface WorkoutRepositoryInterface {
-  getAll(): Promise<Result<WorkoutListItem[], DomainError>>;
-  getById(id: string): Promise<Result<WorkoutDetail, DomainError>>;
+  getAll(query?: GetWorkoutsInput): Promise<Result<WorkoutListItem[], DomainError>>;
+  getById(id: string): Promise<Result<WorkoutById, DomainError>>;
   create(request: CreateWorkoutRequest): Promise<Result<Workout, DomainError>>;
   update(id: string, request: UpdateWorkoutRequest): Promise<Result<Workout, DomainError>>;
   addExercise(

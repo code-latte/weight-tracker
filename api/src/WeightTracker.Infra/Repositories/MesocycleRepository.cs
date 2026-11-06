@@ -30,6 +30,19 @@ public class MesocycleRepository : IMesocycleRepository
         return MesocycleMapper.MapToDomain(entity);
     }
 
+    public Task<IEnumerable<Mesocycle>> GetAll(CancellationToken cancellationToken)
+        => Query(mesocycles => mesocycles, cancellationToken);
+
+    public Task<IEnumerable<Mesocycle>> GetAllByTrainerId(Id trainerId, CancellationToken cancellationToken)
+        => Query(mesocycles => mesocycles.Where(mesocycle => mesocycle.TrainerId == trainerId.Value), cancellationToken);
+
+    public Task<IEnumerable<Mesocycle>> GetAllByAthleteId(Id athleteId, CancellationToken cancellationToken)
+        => Query(mesocycles => mesocycles.Where(mesocycle => mesocycle.AthleteId == athleteId.Value), cancellationToken);
+
+    public Task<IEnumerable<Mesocycle>> GetAllByTrainerIdAndAthleteId(Id trainerId, Id athleteId, CancellationToken cancellationToken)
+        => Query(mesocycles => mesocycles.Where(mesocycle =>
+            mesocycle.TrainerId == trainerId.Value && mesocycle.AthleteId == athleteId.Value), cancellationToken);
+
     public async Task Save(Mesocycle mesocycle, CancellationToken cancellationToken)
     {
         var entity = MesocycleMapper.MapToEntity(mesocycle);
@@ -93,5 +106,19 @@ public class MesocycleRepository : IMesocycleRepository
             existing.TrainingWeekType = incomingWeek.TrainingWeekType;
             existing.Objective = incomingWeek.Objective;
         }
+    }
+
+    private async Task<IEnumerable<Mesocycle>> Query(
+        Func<IQueryable<MesocycleEntity>, IQueryable<MesocycleEntity>> filter,
+        CancellationToken cancellationToken)
+    {
+        // Id breaks ties so mesocycles starting the same day keep a stable order
+        var entities = await filter(_context.Mesocycles.AsNoTracking())
+            .Include(mesocycle => mesocycle.Weeks)
+            .OrderByDescending(mesocycle => mesocycle.StartDate)
+            .ThenBy(mesocycle => mesocycle.Id)
+            .ToListAsync(cancellationToken);
+
+        return entities.Select(MesocycleMapper.MapToDomain).ToList();
     }
 }

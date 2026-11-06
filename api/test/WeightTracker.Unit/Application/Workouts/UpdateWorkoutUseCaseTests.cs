@@ -8,6 +8,7 @@ using WeightTracker.Application.UseCases.Workouts;
 using WeightTracker.Domain.Auth;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exceptions;
+using WeightTracker.Domain.Mesocycles;
 using WeightTracker.Domain.Users;
 using WeightTracker.Domain.Workouts;
 using Xunit;
@@ -87,11 +88,15 @@ public class UpdateWorkoutUseCaseTests
         workout.TrainerId.Should().Be(trainerId);
     }
 
+    private readonly Mock<IMesocycleRepository> _mesocycles = new(MockBehavior.Strict);
+
     private UpdateWorkoutUseCase AUseCase()
-        => new(_workouts.Object, new WorkoutEditAuthorizer(), new WorkoutAssignmentValidator(_users.Object), _unitOfWork.Object);
+        => new(
+            _workouts.Object, new WorkoutEditAuthorizer(), new WorkoutAssignmentValidator(_users.Object),
+            new MesocyclePlacementValidator(_mesocycles.Object, new MesocycleEditAuthorizer()), _unitOfWork.Object);
 
     private Task<Workout> Update(Id callerId, Role callerRole, Workout workout, Id userId, Id? trainerId)
-        => AUseCase().Execute(callerId, callerRole, workout.Id, NewName, NewDescription, NewDate, userId, trainerId, CancellationToken.None);
+        => AUseCase().Execute(callerId, callerRole, workout.Id, NewName, NewDescription, NewDate, userId, trainerId, null, null, CancellationToken.None);
 
     // ---- Not found
 
@@ -103,7 +108,7 @@ public class UpdateWorkoutUseCaseTests
         _workouts.Setup(repository => repository.GetById(workoutId, It.IsAny<CancellationToken>())).ReturnsAsync((Workout?)null);
 
         // Act
-        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, workoutId, NewName, NewDescription, NewDate, OwnerId, null, CancellationToken.None);
+        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, workoutId, NewName, NewDescription, NewDate, OwnerId, null, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<WorkoutNotFoundException>();
@@ -477,5 +482,204 @@ public class UpdateWorkoutUseCaseTests
         updated.Name.Should().Be(NewName);
         VerifySavedAndCommittedOnce(workout);
         _users.VerifyNoOtherCalls();
+    }
+
+    // ---- Mesocycle placement
+
+    private Mesocycle GivenMesocycle(Id trainerId, Id athleteId)
+    {
+        var mesocycle = Mesocycle.Rehydrate(
+            Id.New(), trainerId, athleteId, MesocycleName.From("Block"), MesocycleObjective.From("Objective"),
+            WorkoutDate, DurationInWeeks.From(4), []);
+        _mesocycles.Setup(repository => repository.GetById(mesocycle.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mesocycle);
+
+        return mesocycle;
+    }
+
+    private static Workout APlacedWorkout(Id mesocycleId, int weekNumber, WorkoutStatus status = WorkoutStatus.PUBLISHED)
+        => Workout.Rehydrate(
+            Id.New(), OwnerId, TrainerId, Name, null, WorkoutDate, status, [], mesocycleId, WeekNumber.From(weekNumber));
+
+    private Task<Workout> Place(Id callerId, Role callerRole, Workout workout, Id userId, Id? trainerId, Id? mesocycleId, int? weekNumber)
+        => AUseCase().Execute(
+            callerId, callerRole, workout.Id, NewName, NewDescription, NewDate, userId, trainerId, mesocycleId,
+            weekNumber is null ? null : WeekNumber.From(weekNumber.Value), CancellationToken.None);
+
+    [Fact]
+    public async Task Execute_ShouldMoveAPlacedWorkoutToAnotherWeek()
+    {
+        // Arrange
+        var mesocycle = GivenMesocycle(TrainerId, OwnerId);
+        var workout = APlacedWorkout(mesocycle.Id, 1);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await Place(TrainerId, Role.TRAINER, workout, OwnerId, TrainerId, mesocycle.Id, 3);
+
+        // Assert
+        updated.MesocycleId.Should().Be(mesocycle.Id);
+        updated.MesocycleWeekNumber.Should().Be(WeekNumber.From(3));
+        updated.WorkoutDate.Should().Be(new DateTime(2026, 10, 14));
+        VerifySavedAndCommittedOnce(workout);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRedateAnUnchangedPlacementByItsWeek()
+    {
+        // Arrange
+        var mesocycle = GivenMesocycle(TrainerId, OwnerId);
+        var workout = APlacedWorkout(mesocycle.Id, 1);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await Place(TrainerId, Role.TRAINER, workout, OwnerId, TrainerId, mesocycle.Id, 1);
+
+        // Assert
+        updated.WorkoutDate.Should().Be(new DateTime(2026, 9, 30));
+        updated.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
+        VerifySavedAndCommittedOnce(workout);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldKeepAPlacedWorkoutWithoutASentDate()
+    {
+        // Arrange
+        var mesocycle = GivenMesocycle(TrainerId, OwnerId);
+        var workout = APlacedWorkout(mesocycle.Id, 2);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await AUseCase().Execute(
+            TrainerId, Role.TRAINER, workout.Id, NewName, NewDescription, null, OwnerId, TrainerId, mesocycle.Id,
+            WeekNumber.From(2), CancellationToken.None);
+
+        // Assert
+        updated.WorkoutDate.Should().Be(new DateTime(2026, 10, 7));
+        VerifySavedAndCommittedOnce(workout);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectAStandaloneUpdateWithoutADateBeforeLoadingTheWorkout()
+    {
+        // Arrange
+        var workout = APlacedWorkout(Id.New(), 1);
+
+        // Act
+        var act = () => AUseCase().Execute(
+            TrainerId, Role.TRAINER, workout.Id, NewName, NewDescription, null, OwnerId, TrainerId, null, null,
+            CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<MissingWorkoutDateException>();
+        _workouts.VerifyNoOtherCalls();
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(1));
+        workout.WorkoutDate.Should().Be(WorkoutDate);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldUnlinkWhenThePlacementIsOmittedWithoutLookingUpTheMesocycle()
+    {
+        // Arrange
+        var workout = APlacedWorkout(Id.New(), 1);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await Place(TrainerId, Role.TRAINER, workout, OwnerId, TrainerId, null, null);
+
+        // Assert
+        updated.MesocycleId.Should().BeNull();
+        updated.MesocycleWeekNumber.Should().BeNull();
+        updated.WorkoutDate.Should().Be(NewDate);
+        _mesocycles.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldAcceptTheUnchangedPlacementOfAStartedWorkout()
+    {
+        // Arrange
+        var mesocycle = GivenMesocycle(TrainerId, OwnerId);
+        var workout = APlacedWorkout(mesocycle.Id, 2, WorkoutStatus.STARTED);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await Place(AdminId, Role.ADMIN, workout, OwnerId, TrainerId, mesocycle.Id, 2);
+
+        // Assert
+        updated.Name.Should().Be(NewName);
+        updated.MesocycleWeekNumber.Should().Be(WeekNumber.From(2));
+        updated.WorkoutDate.Should().Be(new DateTime(2026, 10, 7));
+        VerifySavedAndCommittedOnce(workout);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRefuseMovingAStartedWorkoutEvenForAnAdmin()
+    {
+        // Arrange
+        var mesocycle = GivenMesocycle(TrainerId, OwnerId);
+        var workout = APlacedWorkout(mesocycle.Id, 2, WorkoutStatus.STARTED);
+        GivenStored(workout);
+
+        // Act
+        var act = () => Place(AdminId, Role.ADMIN, workout, OwnerId, TrainerId, mesocycle.Id, 3);
+
+        // Assert
+        await act.Should().ThrowAsync<WorkoutPlacementLockedException>();
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(2));
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectAReassignmentThatBreaksAKeptPlacement()
+    {
+        // Arrange
+        var newOwnerId = Id.New();
+        var mesocycle = GivenMesocycle(TrainerId, OwnerId);
+        var workout = APlacedWorkout(mesocycle.Id, 1);
+        GivenStored(workout);
+        GivenUser(newOwnerId, Role.USER);
+
+        // Act
+        var act = () => Place(AdminId, Role.ADMIN, workout, newOwnerId, TrainerId, mesocycle.Id, 1);
+
+        // Assert
+        await act.Should().ThrowAsync<MesocycleAthleteMismatchException>();
+        ShouldBeUnchanged(workout, OwnerId, TrainerId);
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRefuseAnOwnerPlacingTheirSelfPlannedWorkout()
+    {
+        // Arrange
+        var mesocycle = GivenMesocycle(TrainerId, OwnerId);
+        var workout = ASelfPlannedWorkout();
+        GivenStored(workout);
+
+        // Act
+        var act = () => Place(OwnerId, Role.USER, workout, OwnerId, null, mesocycle.Id, 1);
+
+        // Assert
+        await act.Should().ThrowAsync<UnauthorizedOperationException>();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectHalfAPlacementBeforeLoadingTheWorkout()
+    {
+        // Arrange
+        var workout = APrescribedWorkout();
+
+        // Act
+        var act = () => Place(TrainerId, Role.TRAINER, workout, OwnerId, TrainerId, null, 2);
+
+        // Assert
+        await act.Should().ThrowAsync<IncompleteMesocyclePlacementException>();
+        _workouts.VerifyNoOtherCalls();
     }
 }

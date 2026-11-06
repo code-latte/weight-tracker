@@ -19,6 +19,8 @@ interface WorkoutDetailsCardProps {
   values: WorkoutDetailsFormValues;
   errors: WorkoutDetailsFormViolations;
   disabled?: boolean;
+  /** The week is shown but cannot be changed, as for a workout its mesocycle week dates. */
+  weekLocked?: boolean;
   /** Saving is in progress: the save action is disabled. */
   saving: boolean;
   onSave: () => void;
@@ -39,6 +41,7 @@ export default function WorkoutDetailsCard({
   values,
   errors,
   disabled = false,
+  weekLocked = false,
   saving,
   onSave,
   onChange,
@@ -79,7 +82,7 @@ export default function WorkoutDetailsCard({
             <WeekField
               value={values.workoutDate}
               onChange={(monday) => onChange("workoutDate", monday)}
-              disabled={disabled}
+              disabled={disabled || weekLocked}
               error={
                 errors.workoutDate ? t(`createWorkout.validation.${errors.workoutDate}`) : undefined
               }

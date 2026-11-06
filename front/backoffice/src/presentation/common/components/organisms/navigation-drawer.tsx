@@ -9,6 +9,7 @@ import EventNoteOutlined from "@mui/icons-material/EventNoteOutlined";
 import FitnessCenterOutlined from "@mui/icons-material/FitnessCenterOutlined";
 import GroupOutlined from "@mui/icons-material/GroupOutlined";
 import HomeOutlined from "@mui/icons-material/HomeOutlined";
+import ListAltOutlined from "@mui/icons-material/ListAltOutlined";
 import MenuOutlined from "@mui/icons-material/MenuOutlined";
 import PendingActionsOutlined from "@mui/icons-material/PendingActionsOutlined";
 import PersonAddAltOutlined from "@mui/icons-material/PersonAddAltOutlined";
@@ -87,6 +88,11 @@ const sections: { title: string; items: MenuItemDefinition[] }[] = [
         label: "menu.programming.assignedPlans",
         icon: AssignmentOutlined,
         href: "/assigned-plans",
+      },
+      {
+        label: "menu.programming.assignedWorkouts",
+        icon: ListAltOutlined,
+        href: "/assigned-workouts",
       },
       { label: "menu.programming.calendar", icon: CalendarMonthOutlined },
     ],

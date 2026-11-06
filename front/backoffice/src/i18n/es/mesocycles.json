@@ -1,0 +1,100 @@
+{
+  "assignedPlans": {
+    "title": "Mesociclos",
+    "newMesocycle": "Nuevo mesociclo",
+    "columns": {
+      "name": "Nombre",
+      "athlete": "Atleta",
+      "trainer": "Entrenador",
+      "startDate": "Fecha de inicio",
+      "duration": "Duración",
+      "weeks": "Semanas definidas"
+    },
+    "empty": "Todavía no hay mesociclos.",
+    "edit": "Editar {{name}}",
+    "duration_one": "{{count}} semana",
+    "duration_other": "{{count}} semanas",
+    "definedWeeks": "{{defined}} / {{total}}"
+  },
+  "mesocycle": {
+    "createTitle": "Crear mesociclo",
+    "editTitle": "Editar mesociclo",
+    "subtitle": "Define el objetivo del mesociclo y planifica sus semanas",
+    "back": "Volver",
+    "notFound": "No hemos encontrado este mesociclo.",
+    "backToList": "Volver a mesociclos",
+    "context": {
+      "label": "Personas del mesociclo"
+    },
+    "saved": "Mesociclo guardado.",
+    "details": {
+      "title": "Información general",
+      "create": "Crear mesociclo",
+      "save": "Guardar"
+    },
+    "fields": {
+      "athlete": "Atleta",
+      "trainer": "Entrenador",
+      "name": "Nombre",
+      "startDate": "Fecha de inicio",
+      "duration": "Duración (semanas)",
+      "objective": "Objetivo general"
+    },
+    "validation": {
+      "required": "Este campo es obligatorio.",
+      "maxLength": "No puede superar los {{max}} caracteres.",
+      "date": "Introduce una fecha válida.",
+      "range": "Debe estar entre {{min}} y {{max}}.",
+      "uuid": "Introduce un identificador válido.",
+      "athleteRequired": "Selecciona un atleta.",
+      "trainerRequired": "Selecciona un entrenador."
+    },
+    "noAthletes": "No hay atletas disponibles.",
+    "noTrainers": "No hay entrenadores disponibles.",
+    "retry": "Reintentar"
+  },
+  "weeks": {
+    "title": "Planificación semanal",
+    "subtitle": "Define el objetivo de cada semana",
+    "add": "Añadir semana",
+    "week": "Semana {{number}}",
+    "edit": "Editar semana {{number}}",
+    "empty": "Todavía no hay semanas definidas.",
+    "saveFirst": "Guarda el mesociclo para planificar sus semanas.",
+    "dialog": {
+      "type": "Tipo de semana",
+      "objective": "Objetivo",
+      "cancel": "Cancelar",
+      "save": "Guardar"
+    },
+    "newWorkout": "Nuevo entrenamiento",
+    "workoutCount_one": "{{count}} entrenamiento",
+    "workoutCount_other": "{{count}} entrenamientos",
+    "showWorkouts": "Mostrar entrenamientos de la semana {{number}}",
+    "hideWorkouts": "Ocultar entrenamientos de la semana {{number}}",
+    "workoutsTable": {
+      "name": "Nombre",
+      "exercises": "Ejercicios"
+    },
+    "editWorkout": "Editar {{name}}"
+  },
+  "trainingWeekType": {
+    "ADAPTATION": "Adaptación",
+    "ACCUMULATION": "Acumulación",
+    "INTENSIFICATION": "Intensificación",
+    "REALIZATION": "Realización",
+    "DELOAD": "Descarga",
+    "RECOVERY": "Recuperación"
+  },
+  "weekWorkout": {
+    "title": "Nuevo entrenamiento · Semana {{number}}",
+    "fields": {
+      "name": "Nombre",
+      "description": "Descripción"
+    },
+    "actions": {
+      "cancel": "Cancelar",
+      "create": "Crear"
+    }
+  }
+}

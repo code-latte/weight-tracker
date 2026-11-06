@@ -20,10 +20,10 @@ import DialogContent from "@/presentation/common/components/atoms/dialog-content
 import DialogTitle from "@/presentation/common/components/atoms/dialog-title";
 import TextField from "@/presentation/common/components/atoms/text-field";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
-import PersonPicker from "@/presentation/workouts/components/molecules/person-picker";
+import PersonPicker from "@/presentation/common/components/molecules/person-picker";
 import WeekField from "@/presentation/workouts/components/molecules/week-field";
 import useCreateWorkout from "@/presentation/workouts/hooks/use-create-workout";
-import useWorkoutAssignees from "@/presentation/workouts/hooks/use-workout-assignees";
+import useAssignees from "@/presentation/common/hooks/use-assignees";
 import { currentWeekStart, weekMiddleOf } from "@/presentation/workouts/week";
 
 interface CreateWorkoutDialogProps {
@@ -80,7 +80,7 @@ function CreateWorkoutForm({ onClose }: { onClose: () => void }) {
   const [errors, setErrors] = useState<CreateWorkoutFormViolations>({});
   // Mirrors whom the API requires a trainer from; the API keeps the rule.
   const withTrainer = profile?.role === "ADMIN";
-  const assignees = useWorkoutAssignees(
+  const assignees = useAssignees(
     profile?.role === "ADMIN" || profile?.role === "TRAINER" ? profile.role : null,
   );
   const optionsLoaded = assignees.status === "loaded";

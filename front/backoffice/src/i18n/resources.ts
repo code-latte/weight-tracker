@@ -3,6 +3,7 @@ import enAuth from "./en/auth.json";
 import enCommon from "./en/common.json";
 import enErrors from "./en/errors.json";
 import enInvitations from "./en/invitations.json";
+import enMesocycles from "./en/mesocycles.json";
 import enOnboarding from "./en/onboarding.json";
 import enProfile from "./en/profile.json";
 import enTrainerAssignments from "./en/trainer-assignments.json";
@@ -13,6 +14,7 @@ import esAuth from "./es/auth.json";
 import esCommon from "./es/common.json";
 import esErrors from "./es/errors.json";
 import esInvitations from "./es/invitations.json";
+import esMesocycles from "./es/mesocycles.json";
 import esOnboarding from "./es/onboarding.json";
 import esProfile from "./es/profile.json";
 import esTrainerAssignments from "./es/trainer-assignments.json";
@@ -26,6 +28,7 @@ const resources = {
     common: esCommon,
     errors: esErrors,
     invitations: esInvitations,
+    mesocycles: esMesocycles,
     onboarding: esOnboarding,
     profile: esProfile,
     trainerAssignments: esTrainerAssignments,
@@ -38,6 +41,7 @@ const resources = {
     common: enCommon,
     errors: enErrors,
     invitations: enInvitations,
+    mesocycles: enMesocycles,
     onboarding: enOnboarding,
     profile: enProfile,
     trainerAssignments: enTrainerAssignments,

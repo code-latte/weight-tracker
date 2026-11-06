@@ -67,6 +67,11 @@ public static class SeedData
     /// <summary>The trained workout has no description.</summary>
     public const string TrainedWorkoutName = "Leg day";
 
+    /// <summary>
+    /// Wednesday of week 1 of <see cref="MesocycleId"/>, which starts on Thursday 2026-10-01.
+    /// </summary>
+    public static readonly DateTime TrainedWorkoutDate = new(2026, 9, 30, 0, 0, 0, DateTimeKind.Utc);
+
     /// <summary>Owned by the trainer themselves, no trainer assigned.</summary>
     public static readonly Guid TrainerOwnWorkoutId = new("00000000-0000-0000-0000-000000000023");
 
@@ -126,6 +131,9 @@ public static class SeedData
 
     /// <summary>Owned by the user, prescribed by the trainer, already started. Locked for editing.</summary>
     public static readonly Guid PrescribedStartedWorkoutId = new("00000000-0000-0000-0000-000000000029");
+
+    /// <summary>Wednesday of week 2 of <see cref="MesocycleId"/>.</summary>
+    public static readonly DateTime PrescribedStartedWorkoutDate = new(2026, 10, 7, 0, 0, 0, DateTimeKind.Utc);
 
     /// <summary>Press Banca in the prescribed draft workout, 3 x 10 reps.</summary>
     public static readonly Guid PrescribedDraftPressBancaEntryId = new("00000000-0000-0000-0000-000000000044");

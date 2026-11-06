@@ -828,8 +828,8 @@ public class AggregateMapperTests
         {
             // Arrange
             var original = AMesocycle();
-            original.DefineWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, MesocycleObjective.From("Heavy triples"));
-            original.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+            original.AddWeek(WeekNumber.From(3), TrainingWeekType.INTENSIFICATION, MesocycleObjective.From("Heavy triples"));
+            original.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
 
             // Act
             var restored = RoundTrip(original);
@@ -846,7 +846,7 @@ public class AggregateMapperTests
             var types = Enum.GetValues<TrainingWeekType>();
             var original = AMesocycle(types.Length);
             for (var index = 0; index < types.Length; index++)
-                original.DefineWeek(WeekNumber.From(index + 1), types[index], WeekObjective);
+                original.AddWeek(WeekNumber.From(index + 1), types[index], WeekObjective);
 
             // Act
             var restored = RoundTrip(original);
@@ -860,7 +860,7 @@ public class AggregateMapperTests
         {
             // Arrange
             var original = AMesocycle();
-            original.DefineWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
+            original.AddWeek(WeekNumber.From(1), TrainingWeekType.ADAPTATION, WeekObjective);
             var entity = MesocycleMapper.MapToEntity(original);
             entity.Weeks[0].TrainingWeekType = 99;
 
@@ -876,7 +876,7 @@ public class AggregateMapperTests
         {
             // Arrange
             var original = AMesocycle();
-            original.DefineWeek(WeekNumber.From(4), TrainingWeekType.DELOAD, WeekObjective);
+            original.AddWeek(WeekNumber.From(4), TrainingWeekType.DELOAD, WeekObjective);
             var entity = MesocycleMapper.MapToEntity(original);
             entity.DurationInWeeks = 3;
 

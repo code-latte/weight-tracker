@@ -22,7 +22,7 @@ public class GetAllWorkoutsUseCaseTests
 
     private readonly Mock<IUserRepository> _users = new(MockBehavior.Strict);
 
-    private GetAllWorkoutsUseCase AUseCase() => new(new WorkoutVisibility(_workouts.Object), _exercises.Object, _users.Object);
+    private GetAllWorkoutsUseCase AUseCase() => new(new WorkoutVisibility(_workouts.Object), new WorkoutListLoader(_exercises.Object, _users.Object));
 
     private static Workout AWorkout(Id ownerId, params Id[] exerciseIds) =>
         Workout.Rehydrate(
@@ -59,7 +59,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.ADMIN, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.ADMIN, false, CancellationToken.None);
 
         // Assert
         result.Workouts.Should().BeEquivalentTo(all);
@@ -78,7 +78,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.TRAINER, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.TRAINER, false, CancellationToken.None);
 
         // Assert
         result.Workouts.Should().BeEquivalentTo(visible);
@@ -97,7 +97,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         result.Workouts.Should().BeEquivalentTo(owned);
@@ -106,10 +106,54 @@ public class GetAllWorkoutsUseCaseTests
     }
 
     [Fact]
+    public async Task StandaloneOnly_ShouldLeaveOutWorkoutsPlacedInAMesocycle()
+    {
+        // Arrange
+        var callerId = Id.New();
+        var standalone = AWorkout(callerId);
+        var placed = Workout.Rehydrate(
+            Id.New(), callerId, null, Name, null, new DateTime(2026, 10, 1), WorkoutStatus.DRAFT, [],
+            Id.New(), WeekNumber.From(1));
+        _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { standalone, placed });
+        NoExercisesStored();
+        EveryUserStored();
+
+        // Act
+        var result = await AUseCase().Execute(callerId, Role.USER, true, CancellationToken.None);
+
+        // Assert
+        result.Workouts.Should().BeEquivalentTo(new[] { standalone });
+        _users.Verify(repository => repository.GetAllByIds(
+            It.Is<IEnumerable<Id>>(ids => ids.SequenceEqual(new[] { callerId })),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task WithoutStandaloneOnly_ShouldKeepWorkoutsPlacedInAMesocycle()
+    {
+        // Arrange
+        var callerId = Id.New();
+        var placed = Workout.Rehydrate(
+            Id.New(), callerId, null, Name, null, new DateTime(2026, 10, 1), WorkoutStatus.DRAFT, [],
+            Id.New(), WeekNumber.From(1));
+        _workouts.Setup(repository => repository.GetAllByUserId(callerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { placed });
+        NoExercisesStored();
+        EveryUserStored();
+
+        // Act
+        var result = await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
+
+        // Assert
+        result.Workouts.Should().BeEquivalentTo(new[] { placed });
+    }
+
+    [Fact]
     public async Task UnknownRole_ShouldBeRejected()
     {
         // Arrange & Act
-        var act = async () => await AUseCase().Execute(Id.New(), (Role)99, CancellationToken.None);
+        var act = async () => await AUseCase().Execute(Id.New(), (Role)99, false, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
@@ -131,7 +175,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         _exercises.Verify(repository => repository.GetAllByIds(
@@ -155,7 +199,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         result.Exercises.Should().ContainSingle();
@@ -183,7 +227,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         result.Workouts.Should().BeEquivalentTo([published, selfPlannedDraft]);
@@ -202,7 +246,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.TRAINER, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.TRAINER, false, CancellationToken.None);
 
         // Assert
         result.Workouts.Should().BeEquivalentTo([draft]);
@@ -221,7 +265,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.TRAINER, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.TRAINER, false, CancellationToken.None);
 
         // Assert
         result.Workouts.Should().BeEquivalentTo([prescribedByThem]);
@@ -238,7 +282,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(Id.New(), Role.ADMIN, CancellationToken.None);
+        var result = await AUseCase().Execute(Id.New(), Role.ADMIN, false, CancellationToken.None);
 
         // Assert
         result.Workouts.Should().BeEquivalentTo([draft]);
@@ -256,7 +300,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         _exercises.Verify(repository => repository.GetAllByIds(
@@ -282,7 +326,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        await AUseCase().Execute(Id.New(), Role.ADMIN, CancellationToken.None);
+        await AUseCase().Execute(Id.New(), Role.ADMIN, false, CancellationToken.None);
 
         // Assert
         _users.Verify(repository => repository.GetAllByIds(
@@ -301,7 +345,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         _users.Verify(repository => repository.GetAllByIds(
@@ -319,7 +363,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         result.Users.Should().BeEmpty();
@@ -340,7 +384,7 @@ public class GetAllWorkoutsUseCaseTests
         EveryUserStored();
 
         // Act
-        var result = await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        var result = await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         result.Users.Keys.Should().BeEquivalentTo([callerId, trainerId]);
@@ -361,7 +405,7 @@ public class GetAllWorkoutsUseCaseTests
             .ReturnsAsync([AUser(callerId)]);
 
         // Act
-        var act = async () => await AUseCase().Execute(callerId, Role.USER, CancellationToken.None);
+        var act = async () => await AUseCase().Execute(callerId, Role.USER, false, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>();

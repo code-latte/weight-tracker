@@ -42,7 +42,7 @@ second section SHALL read "Usuarios: Todos los usuarios, Asignación de entrenad
 
 - Inicio
 - Atletas: Todos los atletas, Invitaciones
-- Programación: Planes asignados, Calendario
+- Programación: Mesociclos, Entrenamientos, Calendario
 - Biblioteca: Plantillas de entrenamiento, Catálogo de ejercicios
 - Seguimiento: Feedback de entrenamientos, Revisiones semanales, Pendientes de revisión
 
@@ -83,9 +83,9 @@ The Inicio entry SHALL link to `/`. The entry of the current screen SHALL be sho
 
 ### Requirement: Items without a screen do nothing
 
-Every item other than Inicio, Planes asignados, Catálogo de ejercicios, an admin's Todos los usuarios, an admin's
-Asignación de entrenadores, a trainer's Todos los atletas, Invitaciones and Cerrar sesión SHALL be shown but SHALL NOT
-navigate or trigger any operation until its screen exists.
+Every item other than Inicio, Mesociclos, Entrenamientos, Catálogo de ejercicios, an admin's Todos los
+usuarios, an admin's Asignación de entrenadores, a trainer's Todos los atletas, Invitaciones and Cerrar sesión SHALL be
+shown but SHALL NOT navigate or trigger any operation until its screen exists.
 
 #### Scenario: Placeholder item clicked
 
@@ -112,22 +112,6 @@ Every drawer item, Inicio included, SHALL show an icon before its text. Section 
 
 - **WHEN** the drawer is shown
 - **THEN** each of its items shows an icon before its text
-
-### Requirement: Planes asignados goes to the assigned plans screen
-
-The Planes asignados entry SHALL link to `/assigned-plans` and SHALL be shown as selected while the visitor is on that
-screen. It SHALL NOT be selected on any other screen.
-
-#### Scenario: Planes asignados clicked
-
-- **WHEN** the visitor clicks "Planes asignados" from home
-- **THEN** the visitor ends on `/assigned-plans`
-
-#### Scenario: Planes asignados on its screen
-
-- **WHEN** the visitor is on `/assigned-plans`
-- **THEN** Planes asignados is shown as selected
-- **AND** Inicio is not shown as selected
 
 ### Requirement: Todos los usuarios goes to the users screen for admins
 
@@ -214,3 +198,40 @@ that screen. It SHALL NOT be selected on any other screen, and no other entry SH
 - **WHEN** the visitor is on `/exercises`
 - **THEN** Catálogo de ejercicios is shown as selected
 - **AND** Inicio is not shown as selected
+
+### Requirement: Entrenamientos goes to the workouts screen
+
+The Entrenamientos entry SHALL link to `/assigned-workouts` and SHALL be shown as selected while the visitor
+is on that screen. It SHALL NOT be selected on any other screen, and Mesociclos SHALL NOT be selected on it.
+
+#### Scenario: Entrenamientos clicked
+
+- **WHEN** the visitor clicks "Entrenamientos" from home
+- **THEN** the visitor ends on `/assigned-workouts`
+
+#### Scenario: Entrenamientos on its screen
+
+- **WHEN** the visitor is on `/assigned-workouts`
+- **THEN** Entrenamientos is shown as selected
+- **AND** neither Inicio nor Mesociclos is shown as selected
+
+#### Scenario: Entry in English
+
+- **WHEN** the drawer is shown in English
+- **THEN** the entry reads "Workouts"
+
+### Requirement: Mesociclos goes to the mesocycles screen
+
+The Mesociclos entry SHALL link to `/assigned-plans` and SHALL be shown as selected while the visitor is on that
+screen. It SHALL NOT be selected on any other screen, including `/assigned-workouts`.
+
+#### Scenario: Mesociclos clicked
+
+- **WHEN** the visitor clicks "Mesociclos" from home
+- **THEN** the visitor ends on `/assigned-plans`
+
+#### Scenario: Mesociclos on its screen
+
+- **WHEN** the visitor is on `/assigned-plans`
+- **THEN** Mesociclos is shown as selected
+- **AND** neither Inicio nor Entrenamientos is shown as selected

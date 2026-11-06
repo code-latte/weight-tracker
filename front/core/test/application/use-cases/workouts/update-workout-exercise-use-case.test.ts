@@ -8,6 +8,7 @@ import {
   type AddExerciseRequest,
   type Result,
   type Workout,
+  type WorkoutById,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
@@ -48,7 +49,7 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
-  async getById(): Promise<Result<WorkoutDetail, DomainError>> {
+  async getById(): Promise<Result<WorkoutById, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }

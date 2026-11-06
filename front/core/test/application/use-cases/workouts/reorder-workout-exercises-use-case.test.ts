@@ -8,6 +8,7 @@ import {
   type ReorderWorkoutExercisesRequest,
   type Result,
   type Workout,
+  type WorkoutById,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
@@ -27,6 +28,8 @@ const workoutDetail: WorkoutDetail = {
   userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
   trainerId: null,
   status: "DRAFT",
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
   exercises: exerciseIds.map((exerciseId, index) => ({
     id: `0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4${index}`,
     exerciseId,
@@ -49,7 +52,7 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
-  async getById(): Promise<Result<WorkoutDetail, DomainError>> {
+  async getById(): Promise<Result<WorkoutById, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }

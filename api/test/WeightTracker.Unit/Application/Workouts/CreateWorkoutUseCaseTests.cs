@@ -8,6 +8,7 @@ using WeightTracker.Application.UseCases.Workouts;
 using WeightTracker.Domain.Auth;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exceptions;
+using WeightTracker.Domain.Mesocycles;
 using WeightTracker.Domain.Users;
 using WeightTracker.Domain.Workouts;
 using Xunit;
@@ -30,7 +31,11 @@ public class CreateWorkoutUseCaseTests
     private readonly Mock<IUserRepository> _users = new(MockBehavior.Strict);
     private readonly Mock<IUnitOfWork> _unitOfWork = new(MockBehavior.Strict);
 
-    private CreateWorkoutUseCase AUseCase() => new(_workouts.Object, new WorkoutAssignmentValidator(_users.Object), _unitOfWork.Object);
+    private readonly Mock<IMesocycleRepository> _mesocycles = new(MockBehavior.Strict);
+
+    private CreateWorkoutUseCase AUseCase() => new(
+        _workouts.Object, new WorkoutAssignmentValidator(_users.Object),
+        new MesocyclePlacementValidator(_mesocycles.Object, new MesocycleEditAuthorizer()), _unitOfWork.Object);
 
     private static User AUser(Id id, Role role, bool isActive = true) => User.Rehydrate(
         id, Email.From($"{id.Value}@weighttracker.test"), PersonName.From("Grace"), PersonName.From("Hopper"),
@@ -79,7 +84,7 @@ public class CreateWorkoutUseCaseTests
         GivenSaveWorks();
 
         // Act
-        var workout = await AUseCase().Execute(UserId, Role.USER, null, null, Name, null, WorkoutDate, CancellationToken.None);
+        var workout = await AUseCase().Execute(UserId, Role.USER, null, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         workout.UserId.Should().Be(UserId);
@@ -98,7 +103,7 @@ public class CreateWorkoutUseCaseTests
         var description = WorkoutDescription.From("Focus on tempo");
 
         // Act
-        var workout = await AUseCase().Execute(UserId, Role.USER, null, null, Name, description, WorkoutDate, CancellationToken.None);
+        var workout = await AUseCase().Execute(UserId, Role.USER, null, null, Name, description, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         workout.Name.Should().Be(Name);
@@ -113,7 +118,7 @@ public class CreateWorkoutUseCaseTests
         GivenSaveWorks();
 
         // Act
-        var workout = await AUseCase().Execute(UserId, Role.USER, UserId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var workout = await AUseCase().Execute(UserId, Role.USER, UserId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         workout.UserId.Should().Be(UserId);
@@ -125,7 +130,7 @@ public class CreateWorkoutUseCaseTests
     public async Task Execute_ShouldRejectAUserNamingAnotherOwner()
     {
         // Arrange & Act
-        var act = () => AUseCase().Execute(UserId, Role.USER, Id.New(), null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(UserId, Role.USER, Id.New(), null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -137,7 +142,7 @@ public class CreateWorkoutUseCaseTests
     public async Task Execute_ShouldRejectAUserNamingATrainer()
     {
         // Arrange & Act
-        var act = () => AUseCase().Execute(UserId, Role.USER, null, TrainerId, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(UserId, Role.USER, null, TrainerId, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -155,7 +160,7 @@ public class CreateWorkoutUseCaseTests
         GivenSaveWorks();
 
         // Act
-        var workout = await AUseCase().Execute(TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var workout = await AUseCase().Execute(TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         workout.UserId.Should().Be(UserId);
@@ -167,7 +172,7 @@ public class CreateWorkoutUseCaseTests
     public async Task Execute_ShouldRejectATrainerWhoSendsNoOwner()
     {
         // Arrange & Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, null, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, null, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -179,7 +184,7 @@ public class CreateWorkoutUseCaseTests
     public async Task Execute_ShouldRejectATrainerNamingThemselvesAsOwner()
     {
         // Arrange & Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, TrainerId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, TrainerId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -191,7 +196,7 @@ public class CreateWorkoutUseCaseTests
     public async Task Execute_ShouldRejectATrainerNamingATrainer()
     {
         // Arrange & Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, UserId, Id.New(), Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, UserId, Id.New(), Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -206,7 +211,7 @@ public class CreateWorkoutUseCaseTests
         GivenNoUser(UserId);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UserNotFoundException>();
@@ -223,7 +228,7 @@ public class CreateWorkoutUseCaseTests
         GivenStored(ownerId, ownerRole);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, ownerId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, ownerId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
@@ -240,7 +245,7 @@ public class CreateWorkoutUseCaseTests
         GivenSaveWorks();
 
         // Act
-        var workout = await AUseCase().Execute(AdminId, Role.ADMIN, UserId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var workout = await AUseCase().Execute(AdminId, Role.ADMIN, UserId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         workout.UserId.Should().Be(UserId);
@@ -257,7 +262,7 @@ public class CreateWorkoutUseCaseTests
         GivenSaveWorks();
 
         // Act
-        var workout = await AUseCase().Execute(AdminId, Role.ADMIN, UserId, TrainerId, Name, null, WorkoutDate, CancellationToken.None);
+        var workout = await AUseCase().Execute(AdminId, Role.ADMIN, UserId, TrainerId, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         workout.UserId.Should().Be(UserId);
@@ -269,7 +274,7 @@ public class CreateWorkoutUseCaseTests
     public async Task Execute_ShouldRejectAnAdminWhoSendsNoOwner()
     {
         // Arrange & Act
-        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, null, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, null, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -281,7 +286,7 @@ public class CreateWorkoutUseCaseTests
     public async Task Execute_ShouldRejectAnAdminNamingThemselvesAsOwner()
     {
         // Arrange & Act
-        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, AdminId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, AdminId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -296,7 +301,7 @@ public class CreateWorkoutUseCaseTests
         GivenNoUser(UserId);
 
         // Act
-        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, UserId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, UserId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UserNotFoundException>();
@@ -311,7 +316,7 @@ public class CreateWorkoutUseCaseTests
         GivenTrainerCheck(TrainerId, false);
 
         // Act
-        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, UserId, TrainerId, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, UserId, TrainerId, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -326,7 +331,7 @@ public class CreateWorkoutUseCaseTests
         GivenTrainerCheck(TrainerId, true);
 
         // Act
-        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, TrainerId, TrainerId, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, TrainerId, TrainerId, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<TrainerCannotBeWorkoutOwnerException>();
@@ -340,7 +345,7 @@ public class CreateWorkoutUseCaseTests
         GivenDeactivated(UserId, Role.USER);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -354,7 +359,7 @@ public class CreateWorkoutUseCaseTests
         GivenDeactivated(UserId, Role.USER);
 
         // Act
-        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, UserId, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, UserId, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -369,7 +374,7 @@ public class CreateWorkoutUseCaseTests
         GivenDeactivated(TrainerId, Role.TRAINER);
 
         // Act
-        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, UserId, TrainerId, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(AdminId, Role.ADMIN, UserId, TrainerId, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutAssignmentException>();
@@ -384,10 +389,189 @@ public class CreateWorkoutUseCaseTests
         GivenDeactivated(otherTrainer, Role.TRAINER);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, otherTrainer, null, Name, null, WorkoutDate, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, otherTrainer, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    // ---- Mesocycle placement
+
+    private Mesocycle GivenMesocycle(Id trainerId, Id athleteId)
+    {
+        var mesocycle = Mesocycle.Rehydrate(
+            Id.New(), trainerId, athleteId, MesocycleName.From("Block"), MesocycleObjective.From("Objective"),
+            WorkoutDate, DurationInWeeks.From(4), []);
+        _mesocycles.Setup(repository => repository.GetById(mesocycle.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mesocycle);
+
+        return mesocycle;
+    }
+
+    [Fact]
+    public async Task Execute_ShouldCreateATrainersWorkoutPlacedInTheirMesocycle()
+    {
+        // Arrange
+        GivenStored(UserId, Role.USER);
+        GivenSaveWorks();
+        var mesocycle = GivenMesocycle(TrainerId, UserId);
+
+        // Act
+        var workout = await AUseCase().Execute(
+            TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, mesocycle.Id, WeekNumber.From(3), CancellationToken.None);
+
+        // Assert
+        workout.MesocycleId.Should().Be(mesocycle.Id);
+        workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(3));
+        VerifySavedAndCommittedOnce(workout);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldDateAPlacedWorkoutByItsWeekIgnoringTheSentDate()
+    {
+        // Arrange
+        GivenStored(UserId, Role.USER);
+        GivenSaveWorks();
+        var mesocycle = GivenMesocycle(TrainerId, UserId);
+        var sentDate = new DateTime(2026, 12, 25);
+
+        // Act
+        var workout = await AUseCase().Execute(
+            TrainerId, Role.TRAINER, UserId, null, Name, null, sentDate, mesocycle.Id, WeekNumber.From(3), CancellationToken.None);
+
+        // Assert
+        workout.WorkoutDate.Should().Be(new DateTime(2026, 10, 14));
+    }
+
+    [Fact]
+    public async Task Execute_ShouldCreateAPlacedWorkoutWithoutADate()
+    {
+        // Arrange
+        GivenStored(UserId, Role.USER);
+        GivenSaveWorks();
+        var mesocycle = GivenMesocycle(TrainerId, UserId);
+
+        // Act
+        var workout = await AUseCase().Execute(
+            TrainerId, Role.TRAINER, UserId, null, Name, null, null, mesocycle.Id, WeekNumber.From(1), CancellationToken.None);
+
+        // Assert
+        workout.WorkoutDate.Should().Be(new DateTime(2026, 9, 30));
+        VerifySavedAndCommittedOnce(workout);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectAStandaloneWorkoutWithoutADateBeforeAnyLookup()
+    {
+        // Arrange
+        var callerId = TrainerId;
+
+        // Act
+        var act = () => AUseCase().Execute(
+            callerId, Role.TRAINER, UserId, null, Name, null, null, null, null, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<MissingWorkoutDateException>();
+        VerifyNoUserLookups();
+        _mesocycles.VerifyNoOtherCalls();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldCreateAStandaloneWorkoutWithoutPlacement()
+    {
+        // Arrange
+        GivenSaveWorks();
+
+        // Act
+        var workout = await AUseCase().Execute(UserId, Role.USER, null, null, Name, null, WorkoutDate, null, null, CancellationToken.None);
+
+        // Assert
+        workout.MesocycleId.Should().BeNull();
+        workout.MesocycleWeekNumber.Should().BeNull();
+        workout.WorkoutDate.Should().Be(WorkoutDate);
+        _mesocycles.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectHalfAPlacementBeforeAnyLookup()
+    {
+        // Arrange
+        var mesocycleId = Id.New();
+
+        // Act
+        var act = () => AUseCase().Execute(
+            TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, mesocycleId, null, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<IncompleteMesocyclePlacementException>();
+        VerifyNoUserLookups();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRefuseAUserPlacingTheirOwnWorkout()
+    {
+        // Arrange
+        var mesocycle = GivenMesocycle(TrainerId, UserId);
+
+        // Act
+        var act = () => AUseCase().Execute(
+            UserId, Role.USER, null, null, Name, null, WorkoutDate, mesocycle.Id, WeekNumber.From(1), CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<UnauthorizedOperationException>();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectAPlacementInAMesocycleOfAnotherAthlete()
+    {
+        // Arrange
+        GivenStored(UserId, Role.USER);
+        var mesocycle = GivenMesocycle(TrainerId, Id.New());
+
+        // Act
+        var act = () => AUseCase().Execute(
+            TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, mesocycle.Id, WeekNumber.From(1), CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<MesocycleAthleteMismatchException>();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectAnAdminPlacementWhoseTrainerDoesNotPrepareTheMesocycle()
+    {
+        // Arrange
+        var otherTrainerId = Id.New();
+        GivenStored(UserId, Role.USER);
+        GivenTrainerCheck(otherTrainerId, canTrain: true);
+        var mesocycle = GivenMesocycle(TrainerId, UserId);
+
+        // Act
+        var act = () => AUseCase().Execute(
+            AdminId, Role.ADMIN, UserId, otherTrainerId, Name, null, WorkoutDate, mesocycle.Id, WeekNumber.From(1), CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<MesocycleTrainerMismatchException>();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectAPlacementBeyondTheMesocyclesDuration()
+    {
+        // Arrange
+        GivenStored(UserId, Role.USER);
+        var mesocycle = GivenMesocycle(TrainerId, UserId);
+
+        // Act
+        var act = () => AUseCase().Execute(
+            TrainerId, Role.TRAINER, UserId, null, Name, null, WorkoutDate, mesocycle.Id, WeekNumber.From(5), CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<MesocycleWeekOutOfRangeException>();
         VerifyNothingSavedOrCommitted();
     }
 }

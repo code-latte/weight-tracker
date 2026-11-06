@@ -32,7 +32,7 @@ public class WorkoutResponseShapeTests : IntegrationTest
         var workout = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.TrainedWorkoutId);
 
         // Assert
-        workout.GetProperty("workoutDate").GetString().Should().Be("2026-10-03");
+        workout.GetProperty("workoutDate").GetString().Should().Be($"{SeedData.TrainedWorkoutDate:yyyy-MM-dd}");
         workout.GetProperty("userId").GetGuid().Should().Be(SeedData.UserId);
         workout.GetProperty("trainerId").GetGuid().Should().Be(SeedData.TrainerId);
     }
@@ -350,5 +350,83 @@ public class WorkoutResponseShapeTests : IntegrationTest
         var created = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         created.TryGetProperty("athlete", out _).Should().BeFalse();
         created.TryGetProperty("trainer", out _).Should().BeFalse();
+    }
+
+    private async Task<JsonElement> WorkoutReadByAdmin(Guid workoutId)
+    {
+        var client = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        var response = await client.GetAsync($"/workouts/{workoutId}");
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+    }
+
+    [Fact]
+    public async Task PlacedWorkout_ShouldCarryItsMesocycleAndWeekWhenReadById()
+    {
+        // Arrange & Act
+        var workout = await WorkoutReadByAdmin(SeedData.TrainedWorkoutId);
+
+        // Assert
+        workout.GetProperty("mesocycleId").GetGuid().Should().Be(SeedData.MesocycleId);
+        workout.GetProperty("mesocycleWeekNumber").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task StandaloneWorkout_ShouldKeepAnExplicitNullPlacementWhenReadById()
+    {
+        // Arrange & Act
+        var workout = await WorkoutReadByAdmin(SeedData.OwnedWorkoutId);
+
+        // Assert
+        workout.TryGetProperty("mesocycleId", out var mesocycleId).Should().BeTrue();
+        mesocycleId.ValueKind.Should().Be(JsonValueKind.Null);
+        workout.TryGetProperty("mesocycleWeekNumber", out var weekNumber).Should().BeTrue();
+        weekNumber.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task ListedPlacedWorkout_ShouldCarryItsMesocycleAndWeek()
+    {
+        // Arrange & Act
+        var workout = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.TrainedWorkoutId);
+
+        // Assert
+        workout.GetProperty("mesocycleId").GetGuid().Should().Be(SeedData.MesocycleId);
+        workout.GetProperty("mesocycleWeekNumber").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ListedStandaloneWorkout_ShouldKeepAnExplicitNullPlacement()
+    {
+        // Arrange & Act
+        var workout = WorkoutWithId(await WorkoutsSeenByAdmin(), SeedData.OwnedWorkoutId);
+
+        // Assert
+        workout.TryGetProperty("mesocycleId", out var mesocycleId).Should().BeTrue();
+        mesocycleId.ValueKind.Should().Be(JsonValueKind.Null);
+        workout.TryGetProperty("mesocycleWeekNumber", out var weekNumber).Should().BeTrue();
+        weekNumber.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task StandaloneList_ShouldKeepAnExplicitNullPlacementOnEveryItem()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await client.GetAsync("/workouts?standalone=true");
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        var workouts = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        workouts.GetArrayLength().Should().BePositive();
+        foreach (var workout in workouts.EnumerateArray())
+        {
+            workout.GetProperty("mesocycleId").ValueKind.Should().Be(JsonValueKind.Null);
+            workout.GetProperty("mesocycleWeekNumber").ValueKind.Should().Be(JsonValueKind.Null);
+        }
     }
 }

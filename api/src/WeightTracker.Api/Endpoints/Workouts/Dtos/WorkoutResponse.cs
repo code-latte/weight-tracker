@@ -6,6 +6,8 @@ using WeightTracker.Domain.Workouts;
 
 namespace WeightTracker.Api.Endpoints.Workouts.Dtos;
 
+/// <param name="MesocycleId">Mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
+/// <param name="MesocycleWeekNumber">Week of the mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
 public sealed record WorkoutResponse(
     Guid Id,
     string Name,
@@ -14,7 +16,9 @@ public sealed record WorkoutResponse(
     Guid UserId,
     Guid? TrainerId,
     string Status,
-    IReadOnlyList<WorkoutExerciseResponse> Exercises)
+    IReadOnlyList<WorkoutExerciseResponse> Exercises,
+    Guid? MesocycleId,
+    int? MesocycleWeekNumber)
 {
     /// <param name="workout">Workout to project.</param>
     /// <param name="exercises">Exercises referenced by the workout, keyed by identifier.</param>
@@ -29,13 +33,17 @@ public sealed record WorkoutResponse(
             workout.Status.ToString(),
             workout.Exercises
                 .Select(entry => WorkoutExerciseResponse.From(entry, exercises[entry.ExerciseId]))
-                .ToList());
+                .ToList(),
+            workout.MesocycleId?.Value,
+            workout.MesocycleWeekNumber?.Value);
 }
 
 /// <summary>
 /// A single workout as read by id. Entries reference the catalog exercise by <c>ExerciseId</c> only:
 /// the client already holds the catalog, so no exercise data is embedded.
 /// </summary>
+/// <param name="MesocycleId">Mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
+/// <param name="MesocycleWeekNumber">Week of the mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
 public sealed record WorkoutDetailResponse(
     Guid Id,
     string Name,
@@ -44,7 +52,9 @@ public sealed record WorkoutDetailResponse(
     Guid UserId,
     Guid? TrainerId,
     string Status,
-    IReadOnlyList<WorkoutExerciseDetailResponse> Exercises)
+    IReadOnlyList<WorkoutExerciseDetailResponse> Exercises,
+    Guid? MesocycleId,
+    int? MesocycleWeekNumber)
 {
     public static WorkoutDetailResponse From(Workout workout)
         => new(
@@ -55,7 +65,9 @@ public sealed record WorkoutDetailResponse(
             workout.UserId.Value,
             workout.TrainerId?.Value,
             workout.Status.ToString(),
-            workout.Exercises.Select(WorkoutExerciseDetailResponse.From).ToList());
+            workout.Exercises.Select(WorkoutExerciseDetailResponse.From).ToList(),
+            workout.MesocycleId?.Value,
+            workout.MesocycleWeekNumber?.Value);
 }
 
 /// <param name="Id">Identifier of this entry of the workout.</param>

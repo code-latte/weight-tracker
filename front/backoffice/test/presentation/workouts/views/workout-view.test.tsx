@@ -6,6 +6,7 @@ import type {
   AddExerciseToWorkoutInput,
   Exercise,
   ExerciseFavorite,
+  Mesocycle,
   RemoveExerciseFromWorkoutInput,
   ReorderWorkoutExercisesInput,
   Result,
@@ -14,6 +15,7 @@ import type {
   UpdateWorkoutInput,
   UserProfile,
   Workout,
+  WorkoutById,
   WorkoutDetail,
   WorkoutExerciseDetail,
 } from "@weight-tracker/core/domain";
@@ -150,7 +152,15 @@ const benchInWorkout = workoutExercise("we-2", bench.id, "MID", [
 ]);
 const pressInWorkout = workoutExercise("we-3", legPress.id, "LOW", []);
 
-const workout: WorkoutDetail = {
+const ana = {
+  id: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
+  email: "ana@example.com",
+  name: "Ana",
+  surname: "García",
+  role: "USER",
+};
+
+const workout: WorkoutById = {
   id: "w-1",
   name: "Pierna",
   description: "Día 1",
@@ -158,7 +168,11 @@ const workout: WorkoutDetail = {
   userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
   trainerId: null,
   status: "DRAFT",
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
   exercises: [squatInWorkout, benchInWorkout, pressInWorkout],
+  athlete: ana,
+  trainer: null,
 };
 
 /** What the API answers to an update: the saved data, with the list response's shape. */
@@ -227,7 +241,7 @@ const setSummaries = () =>
     .getAllByRole("listitem")
     .map((item) => item.textContent);
 /** A workout without exercises, so the catalog lists all of its exercises. */
-const emptyWorkout: WorkoutDetail = { ...workout, exercises: [] };
+const emptyWorkout: WorkoutById = { ...workout, exercises: [] };
 const withoutExercises = async () => ok(emptyWorkout);
 
 function favoriteOf(exerciseId: string): ExerciseFavorite {
@@ -246,13 +260,15 @@ function renderWorkout({
   getFavorites = async () => ok([]),
   markFavorite = async (exerciseId) => ok(favoriteOf(exerciseId)),
   unmarkFavorite = async () => ok(undefined),
+  getMesocycle = async () => fail(new DomainError("UNEXPECTED", "Not used")),
   profile = completeProfile,
 }: {
-  getWorkout?: () => Promise<Result<WorkoutDetail, DomainError>>;
+  getWorkout?: () => Promise<Result<WorkoutById, DomainError>>;
   getExercises?: () => Promise<Result<Exercise[], DomainError>>;
   getFavorites?: () => Promise<Result<ExerciseFavorite[], DomainError>>;
   markFavorite?: (exerciseId: string) => Promise<Result<ExerciseFavorite, DomainError>>;
   unmarkFavorite?: (exerciseId: string) => Promise<Result<void, DomainError>>;
+  getMesocycle?: () => Promise<Result<Mesocycle, DomainError>>;
   profile?: UserProfile;
   session?: () => Promise<Result<Session | null, DomainError>>;
   updateWorkout?: (input: UpdateWorkoutInput) => Promise<Result<Workout, DomainError>>;
@@ -269,6 +285,7 @@ function renderWorkout({
 } = {}) {
   const readWorkout = vi.fn(getWorkout);
   const readCatalog = vi.fn(getExercises);
+  const readMesocycle = vi.fn(getMesocycle);
   const favorites = {
     read: vi.fn(getFavorites),
     mark: vi.fn(markFavorite),
@@ -286,12 +303,14 @@ function renderWorkout({
   return {
     readWorkout,
     readCatalog,
+    readMesocycle,
     favorites,
     mutations,
     rendered: renderWithProviders(<WorkoutView />, {
       getSessionUseCase: () => ({ execute: session }),
       getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
       getWorkoutByIdUseCase: () => ({ execute: readWorkout }),
+      getMesocycleByIdUseCase: () => ({ execute: readMesocycle }),
       getExercisesUseCase: () => ({ execute: readCatalog }),
       getExerciseFavoritesUseCase: () => ({ execute: favorites.read }),
       markExerciseFavoriteUseCase: () => ({ execute: favorites.mark }),
@@ -933,7 +952,10 @@ describe("WorkoutView", () => {
       screen.getByRole("heading", { level: 1, name: "Editar entrenamiento" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, name: "Pierna" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute("href", "/assigned-plans");
+    expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute(
+      "href",
+      "/assigned-workouts",
+    );
     expect(
       within(propertiesSection()).getByRole("button", { name: "Guardar" }),
     ).toBeInTheDocument();
@@ -2076,9 +2098,9 @@ describe("WorkoutView", () => {
 
     // Assert
     expect(await screen.findByText("No hemos encontrado este entrenamiento.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Volver a planes asignados" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Volver a entrenamientos" })).toHaveAttribute(
       "href",
-      "/assigned-plans",
+      "/assigned-workouts",
     );
     expect(readWorkout).not.toHaveBeenCalled();
   });
@@ -2090,7 +2112,7 @@ describe("WorkoutView", () => {
 
     // Assert
     expect(await screen.findByText("No hemos encontrado este entrenamiento.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Volver a planes asignados" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Volver a entrenamientos" })).toBeInTheDocument();
   });
 
   it("reads the catalog again when Reintentar is pressed after it failed", async () => {
@@ -3273,6 +3295,265 @@ describe("WorkoutView", () => {
           .getAllByRole("listitem")
           .map((item) => item.textContent),
       ).toEqual(["3 × 1:30 min per side", "1 × 20 min per side"]);
+    });
+  });
+
+  describe("context and placement", () => {
+    const luis = {
+      id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
+      email: "luis@example.com",
+      name: "Luis",
+      surname: "Pérez",
+      role: "TRAINER",
+    };
+    const admin: UserProfile = { ...completeProfile, id: "admin-1", role: "ADMIN" };
+    const prescribed: WorkoutById = { ...workout, trainerId: luis.id, trainer: luis };
+    /** Placed in week 2 of mesocycle `m-1`, which dates it on the Wednesday of 2026-11-02's week. */
+    const placed: WorkoutById = {
+      ...prescribed,
+      workoutDate: "2026-11-04",
+      mesocycleId: "m-1",
+      mesocycleWeekNumber: 2,
+    };
+    const hypertrophy: Mesocycle = {
+      id: "m-1",
+      trainerId: luis.id,
+      athleteId: ana.id,
+      name: "Hipertrofia",
+      objective: "Ganar masa",
+      startDate: "2026-10-26",
+      durationInWeeks: 4,
+      weeks: [],
+      trainer: luis,
+      athlete: ana,
+    };
+    const strip = () => screen.getByRole("region", { name: "Datos del entrenamiento" });
+
+    it("shows the athlete above the properties card", async () => {
+      // Arrange & Act
+      await renderWorkout().rendered;
+
+      // Assert
+      await loaded();
+      expect(within(strip()).getByText("AG")).toBeInTheDocument();
+      expect(within(strip()).getByText("Ana García")).toBeInTheDocument();
+      expect(within(strip()).getByText("Atleta")).toBeInTheDocument();
+      expect(
+        strip().compareDocumentPosition(propertiesSection()) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("shows the athlete's email when they have no name", async () => {
+      // Arrange
+      const nameless = { ...workout, athlete: { ...ana, name: "", surname: "" } };
+
+      // Act
+      await renderWorkout({ getWorkout: async () => ok(nameless) }).rendered;
+
+      // Assert
+      await loaded();
+      expect(within(strip()).getByText("A")).toBeInTheDocument();
+      expect(within(strip()).getByText("ana@example.com")).toBeInTheDocument();
+    });
+
+    it("shows the trainer to an admin", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: async () => ok(prescribed), profile: admin }).rendered;
+
+      // Assert
+      await loaded();
+      expect(within(strip()).getByText("LP")).toBeInTheDocument();
+      expect(within(strip()).getByText("Luis Pérez")).toBeInTheDocument();
+      expect(within(strip()).getByText("Entrenador")).toBeInTheDocument();
+    });
+
+    it("hides the trainer from a trainer", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: async () => ok(prescribed) }).rendered;
+
+      // Assert
+      await loaded();
+      expect(within(strip()).queryByText("Entrenador")).not.toBeInTheDocument();
+      expect(within(strip()).queryByText("Luis Pérez")).not.toBeInTheDocument();
+    });
+
+    it("shows no trainer entry to an admin when the workout has none", async () => {
+      // Arrange & Act
+      await renderWorkout({ profile: admin }).rendered;
+
+      // Assert
+      await loaded();
+      expect(within(strip()).queryByText("Entrenador")).not.toBeInTheDocument();
+    });
+
+    it("reads a placed workout's mesocycle once and shows its week as a breadcrumb", async () => {
+      // Arrange
+      const { readMesocycle, rendered } = renderWorkout({
+        getWorkout: async () => ok(placed),
+        getMesocycle: async () => ok(hypertrophy),
+      });
+
+      // Act
+      await rendered;
+      await loaded();
+
+      // Assert
+      const breadcrumb = await within(strip()).findByRole("navigation", {
+        name: "Mesociclo y semana",
+      });
+      expect(breadcrumb).toHaveTextContent("Hipertrofia/Semana 2");
+      expect(within(strip()).queryByRole("link")).not.toBeInTheDocument();
+      expect(readMesocycle).toHaveBeenCalledTimes(1);
+      expect(readMesocycle).toHaveBeenCalledWith({ id: "m-1" });
+    });
+
+    it("reads no mesocycle for a standalone workout", async () => {
+      // Arrange
+      const { readMesocycle, rendered } = renderWorkout();
+
+      // Act
+      await rendered;
+      await loaded();
+
+      // Assert
+      expect(within(strip()).queryByText("Mesociclo")).not.toBeInTheDocument();
+      expect(readMesocycle).not.toHaveBeenCalled();
+    });
+
+    it("leaves the mesocycle out and keeps the editor when it cannot be read", async () => {
+      // Arrange
+      const { readMesocycle, rendered } = renderWorkout({
+        getWorkout: async () => ok(placed),
+        getMesocycle: async () => fail(new DomainError("NETWORK", "")),
+      });
+
+      // Act
+      await rendered;
+      await loaded();
+
+      // Assert
+      await waitFor(() => expect(readMesocycle).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(within(strip()).queryByText("Mesociclo")).not.toBeInTheDocument());
+      expect(within(strip()).getByText("Ana García")).toBeInTheDocument();
+      expect(within(propertiesSection()).getByRole("textbox", { name: "Nombre" })).toHaveValue(
+        "Pierna",
+      );
+    });
+
+    it("leads Volver back to the mesocycle of a placed workout", async () => {
+      // Arrange & Act
+      await renderWorkout({
+        getWorkout: async () => ok(placed),
+        getMesocycle: async () => ok(hypertrophy),
+      }).rendered;
+
+      // Assert
+      await loaded();
+      expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute(
+        "href",
+        "/mesocycle?id=m-1",
+      );
+    });
+
+    it("locks the week of a placed workout", async () => {
+      // Arrange & Act
+      await renderWorkout({
+        getWorkout: async () => ok(placed),
+        getMesocycle: async () => ok(hypertrophy),
+      }).rendered;
+
+      // Assert
+      await loaded();
+      const week = within(propertiesSection()).getByRole("group", { name: "Semana" });
+      expect(week).toHaveTextContent("Semana del 2 nov – 8 nov");
+      expect(within(week).getByRole("button", { name: "Semana anterior" })).toBeDisabled();
+      expect(within(week).getByRole("button", { name: "Semana siguiente" })).toBeDisabled();
+    });
+
+    it("saves a placed workout with its placement and no date", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({
+        getWorkout: async () => ok(placed),
+        getMesocycle: async () => ok(hypertrophy),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      const name = within(propertiesSection()).getByRole("textbox", { name: "Nombre" });
+      await user.clear(name);
+      await user.type(name, "Pierna B");
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      await waitFor(() => expect(mutations.update).toHaveBeenCalledTimes(1));
+      expect(mutations.update).toHaveBeenCalledWith({
+        id: "w-1",
+        name: "Pierna B",
+        description: "Día 1",
+        userId: placed.userId,
+        trainerId: luis.id,
+        mesocycleId: "m-1",
+        mesocycleWeekNumber: 2,
+      });
+    });
+
+    it("saves a standalone workout without a placement", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      await waitFor(() => expect(mutations.update).toHaveBeenCalledTimes(1));
+      const [input] = mutations.update.mock.calls[0]!;
+      expect(input).not.toHaveProperty("mesocycleId");
+      expect(input).not.toHaveProperty("mesocycleWeekNumber");
+      expect(input).toHaveProperty("workoutDate", "2026-11-04");
+    });
+
+    it("keeps showing the athlete after a save", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      expect(await screen.findByText("Entrenamiento guardado.")).toBeInTheDocument();
+      expect(mutations.update).toHaveBeenCalledTimes(1);
+      expect(within(strip()).getByText("Ana García")).toBeInTheDocument();
+    });
+
+    it("shows the strip in the active language", async () => {
+      // Arrange
+      await renderWorkout({
+        getWorkout: async () => ok(placed),
+        getMesocycle: async () => ok(hypertrophy),
+        profile: admin,
+      }).rendered;
+      await loaded();
+      await within(strip()).findByRole("navigation", { name: "Mesociclo y semana" });
+
+      // Act
+      await act(() => i18n.changeLanguage("en"));
+
+      // Assert
+      const english = screen.getByRole("region", { name: "Workout details" });
+      expect(within(english).getByText("Athlete")).toBeInTheDocument();
+      expect(within(english).getByText("Trainer")).toBeInTheDocument();
+      expect(within(english).getByText("Mesocycle")).toBeInTheDocument();
+      expect(
+        within(english).getByRole("navigation", { name: "Mesocycle and week" }),
+      ).toHaveTextContent("Hipertrofia/Week 2");
     });
   });
 });

@@ -18,7 +18,17 @@ public interface IWorkoutRepository
     /// </summary>
     public Task<IEnumerable<Workout>> GetAllByUserOrTrainerId(Id id, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Workouts placed in the given mesocycle, whatever their week and status.
+    /// </summary>
+    public Task<IEnumerable<Workout>> GetAllByMesocycleId(Id mesocycleId, CancellationToken cancellationToken);
+
     public Task<Workout?> GetById(Id workoutId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether any workout, whatever its status, is placed in the given week of the given mesocycle.
+    /// </summary>
+    public Task<bool> ExistsByMesocycleWeek(Id mesocycleId, WeekNumber weekNumber, CancellationToken cancellationToken);
 
     public Task Save(Workout workout, CancellationToken cancellationToken);
 

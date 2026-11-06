@@ -2,6 +2,7 @@ using FluentAssertions;
 using Moq;
 using WeightTracker.Application.Exceptions;
 using WeightTracker.Application.Interfaces;
+using WeightTracker.Application.Services;
 using WeightTracker.Application.UseCases.Workouts;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Users;
@@ -16,7 +17,21 @@ public class GetWorkoutByIdUseCaseTests
 
     private readonly Mock<IWorkoutRepository> _workouts = new(MockBehavior.Strict);
 
-    private GetWorkoutByIdUseCase AUseCase() => new(_workouts.Object);
+    private readonly Mock<IUserRepository> _users = new();
+
+    public GetWorkoutByIdUseCaseTests()
+    {
+        // Every requested user exists, which the foreign keys guarantee outside tests
+        _users
+            .Setup(repository => repository.GetAllByIds(It.IsAny<IEnumerable<Id>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IEnumerable<Id> ids, CancellationToken _) => ids.Select(AUser).ToList());
+    }
+
+    private GetWorkoutByIdUseCase AUseCase() => new(_workouts.Object, new WorkoutVisibility(_workouts.Object), _users.Object);
+
+    private static User AUser(Id id) => User.Rehydrate(
+        id, Email.From($"{id.Value}@weighttracker.test"), PersonName.From("Ada"), PersonName.From("Lovelace"),
+        new DateOnly(1988, 5, 12), Role.USER, PasswordHash.From("stored-hash"), new DateTime(2026, 1, 1), true, null);
 
     private Workout StoredWorkout(Id ownerId, Id? trainerId = null, WorkoutStatus status = WorkoutStatus.PUBLISHED)
     {
@@ -38,7 +53,7 @@ public class GetWorkoutByIdUseCaseTests
         var result = await AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, CancellationToken.None);
 
         // Assert
-        result.Should().BeSameAs(workout);
+        result.Workout.Should().BeSameAs(workout);
     }
 
     [Fact]
@@ -52,7 +67,7 @@ public class GetWorkoutByIdUseCaseTests
         var result = await AUseCase().Execute(callerId, Role.TRAINER, workout.Id, CancellationToken.None);
 
         // Assert
-        result.Should().BeSameAs(workout);
+        result.Workout.Should().BeSameAs(workout);
     }
 
     [Fact]
@@ -66,7 +81,7 @@ public class GetWorkoutByIdUseCaseTests
         var result = await AUseCase().Execute(callerId, Role.TRAINER, workout.Id, CancellationToken.None);
 
         // Assert
-        result.Should().BeSameAs(workout);
+        result.Workout.Should().BeSameAs(workout);
     }
 
     [Fact]
@@ -93,7 +108,7 @@ public class GetWorkoutByIdUseCaseTests
         var result = await AUseCase().Execute(callerId, Role.USER, workout.Id, CancellationToken.None);
 
         // Assert
-        result.Should().BeSameAs(workout);
+        result.Workout.Should().BeSameAs(workout);
     }
 
     [Fact]
@@ -165,7 +180,7 @@ public class GetWorkoutByIdUseCaseTests
         var result = await AUseCase().Execute(callerId, Role.USER, workout.Id, CancellationToken.None);
 
         // Assert
-        result.Should().BeSameAs(workout);
+        result.Workout.Should().BeSameAs(workout);
     }
 
     [Fact]
@@ -179,7 +194,7 @@ public class GetWorkoutByIdUseCaseTests
         var result = await AUseCase().Execute(callerId, Role.TRAINER, workout.Id, CancellationToken.None);
 
         // Assert
-        result.Should().BeSameAs(workout);
+        result.Workout.Should().BeSameAs(workout);
     }
 
     [Fact]
@@ -192,7 +207,7 @@ public class GetWorkoutByIdUseCaseTests
         var result = await AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, CancellationToken.None);
 
         // Assert
-        result.Should().BeSameAs(workout);
+        result.Workout.Should().BeSameAs(workout);
     }
 
     [Theory]
@@ -209,6 +224,69 @@ public class GetWorkoutByIdUseCaseTests
         var result = await AUseCase().Execute(callerId, Role.USER, workout.Id, CancellationToken.None);
 
         // Assert
-        result.Should().BeSameAs(workout);
+        result.Workout.Should().BeSameAs(workout);
+    }
+
+    [Fact]
+    public async Task PrescribedWorkout_ShouldComeWithItsAthleteAndTrainer()
+    {
+        // Arrange
+        var ownerId = Id.New();
+        var trainerId = Id.New();
+        var workout = StoredWorkout(ownerId, trainerId);
+
+        // Act
+        var result = await AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, CancellationToken.None);
+
+        // Assert
+        result.Athlete.Id.Should().Be(ownerId);
+        result.Trainer!.Id.Should().Be(trainerId);
+    }
+
+    [Fact]
+    public async Task SelfPlannedWorkout_ShouldComeWithItsAthleteAndNoTrainer()
+    {
+        // Arrange
+        var ownerId = Id.New();
+        var workout = StoredWorkout(ownerId);
+
+        // Act
+        var result = await AUseCase().Execute(ownerId, Role.USER, workout.Id, CancellationToken.None);
+
+        // Assert
+        result.Athlete.Id.Should().Be(ownerId);
+        result.Trainer.Should().BeNull();
+        _users.Verify(repository => repository.GetAllByIds(
+            It.Is<IEnumerable<Id>>(ids => ids.SequenceEqual(new[] { ownerId })), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task MissingUser_ShouldFailInsteadOfReturningAPartialWorkout()
+    {
+        // Arrange
+        var workout = StoredWorkout(Id.New(), Id.New());
+        _users
+            .Setup(repository => repository.GetAllByIds(It.IsAny<IEnumerable<Id>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        // Act
+        var act = async () => await AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task RefusedRead_ShouldNotLookUpAnybody()
+    {
+        // Arrange
+        var workout = StoredWorkout(Id.New(), Id.New());
+
+        // Act
+        var act = async () => await AUseCase().Execute(Id.New(), Role.USER, workout.Id, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<UnauthorizedOperationException>();
+        _users.VerifyNoOtherCalls();
     }
 }

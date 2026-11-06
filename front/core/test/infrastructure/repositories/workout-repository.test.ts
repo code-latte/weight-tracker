@@ -7,6 +7,7 @@ import {
   type ReorderWorkoutExercisesRequest,
   type UpdateWorkoutRequest,
   type Workout,
+  type WorkoutById,
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
@@ -21,8 +22,14 @@ const workout: Workout = {
   userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
   trainerId: null,
   status: "DRAFT",
+  mesocycleId: null,
+  mesocycleWeekNumber: null,
   exercises: [],
 };
+
+const placement = { mesocycleId: "9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d", mesocycleWeekNumber: 2 };
+
+const placedWorkout: Workout = { ...workout, ...placement };
 
 const listedPerson = {
   id: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
@@ -54,6 +61,13 @@ const workoutExercise: WorkoutExerciseDetail = {
 const workoutDetail: WorkoutDetail = {
   ...workout,
   exercises: [workoutExercise],
+};
+
+const workoutById: WorkoutById = {
+  ...workoutDetail,
+  trainerId: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
+  athlete: listedPerson,
+  trainer: { ...listedPerson, id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d", role: "TRAINER" },
 };
 
 const createRequest: CreateWorkoutRequest = {
@@ -115,6 +129,30 @@ describe("WorkoutRepository", () => {
 
       // Act
       await repository.getAll();
+
+      // Assert
+      expect(httpClient.requests).toEqual([{ method: "GET", path: "/workouts" }]);
+    });
+
+    it("asks only for the workouts outside a mesocycle when standalone is set", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => [listedWorkout]);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.getAll({ standalone: true });
+
+      // Assert
+      expect(httpClient.requests).toEqual([{ method: "GET", path: "/workouts?standalone=true" }]);
+    });
+
+    it("gets /workouts when standalone is false", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => [listedWorkout]);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.getAll({ standalone: false });
 
       // Assert
       expect(httpClient.requests).toEqual([{ method: "GET", path: "/workouts" }]);
@@ -183,7 +221,7 @@ describe("WorkoutRepository", () => {
   describe("getById", () => {
     it("gets /workouts/{id} without a body", async () => {
       // Arrange
-      const httpClient = new FakeHttpClient(async () => workoutDetail);
+      const httpClient = new FakeHttpClient(async () => workoutById);
       const repository = new WorkoutRepository(httpClient);
 
       // Act
@@ -193,15 +231,15 @@ describe("WorkoutRepository", () => {
       expect(httpClient.requests).toEqual([{ method: "GET", path: `/workouts/${workout.id}` }]);
     });
 
-    it("returns the workout with its exercises on success", async () => {
+    it("returns the workout with its exercises, athlete and trainer on success", async () => {
       // Arrange
-      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutDetail));
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutById));
 
       // Act
       const result = await repository.getById(workout.id);
 
       // Assert
-      expect(result).toEqual(ok(workoutDetail));
+      expect(result).toEqual(ok(workoutById));
     });
 
     it.each([
@@ -247,6 +285,65 @@ describe("WorkoutRepository", () => {
       ]);
     });
 
+    it("sends the mesocycle placement unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => placedWorkout);
+      const repository = new WorkoutRepository(httpClient);
+      const placedRequest: CreateWorkoutRequest = { ...createRequest, ...placement };
+
+      // Act
+      await repository.create(placedRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "POST", path: "/workouts", body: placedRequest },
+      ]);
+    });
+
+    it("sends a placed workout without a date when none is given", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => placedWorkout);
+      const repository = new WorkoutRepository(httpClient);
+      const placedRequest: CreateWorkoutRequest = {
+        name: "Pierna",
+        userId: workout.userId,
+        ...placement,
+      };
+
+      // Act
+      await repository.create(placedRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "POST", path: "/workouts", body: placedRequest },
+      ]);
+      expect(httpClient.requests[0]?.body).not.toHaveProperty("workoutDate");
+    });
+
+    it("sends no mesocycle placement when it is omitted", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workout);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.create(createRequest);
+
+      // Assert
+      expect(httpClient.requests[0]?.body).not.toHaveProperty("mesocycleId");
+      expect(httpClient.requests[0]?.body).not.toHaveProperty("mesocycleWeekNumber");
+    });
+
+    it("returns the mesocycle placement the API answers with", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => placedWorkout));
+
+      // Act
+      const result = await repository.create(createRequest);
+
+      // Assert
+      expect(result).toEqual(ok(placedWorkout));
+    });
+
     it("returns the workout on success", async () => {
       // Arrange
       const repository = new WorkoutRepository(new FakeHttpClient(async () => workout));
@@ -263,6 +360,7 @@ describe("WorkoutRepository", () => {
       [401, "UNAUTHORIZED"],
       [403, "FORBIDDEN"],
       [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
       [500, "UNEXPECTED"],
     ])("maps status %i to %s", async (status, code) => {
       // Arrange
@@ -325,6 +423,45 @@ describe("WorkoutRepository", () => {
 
       // Assert
       expect(result).toEqual(ok(workout));
+    });
+
+    it("sends the mesocycle placement unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => placedWorkout);
+      const repository = new WorkoutRepository(httpClient);
+      const placedRequest: UpdateWorkoutRequest = { ...updateRequest, ...placement };
+
+      // Act
+      await repository.update(workout.id, placedRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "PUT", path: `/workouts/${workout.id}`, body: placedRequest },
+      ]);
+    });
+
+    it("sends no mesocycle placement when it is omitted", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workout);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.update(workout.id, updateRequest);
+
+      // Assert
+      expect(httpClient.requests[0]?.body).not.toHaveProperty("mesocycleId");
+      expect(httpClient.requests[0]?.body).not.toHaveProperty("mesocycleWeekNumber");
+    });
+
+    it("returns the mesocycle placement the API answers with", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => placedWorkout));
+
+      // Act
+      const result = await repository.update(workout.id, { ...updateRequest, ...placement });
+
+      // Assert
+      expect(result).toEqual(ok(placedWorkout));
     });
 
     it.each([

@@ -7,7 +7,8 @@ namespace WeightTracker.Domain.Workouts;
 /// One exercise inside a workout: which exercise, how hard, and the ordered sets to perform.
 /// </summary>
 /// <remarks>
-/// Entity of the Workout aggregate. It is only created, loaded and saved through <see cref="Workout"/>.
+/// Entity of the Workout and WorkoutTemplate aggregates. It is only created, loaded and saved through its root,
+/// <see cref="Workout"/> or <see cref="WorkoutTemplate"/>, and never shared between two roots.
 /// The Exercise aggregate is referenced by identifier only.
 /// </remarks>
 public sealed class WorkoutExercise : Entity
@@ -43,7 +44,7 @@ public sealed class WorkoutExercise : Entity
 
     /// <summary>
     /// Superseries this entry belongs to, null when it is performed on its own.
-    /// Only <see cref="Workout"/> changes it, because the grouping rules span several entries.
+    /// Only its root changes it, because the grouping rules span several entries.
     /// </summary>
     public SuperSeriesId? SuperSeriesId { get; private set; }
 
@@ -90,7 +91,7 @@ public sealed class WorkoutExercise : Entity
 
     /// <summary>
     /// Replaces the effort, the per-side flag, the rest and every set prescription. Nothing changes when the new values are invalid.
-    /// Only <see cref="Workout"/> calls it, because changing the total of sets can break a superseries.
+    /// Only its root calls it, because changing the total of sets can break a superseries.
     /// </summary>
     /// <exception cref="InvalidEffortException">When the effort is not a defined value.</exception>
     /// <exception cref="WorkoutExerciseRequiresSetsException">When no set prescription is given.</exception>

@@ -109,7 +109,7 @@ public static class WorkoutMapper
         }
     }
 
-    private static (string TargetType, int? TargetValue, int? TargetMaxValue, decimal? TargetMinutes) MapTargetToColumns(SetTarget target) => target switch
+    internal static (string TargetType, int? TargetValue, int? TargetMaxValue, decimal? TargetMinutes) MapTargetToColumns(SetTarget target) => target switch
     {
         SetTarget.Reps reps => (SetTargetTypes.Reps, reps.value, null, null),
         SetTarget.Duration duration => (SetTargetTypes.Duration, duration.value, null, null),
@@ -119,7 +119,7 @@ public static class WorkoutMapper
         _ => throw new PersistenceMappingException($"'{target.GetType().Name}' is not a known set target"),
     };
 
-    private static SetTarget MapTargetToDomain(string targetType, int? targetValue, int? targetMaxValue, decimal? targetMinutes) => targetType switch
+    internal static SetTarget MapTargetToDomain(string targetType, int? targetValue, int? targetMaxValue, decimal? targetMinutes) => targetType switch
     {
         SetTargetTypes.Reps => new SetTarget.Reps(RequireValue(targetType, targetValue)),
         SetTargetTypes.Duration => new SetTarget.Duration(RequireValue(targetType, targetValue)),
@@ -130,7 +130,7 @@ public static class WorkoutMapper
         _ => throw new PersistenceMappingException($"'{targetType}' is not a known set target"),
     };
 
-    private static Effort MapEffort(int effort)
+    internal static Effort MapEffort(int effort)
     {
         if (Enum.IsDefined(typeof(Effort), effort) == false)
             throw new PersistenceMappingException($"'{effort}' is not a known effort");

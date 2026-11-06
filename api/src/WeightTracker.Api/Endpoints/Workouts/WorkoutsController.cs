@@ -1,10 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using WeightTracker.Api.Common;
 using WeightTracker.Api.Endpoints.Workouts.Dtos;
+using WeightTracker.Api.Endpoints.WorkoutTemplates;
+using WeightTracker.Api.Endpoints.WorkoutTemplates.Dtos;
 using WeightTracker.Application.UseCases.Auth;
 using WeightTracker.Application.UseCases.Workouts;
+using WeightTracker.Application.UseCases.WorkoutTemplates;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exercises;
+using WeightTracker.Domain.Users;
 using WeightTracker.Domain.Workouts;
 
 namespace WeightTracker.Api.Endpoints.Workouts;
@@ -24,6 +28,7 @@ public class WorkoutsController : AuthorizedController
     private readonly RemoveWorkoutExerciseUseCase _removeExercise;
     private readonly ReorderWorkoutExercisesUseCase _reorderExercises;
     private readonly ChangeWorkoutStatusUseCase _changeStatus;
+    private readonly CreateWorkoutTemplateFromWorkoutUseCase _createTemplate;
 
     public WorkoutsController(
         GetAllWorkoutsUseCase getAllWorkouts,
@@ -37,6 +42,7 @@ public class WorkoutsController : AuthorizedController
         RemoveWorkoutExerciseUseCase removeExercise,
         ReorderWorkoutExercisesUseCase reorderExercises,
         ChangeWorkoutStatusUseCase changeStatus,
+        CreateWorkoutTemplateFromWorkoutUseCase createTemplate,
         GetAuthenticatedUserUseCase getAuthenticatedUser,
         ExceptionMapper exceptionMapper) : base(getAuthenticatedUser, exceptionMapper)
     {
@@ -51,6 +57,7 @@ public class WorkoutsController : AuthorizedController
         _removeExercise = removeExercise;
         _reorderExercises = reorderExercises;
         _changeStatus = changeStatus;
+        _createTemplate = createTemplate;
     }
 
     /// <summary>
@@ -393,6 +400,39 @@ public class WorkoutsController : AuthorizedController
                 cancellationToken);
 
             return Ok(WorkoutDetailResponse.From(workout));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Saves the workout as a new template owned by its trainer, copying its name, description, exercises, sets and
+    /// superseries. A trainer may only save the workouts they prescribe; an admin may save any workout that has a
+    /// trainer, who owns the template. The workout itself is not changed, whatever its status.
+    /// </summary>
+    /// <remarks>
+    /// The <c>Location</c> header points at <c>GET /workout-templates/{id}</c>.
+    /// </remarks>
+    [HttpPost("{workoutId:guid}/templates")]
+    [RequireRole(Role.TRAINER, Role.ADMIN)]
+    [ProducesResponseType<WorkoutTemplateResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CreateTemplate(Guid workoutId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var template = await _createTemplate.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(workoutId), cancellationToken);
+
+            return CreatedAtAction(
+                nameof(WorkoutTemplatesController.GetById),
+                "WorkoutTemplates",
+                new { id = template.Id.Value },
+                WorkoutTemplateResponse.From(template));
         }
         catch (Exception exception)
         {

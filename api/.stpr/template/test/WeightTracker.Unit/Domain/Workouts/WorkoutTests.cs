@@ -1409,5 +1409,118 @@ public class WorkoutTests
 
     private static Workout APlacedWorkoutIn(WorkoutStatus status, Id mesocycleId, WeekNumber weekNumber)
         => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, status, [], mesocycleId, weekNumber);
-}
 
+    private static WorkoutTemplate ATemplateWithASuperSeries(Id trainerId)
+    {
+        var template = WorkoutTemplate.Create(trainerId, Name, WorkoutDescription.From("Focus on tempo"));
+        template.AddExercise(Id.New(), Effort.HIGH, [FourByTen], perSide: true, rest: TimeInMinutes.From(1.5m));
+        template.AddExercise(Id.New(), Effort.MID, [ThreeByTen, new SetPrescription(1, new SetTarget.MaxReps())]);
+        template.AddExercise(Id.New(), Effort.LOW, [new SetPrescription(3, new SetTarget.Duration(40))]);
+        template.CreateSuperSeries([template.Exercises[0].Id, template.Exercises[1].Id]);
+
+        return template;
+    }
+
+    [Fact]
+    public void CreateFromTemplate_ShouldCopyTheNameDescriptionAndEveryExerciseInOrder()
+    {
+        // Arrange
+        var template = ATemplateWithASuperSeries(Id.New());
+
+        // Act
+        var workout = Workout.CreateFromTemplate(template, Id.New(), WorkoutDate);
+
+        // Assert
+        workout.Name.Should().Be(template.Name);
+        workout.Description.Should().Be(template.Description);
+        workout.Exercises.Should().HaveCount(3);
+        workout.Exercises.Zip(template.Exercises).Should().AllSatisfy(pair =>
+        {
+            var (copy, source) = pair;
+            copy.ExerciseId.Should().Be(source.ExerciseId);
+            copy.Effort.Should().Be(source.Effort);
+            copy.Sets.Should().Equal(source.Sets);
+            copy.PerSide.Should().Be(source.PerSide);
+            copy.Rest.Should().Be(source.Rest);
+            copy.SuperSeriesId.Should().Be(source.SuperSeriesId);
+        });
+    }
+
+    [Fact]
+    public void CreateFromTemplate_ShouldGiveEveryCopiedEntryANewIdentifier()
+    {
+        // Arrange
+        var template = ATemplateWithASuperSeries(Id.New());
+
+        // Act
+        var workout = Workout.CreateFromTemplate(template, Id.New(), WorkoutDate);
+
+        // Assert
+        workout.Exercises.Select(entry => entry.Id).Should().NotIntersectWith(template.Exercises.Select(entry => entry.Id));
+        workout.Exercises.Should().OnlyContain(entry => entry.IsNew);
+    }
+
+    [Fact]
+    public void CreateFromTemplate_ShouldPrescribeANewDraftFromTheTemplateTrainerToTheUser()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var userId = Id.New();
+        var template = ATemplateWithASuperSeries(trainerId);
+
+        // Act
+        var workout = Workout.CreateFromTemplate(template, userId, WorkoutDate);
+
+        // Assert
+        workout.UserId.Should().Be(userId);
+        workout.TrainerId.Should().Be(trainerId);
+        workout.Status.Should().Be(WorkoutStatus.DRAFT);
+        workout.IsNew.Should().BeTrue();
+        workout.WorkoutDate.Should().Be(WorkoutDate.Date);
+        workout.MesocycleId.Should().BeNull();
+    }
+
+    [Fact]
+    public void CreateFromTemplate_ShouldRejectTheTemplateTrainerAsOwner()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var template = ATemplateWithASuperSeries(trainerId);
+
+        // Act
+        var act = () => Workout.CreateFromTemplate(template, trainerId, WorkoutDate);
+
+        // Assert
+        act.Should().Throw<TrainerCannotBeWorkoutOwnerException>();
+    }
+
+    [Fact]
+    public void CreateFromTemplate_ShouldAcceptAnEmptyTemplate()
+    {
+        // Arrange
+        var template = WorkoutTemplate.Create(Id.New(), Name, null);
+
+        // Act
+        var workout = Workout.CreateFromTemplate(template, Id.New(), WorkoutDate);
+
+        // Assert
+        workout.Exercises.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CreateFromTemplate_ShouldNotFollowLaterChangesToTheTemplate()
+    {
+        // Arrange
+        var template = ATemplateWithASuperSeries(Id.New());
+        var workout = Workout.CreateFromTemplate(template, Id.New(), WorkoutDate);
+        var removed = template.Exercises[0].ExerciseId;
+
+        // Act
+        template.RemoveExercise(removed);
+
+        // Assert
+        workout.Exercises.Select(entry => entry.ExerciseId).Should().Contain(removed);
+        workout.Exercises[0].SuperSeriesId.Should().NotBeNull();
+        workout.Exercises[1].SuperSeriesId.Should().NotBeNull();
+    }
+}

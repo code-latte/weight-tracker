@@ -56,6 +56,8 @@ public class WorkoutExerciseRemoveEndpointTests : WorkoutExerciseEndpointTest
     public async Task Delete_ShouldRemoveTheEntryAndItsStoredSetsForThePrescribingTrainer()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         (await StoredSetRowIds(SeedData.TrainedPlanchaEntryId)).Should().NotBeEmpty();
 
@@ -144,6 +146,8 @@ public class WorkoutExerciseRemoveEndpointTests : WorkoutExerciseEndpointTest
     public async Task Delete_ShouldReturnNotFoundForAnExerciseNotInTheWorkout()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -158,6 +162,8 @@ public class WorkoutExerciseRemoveEndpointTests : WorkoutExerciseEndpointTest
     public async Task Delete_ShouldNotAcceptTheWorkoutEntryIdInPlaceOfTheCatalogExercise()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -202,7 +208,7 @@ public class WorkoutExerciseRemoveEndpointTests : WorkoutExerciseEndpointTest
     public async Task Delete_ShouldRejectTheOwnerOfAFinishedWorkoutWithoutTrainerWithConflict()
     {
         // Arrange
-        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "FINISHED");
+        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "COMPLETED");
         var user = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act

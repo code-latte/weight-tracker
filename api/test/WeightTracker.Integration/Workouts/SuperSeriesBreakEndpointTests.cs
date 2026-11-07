@@ -80,6 +80,8 @@ public class SuperSeriesBreakEndpointTests : WorkoutEndpointTest
     public async Task Delete_ShouldUngroupTheEntriesAndKeepThemInOrderForThePrescribingTrainer()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedSuperSeriesWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -168,6 +170,8 @@ public class SuperSeriesBreakEndpointTests : WorkoutEndpointTest
     public async Task Delete_ShouldReturnNotFoundForAnUnknownSuperSeries()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedSuperSeriesWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -209,7 +213,7 @@ public class SuperSeriesBreakEndpointTests : WorkoutEndpointTest
     public async Task Delete_ShouldRejectTheOwnerOfAFinishedWorkoutWithoutTrainerWithConflict()
     {
         // Arrange
-        await GivenWorkoutStatus(SeedData.SelfCreatedSuperSeriesWorkoutId, "FINISHED");
+        await GivenWorkoutStatus(SeedData.SelfCreatedSuperSeriesWorkoutId, "COMPLETED");
         var user = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act

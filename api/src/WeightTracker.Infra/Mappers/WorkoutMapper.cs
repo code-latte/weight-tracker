@@ -7,8 +7,8 @@ using WeightTracker.Infra.Exceptions;
 namespace WeightTracker.Infra.Mappers;
 
 /// <summary>
-/// Maps the Workout aggregate across the three tables it spans:
-/// <c>workouts</c>, <c>workout_exercises</c> and <c>workout_exercise_sets</c>.
+/// Maps the Workout aggregate across the four tables it spans:
+/// <c>workouts</c>, <c>workout_exercises</c>, <c>workout_exercise_sets</c> and <c>SetRecords</c>.
 /// </summary>
 public static class WorkoutMapper
 {
@@ -25,6 +25,9 @@ public static class WorkoutMapper
             Status = (int)workout.Status,
             MesocycleId = workout.MesocycleId?.Value,
             MesocycleWeekNumber = workout.MesocycleWeekNumber?.Value,
+            ReviewedAtUtc = workout.ReviewedAt,
+            ReviewedBy = workout.ReviewedBy?.Value,
+            ResultsUpdatedAtUtc = workout.ResultsUpdatedAt,
         };
 
         var exercisePosition = 0;
@@ -62,6 +65,22 @@ public static class WorkoutMapper
                 });
             }
 
+            var setRecordPosition = 0;
+
+            // Set records have identity, so they keep their own id instead of getting a fresh one like the sets
+            foreach (var setRecord in entry.SetRecords)
+            {
+                workoutExercise.SetRecords.Add(new SetRecordEntity
+                {
+                    Id = setRecord.Id.Value,
+                    WorkoutExerciseId = workoutExercise.Id,
+                    Position = setRecordPosition++,
+                    Reps = setRecord.Reps.Value,
+                    Weight = setRecord.Weight.Value,
+                    RegisterDatetimeUtc = setRecord.RegisteredAtUtc,
+                });
+            }
+
             entity.WorkoutExercises.Add(workoutExercise);
         }
 
@@ -71,7 +90,7 @@ public static class WorkoutMapper
     /// <summary>
     /// Restores the aggregate.
     /// </summary>
-    /// <param name="entity">Workout rows, with its exercises and sets loaded.</param>
+    /// <param name="entity">Workout rows, with its exercises, sets and set records loaded.</param>
     public static Workout MapToDomain(WorkoutEntity entity)
     {
         try
@@ -87,7 +106,14 @@ public static class WorkoutMapper
                         .Select(set => new SetPrescription(set.Count, MapTargetToDomain(set.TargetType, set.TargetValue, set.TargetMaxValue, set.TargetMinutes))),
                     item.SuperSeriesId is null ? null : SuperSeriesId.From(item.SuperSeriesId.Value),
                     item.PerSide,
-                    item.RestMinutes is null ? null : TimeInMinutes.From(item.RestMinutes.Value)))
+                    item.RestMinutes is null ? null : TimeInMinutes.From(item.RestMinutes.Value),
+                    item.SetRecords
+                        .OrderBy(setRecord => setRecord.Position)
+                        .Select(setRecord => SetRecord.Rehydrate(
+                            Id.From(setRecord.Id),
+                            RepCount.From(setRecord.Reps),
+                            Weight.From(setRecord.Weight),
+                            setRecord.RegisterDatetimeUtc))))
                 .ToList();
 
             return Workout.Rehydrate(
@@ -100,7 +126,10 @@ public static class WorkoutMapper
                 MapStatus(entity.Status),
                 exercises,
                 entity.MesocycleId is null ? null : Id.From(entity.MesocycleId.Value),
-                entity.MesocycleWeekNumber is null ? null : WeekNumber.From(entity.MesocycleWeekNumber.Value));
+                entity.MesocycleWeekNumber is null ? null : WeekNumber.From(entity.MesocycleWeekNumber.Value),
+                entity.ReviewedAtUtc,
+                entity.ReviewedBy is null ? null : Id.From(entity.ReviewedBy.Value),
+                entity.ResultsUpdatedAtUtc);
         }
         catch (DomainException exception)
         {

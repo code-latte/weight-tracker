@@ -30,6 +30,8 @@ public class WeightTrackerDbContext : DbContext
 
     public DbSet<WorkoutExerciseSetEntity> WorkoutExerciseSets => Set<WorkoutExerciseSetEntity>();
 
+    public DbSet<SetRecordEntity> SetRecords => Set<SetRecordEntity>();
+
     public DbSet<WorkoutTemplateEntity> WorkoutTemplates => Set<WorkoutTemplateEntity>();
 
     public DbSet<WorkoutTemplateExerciseEntity> WorkoutTemplateExercises => Set<WorkoutTemplateExerciseEntity>();
@@ -113,6 +115,12 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(workout => workout.Status).HasColumnName("Status");
             entity.Property(workout => workout.MesocycleId).HasColumnName("MesocycleId");
             entity.Property(workout => workout.MesocycleWeekNumber).HasColumnName("MesocycleWeekNumber");
+            entity.Property(workout => workout.ReviewedAtUtc).HasColumnName("ReviewedAtUtc");
+            entity.Property(workout => workout.ReviewedBy).HasColumnName("ReviewedBy");
+            entity.Property(workout => workout.ResultsUpdatedAtUtc).HasColumnName("ResultsUpdatedAtUtc");
+
+            // xmin is maintained by Postgres; a save whose original version no longer matches fails instead of overwriting
+            entity.Property(workout => workout.Version).HasColumnName("xmin").HasColumnType("xid").IsRowVersion();
 
             // Declared without navigation properties: the User aggregate stays referenced by
             // identifier only, while EF still orders writes to satisfy the real constraints.
@@ -124,6 +132,11 @@ public class WeightTrackerDbContext : DbContext
             entity.HasOne<UserEntity>()
                 .WithMany()
                 .HasForeignKey(workout => workout.TrainerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(workout => workout.ReviewedBy)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // The Mesocycle aggregate is referenced by identifier only; future read views join on these columns.
@@ -165,6 +178,11 @@ public class WeightTrackerDbContext : DbContext
                 .WithOne()
                 .HasForeignKey(set => set.WorkoutExerciseId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(workoutExercise => workoutExercise.SetRecords)
+                .WithOne()
+                .HasForeignKey(setRecord => setRecord.WorkoutExerciseId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<WorkoutExerciseSetEntity>(entity =>
@@ -179,6 +197,19 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(set => set.TargetValue).HasColumnName("TargetValue");
             entity.Property(set => set.TargetMaxValue).HasColumnName("TargetMaxValue");
             entity.Property(set => set.TargetMinutes).HasColumnName("TargetMinutes").HasPrecision(5, 2);
+        });
+
+        modelBuilder.Entity<SetRecordEntity>(entity =>
+        {
+            entity.ToTable("SetRecords");
+            entity.HasKey(setRecord => setRecord.Id);
+            entity.Property(setRecord => setRecord.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(setRecord => setRecord.WorkoutExerciseId).HasColumnName("WorkoutExerciseId");
+            entity.Property(setRecord => setRecord.Position).HasColumnName("Position");
+            entity.Property(setRecord => setRecord.Reps).HasColumnName("Reps");
+            entity.Property(setRecord => setRecord.Weight).HasColumnName("Weight").HasPrecision(6, 2);
+            entity.Property(setRecord => setRecord.RegisterDatetimeUtc).HasColumnName("RegisterDatetimeUtc").HasColumnType("timestamptz");
+            entity.HasIndex(setRecord => setRecord.WorkoutExerciseId);
         });
 
         modelBuilder.Entity<WorkoutTemplateEntity>(entity =>

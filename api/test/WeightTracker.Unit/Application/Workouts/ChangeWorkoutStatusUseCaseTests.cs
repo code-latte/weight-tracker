@@ -67,7 +67,7 @@ public class ChangeWorkoutStatusUseCaseTests
     public async Task Execute_ShouldLetAnAdminSkipTheLifecycle()
     {
         // Arrange
-        var workout = AStoredWorkoutIn(WorkoutStatus.FINISHED);
+        var workout = AStoredWorkoutIn(WorkoutStatus.COMPLETED);
         GivenStored(workout);
         GivenSaveAndCommitSucceed(workout);
 
@@ -118,7 +118,7 @@ public class ChangeWorkoutStatusUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, WorkoutStatus.FINISHED, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, WorkoutStatus.COMPLETED, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutStatusTransitionException>();
@@ -139,6 +139,38 @@ public class ChangeWorkoutStatusUseCaseTests
         // Assert
         await act.Should().ThrowAsync<InvalidWorkoutStatusException>();
         workout.Status.Should().Be(WorkoutStatus.DRAFT);
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldPropagateAnAdminSettingReviewedWithoutSavingOrCommitting()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.COMPLETED);
+        GivenStored(workout);
+
+        // Act
+        var act = () => AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, WorkoutStatus.REVIEWED, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidWorkoutStatusTransitionException>();
+        workout.Status.Should().Be(WorkoutStatus.COMPLETED);
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldPropagateTheTrainerSettingReviewedWithoutSavingOrCommitting()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.COMPLETED);
+        GivenStored(workout);
+
+        // Act
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, WorkoutStatus.REVIEWED, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidWorkoutStatusTransitionException>();
+        workout.Status.Should().Be(WorkoutStatus.COMPLETED);
         VerifyNothingSavedOrCommitted();
     }
 }

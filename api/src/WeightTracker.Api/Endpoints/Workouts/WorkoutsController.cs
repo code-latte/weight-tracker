@@ -27,7 +27,12 @@ public class WorkoutsController : AuthorizedController
     private readonly UpdateWorkoutExerciseUseCase _updateExercise;
     private readonly RemoveWorkoutExerciseUseCase _removeExercise;
     private readonly ReorderWorkoutExercisesUseCase _reorderExercises;
+    private readonly AddSetRecordUseCase _addSetRecord;
+    private readonly UpdateSetRecordUseCase _updateSetRecord;
+    private readonly RemoveSetRecordUseCase _removeSetRecord;
+    private readonly ReorderSetRecordsUseCase _reorderSetRecords;
     private readonly ChangeWorkoutStatusUseCase _changeStatus;
+    private readonly ReviewWorkoutUseCase _review;
     private readonly CreateWorkoutTemplateFromWorkoutUseCase _createTemplate;
 
     public WorkoutsController(
@@ -41,7 +46,12 @@ public class WorkoutsController : AuthorizedController
         UpdateWorkoutExerciseUseCase updateExercise,
         RemoveWorkoutExerciseUseCase removeExercise,
         ReorderWorkoutExercisesUseCase reorderExercises,
+        AddSetRecordUseCase addSetRecord,
+        UpdateSetRecordUseCase updateSetRecord,
+        RemoveSetRecordUseCase removeSetRecord,
+        ReorderSetRecordsUseCase reorderSetRecords,
         ChangeWorkoutStatusUseCase changeStatus,
+        ReviewWorkoutUseCase review,
         CreateWorkoutTemplateFromWorkoutUseCase createTemplate,
         GetAuthenticatedUserUseCase getAuthenticatedUser,
         ExceptionMapper exceptionMapper) : base(getAuthenticatedUser, exceptionMapper)
@@ -56,7 +66,12 @@ public class WorkoutsController : AuthorizedController
         _updateExercise = updateExercise;
         _removeExercise = removeExercise;
         _reorderExercises = reorderExercises;
+        _addSetRecord = addSetRecord;
+        _updateSetRecord = updateSetRecord;
+        _removeSetRecord = removeSetRecord;
+        _reorderSetRecords = reorderSetRecords;
         _changeStatus = changeStatus;
+        _review = review;
         _createTemplate = createTemplate;
     }
 
@@ -377,8 +392,141 @@ public class WorkoutsController : AuthorizedController
     }
 
     /// <summary>
+    /// Records a set actually performed for an exercise of a started workout. It goes after the existing set records
+    /// of that exercise and is registered at the time of the request. Only the workout's athlete or an admin may record.
+    /// <c>exerciseId</c> is the catalog exercise, not the workout entry id.
+    /// </summary>
+    [HttpPost("{workoutId:guid}/exercises/{exerciseId:guid}/set-records")]
+    [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AddSetRecord(
+        Guid workoutId, Guid exerciseId, [FromBody] AddOrUpdateSetRecordRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workout = await _addSetRecord.Execute(
+                CurrentUser!.Id,
+                CurrentUser.Role,
+                Id.From(workoutId),
+                Id.From(exerciseId),
+                request.Reps!.Value,
+                request.Weight!.Value,
+                cancellationToken);
+
+            return Ok(WorkoutDetailResponse.From(workout));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Corrects the reps and weight of a set already recorded in a started workout. Its id, registration time and
+    /// position are kept. Only the workout's athlete or an admin may change it.
+    /// </summary>
+    [HttpPut("{workoutId:guid}/exercises/{exerciseId:guid}/set-records/{setRecordId:guid}")]
+    [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateSetRecord(
+        Guid workoutId, Guid exerciseId, Guid setRecordId, [FromBody] AddOrUpdateSetRecordRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workout = await _updateSetRecord.Execute(
+                CurrentUser!.Id,
+                CurrentUser.Role,
+                Id.From(workoutId),
+                Id.From(exerciseId),
+                Id.From(setRecordId),
+                request.Reps!.Value,
+                request.Weight!.Value,
+                cancellationToken);
+
+            return Ok(WorkoutDetailResponse.From(workout));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Removes a set already recorded in a started workout; the other set records keep their order.
+    /// Only the workout's athlete or an admin may remove it.
+    /// </summary>
+    [HttpDelete("{workoutId:guid}/exercises/{exerciseId:guid}/set-records/{setRecordId:guid}")]
+    [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RemoveSetRecord(
+        Guid workoutId, Guid exerciseId, Guid setRecordId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workout = await _removeSetRecord.Execute(
+                CurrentUser!.Id,
+                CurrentUser.Role,
+                Id.From(workoutId),
+                Id.From(exerciseId),
+                Id.From(setRecordId),
+                cancellationToken);
+
+            return Ok(WorkoutDetailResponse.From(workout));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Puts the set records of an exercise of a started workout in a new order. <c>setRecordIds</c> must list every
+    /// set record of that exercise exactly once. Only the workout's athlete or an admin may reorder them.
+    /// </summary>
+    [HttpPut("{workoutId:guid}/exercises/{exerciseId:guid}/set-records/order")]
+    [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReorderSetRecords(
+        Guid workoutId, Guid exerciseId, [FromBody] ReorderSetRecordsRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workout = await _reorderSetRecords.Execute(
+                CurrentUser!.Id,
+                CurrentUser.Role,
+                Id.From(workoutId),
+                Id.From(exerciseId),
+                request.SetRecordIds!.Select(Id.From).ToList(),
+                cancellationToken);
+
+            return Ok(WorkoutDetailResponse.From(workout));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
     /// Moves the workout to another status. Admins may set any status; everybody else follows the
-    /// lifecycle (draft, published, started, finished) within what their role allows.
+    /// lifecycle (draft, published, started, completed) within what their role allows. Nobody reaches or
+    /// leaves reviewed through this route.
     /// </summary>
     [HttpPut("{workoutId:guid}/status")]
     [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
@@ -397,6 +545,37 @@ public class WorkoutsController : AuthorizedController
                 CurrentUser.Role,
                 Id.From(workoutId),
                 request.Status!.Value,
+                cancellationToken);
+
+            return Ok(WorkoutDetailResponse.From(workout));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Marks a completed workout as reviewed. Only its prescribing trainer or an admin may review it, and only
+    /// when the results did not change after the <c>resultsUpdatedAt</c> sent, which is the value last read.
+    /// </summary>
+    [HttpPut("{workoutId:guid}/review")]
+    [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Review(
+        Guid workoutId, [FromBody] ReviewWorkoutRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workout = await _review.Execute(
+                CurrentUser!.Id,
+                CurrentUser.Role,
+                Id.From(workoutId),
+                request.ResultsUpdatedAt,
                 cancellationToken);
 
             return Ok(WorkoutDetailResponse.From(workout));

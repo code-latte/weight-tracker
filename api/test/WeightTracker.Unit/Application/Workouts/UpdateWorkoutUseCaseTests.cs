@@ -140,7 +140,7 @@ public class UpdateWorkoutUseCaseTests
     public async Task Execute_ShouldLetThePrescribingTrainerUpdateTheDetails()
     {
         // Arrange
-        var workout = APrescribedWorkout(WorkoutStatus.PUBLISHED);
+        var workout = APrescribedWorkout();
         GivenStored(workout);
         GivenSaveAndCommitSucceed(workout);
 
@@ -149,7 +149,7 @@ public class UpdateWorkoutUseCaseTests
 
         // Assert
         updated.Name.Should().Be(NewName);
-        updated.Status.Should().Be(WorkoutStatus.PUBLISHED);
+        updated.Status.Should().Be(WorkoutStatus.DRAFT);
         VerifySavedAndCommittedOnce(workout);
     }
 
@@ -208,7 +208,7 @@ public class UpdateWorkoutUseCaseTests
 
     [Theory]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
     public async Task Execute_ShouldRejectANonAdminOnALockedWorkoutAndChangeNothing(WorkoutStatus status)
     {
         // Arrange
@@ -228,7 +228,7 @@ public class UpdateWorkoutUseCaseTests
     public async Task Execute_ShouldLetAnAdminUpdateAFinishedWorkout()
     {
         // Arrange
-        var workout = APrescribedWorkout(WorkoutStatus.FINISHED);
+        var workout = APrescribedWorkout(WorkoutStatus.COMPLETED);
         GivenStored(workout);
         GivenSaveAndCommitSucceed(workout);
 
@@ -237,7 +237,7 @@ public class UpdateWorkoutUseCaseTests
 
         // Assert
         updated.Name.Should().Be(NewName);
-        updated.Status.Should().Be(WorkoutStatus.FINISHED);
+        updated.Status.Should().Be(WorkoutStatus.COMPLETED);
         VerifySavedAndCommittedOnce(workout);
     }
 
@@ -497,7 +497,7 @@ public class UpdateWorkoutUseCaseTests
         return mesocycle;
     }
 
-    private static Workout APlacedWorkout(Id mesocycleId, int weekNumber, WorkoutStatus status = WorkoutStatus.PUBLISHED)
+    private static Workout APlacedWorkout(Id mesocycleId, int weekNumber, WorkoutStatus status = WorkoutStatus.DRAFT)
         => Workout.Rehydrate(
             Id.New(), OwnerId, TrainerId, Name, null, WorkoutDate, status, [], mesocycleId, WeekNumber.From(weekNumber));
 

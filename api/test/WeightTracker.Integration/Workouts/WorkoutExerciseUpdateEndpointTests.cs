@@ -61,6 +61,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldReplaceEffortAndEverySetKeepingTheEntryIdAndPositionForThePrescribingTrainer()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -83,6 +85,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldReplaceTheStoredSetRowsEvenWhenOnlyTheEffortChanges()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var before = await StoredSetRowIds(SeedData.TrainedSentadillaEntryId);
 
@@ -105,6 +109,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldLeaveExactlyTheNewSetRowsWhenThereAreMoreOfThemThanBefore()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var before = await StoredSetRowIds(SeedData.TrainedSentadillaEntryId);
 
@@ -227,6 +233,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldReturnNotFoundForAnExerciseNotInTheWorkout()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -276,6 +284,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldRejectAnUndefinedEffortAndChangeNothing()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -291,6 +301,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldRejectANewTotalOfSetsInsideASuperSeriesAndChangeNothing()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedSuperSeriesWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -309,6 +321,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldKeepTheSuperSeriesWhenTheTotalOfSetsIsTheSame()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedSuperSeriesWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -344,7 +358,7 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldRejectTheOwnerOfAFinishedWorkoutWithoutTrainerWithConflict()
     {
         // Arrange
-        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "FINISHED");
+        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "COMPLETED");
         var user = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act
@@ -385,23 +399,60 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     }
 
     [Fact]
-    public async Task Put_ShouldKeepAllowingThePrescribingTrainerOnAPublishedWorkoutWithoutUnpublishingIt()
+    public async Task Put_ShouldConflictForThePrescribingTrainerOnAPublishedWorkoutAndChangeNothing()
     {
         // Arrange
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var before = (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("exercises").GetRawText();
+
+        // Act
+        var response = await trainer.PutAsJsonAsync(ExerciseRoute(SeedData.TrainedWorkoutId, SeedData.SentadillaId), ASentadillaUpdate());
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var stored = await WorkoutAsAdmin(SeedData.TrainedWorkoutId);
+        stored.GetProperty("exercises").GetRawText().Should().Be(before);
+        stored.GetProperty("status").GetString().Should().Be("PUBLISHED");
+    }
+
+    [Fact]
+    public async Task Put_ShouldLetThePrescribingTrainerEditAfterUnpublishing()
+    {
+        // Arrange
+        var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        (await trainer.PutAsJsonAsync($"/workouts/{SeedData.TrainedWorkoutId}/status", new { status = "DRAFT" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Act
         var response = await trainer.PutAsJsonAsync(ExerciseRoute(SeedData.TrainedWorkoutId, SeedData.SentadillaId), ASentadillaUpdate());
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("status").GetString().Should().Be("PUBLISHED");
+        (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("status").GetString().Should().Be("DRAFT");
+    }
+
+    [Fact]
+    public async Task Put_ShouldConflictForAnAdminOnAReviewedWorkoutAndChangeNothing()
+    {
+        // Arrange
+        await GivenReviewed(SeedData.TrainedWorkoutId);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+        var before = (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("exercises").GetRawText();
+
+        // Act
+        var response = await admin.PutAsJsonAsync(ExerciseRoute(SeedData.TrainedWorkoutId, SeedData.SentadillaId), ASentadillaUpdate());
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("exercises").GetRawText().Should().Be(before);
     }
 
     [Fact]
     public async Task Put_ShouldReplacePerSideAndRestAndReturnThem()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var body = BodyWith(SeedData.SentadillaId, "HIGH", true, 1.5m, Reps(2, 12));
 
@@ -422,6 +473,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldClearPerSideAndRestWhenTheyAreOmitted()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var route = ExerciseRoute(SeedData.TrainedWorkoutId, SeedData.SentadillaId);
         (await trainer.PutAsJsonAsync(route, BodyWith(SeedData.SentadillaId, "HIGH", true, 2m, Reps(2, 12)))).EnsureSuccessStatusCode();
@@ -440,6 +493,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldRejectAnInvalidRestAndKeepThePreviousValues()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var route = ExerciseRoute(SeedData.TrainedWorkoutId, SeedData.SentadillaId);
         (await trainer.PutAsJsonAsync(route, BodyWith(SeedData.SentadillaId, "HIGH", true, 2m, Reps(2, 12)))).EnsureSuccessStatusCode();
@@ -460,6 +515,8 @@ public class WorkoutExerciseUpdateEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldKeepAnEntryEditableAfterItsExerciseIsArchived()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var created = await trainer.PostAsJsonAsync("/exercises", new { languageCode = "es", name = "Remo con banda", muscle = "MIDDLE_BACK", type = "STRENGTH" });
         var custom = (await created.Content.ReadFromJsonAsync<JsonElement>(JsonOptions)).GetProperty("id").GetGuid();

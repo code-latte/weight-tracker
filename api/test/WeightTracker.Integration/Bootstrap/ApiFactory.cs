@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using System.Linq.Expressions;
 using Testcontainers.PostgreSql;
 using WeightTracker.Infra.Persistence;
 using WeightTracker.Infra.Seed;
@@ -100,6 +101,13 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>
+    /// Counts the stored rows of a table that match a condition, for tests that must prove rows are gone
+    /// when no repository exposes them, such as the children of an aggregate deleted by cascade.
+    /// </summary>
+    public Task<int> CountRows<TEntity>(Expression<Func<TEntity, bool>> predicate) where TEntity : class
+        => WithScope(services => services.GetRequiredService<WeightTrackerDbContext>().Set<TEntity>().CountAsync(predicate));
+
+    /// <summary>
     /// Empties every table and reapplies the seeded dataset, so each test starts from the
     /// same known state.
     /// </summary>
@@ -150,11 +158,13 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             WHERE "UserId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
             """);
 
+        // A reviewed workout cannot lose its reviewer, so the workouts the user reviewed go as well
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"""
             DELETE FROM "Workouts"
             WHERE "UserId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
                OR "TrainerId" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
+               OR "ReviewedBy" IN (SELECT "Id" FROM "Users" WHERE "Email" = {email.ToLowerInvariant()})
             """);
 
         // Workouts of other users placed in the user's mesocycles become standalone before those mesocycles go

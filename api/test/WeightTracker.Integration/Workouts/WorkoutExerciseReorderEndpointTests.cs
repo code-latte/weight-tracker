@@ -65,6 +65,8 @@ public class WorkoutExerciseReorderEndpointTests : WorkoutExerciseEndpointTest
     public async Task Put_ShouldStoreTheNewOrderForThePrescribingTrainer()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var before = (await EntriesOf(SeedData.TrainedWorkoutId)).ToDictionary(entry => entry.GetProperty("id").GetGuid());
 

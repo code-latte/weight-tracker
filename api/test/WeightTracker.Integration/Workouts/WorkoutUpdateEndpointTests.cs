@@ -187,6 +187,8 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
     public async Task PrescribingTrainer_ShouldUpdateTheDetailsAndKeepTheStatusAndExercises()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -199,7 +201,7 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
         stored.GetProperty("description").GetString().Should().Be(NewDescription);
         // Placed in week 1, so the sent date is ignored and the week dates it
         stored.GetProperty("workoutDate").GetString().Should().Be($"{SeedData.TrainedWorkoutDate:yyyy-MM-dd}");
-        stored.GetProperty("status").GetString().Should().Be("PUBLISHED");
+        stored.GetProperty("status").GetString().Should().Be("DRAFT");
         stored.GetProperty("exercises").EnumerateArray().Select(entry => entry.GetProperty("exerciseId").GetGuid())
             .Should().Equal(SeedData.SentadillaId, SeedData.PlanchaId);
     }
@@ -208,6 +210,8 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
     public async Task PrescribingTrainer_ShouldKeepTheMesocyclePlacementWhenSendingItBack()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -307,7 +311,7 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
     public async Task Admin_ShouldUpdateAFinishedWorkout()
     {
         // Arrange
-        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "FINISHED");
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "COMPLETED");
         var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
 
         // Act
@@ -317,7 +321,7 @@ public class WorkoutUpdateEndpointTests : WorkoutEndpointTest
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var stored = await StoredWorkout(SeedData.TrainedWorkoutId);
         stored.GetProperty("name").GetString().Should().Be(NewName);
-        stored.GetProperty("status").GetString().Should().Be("FINISHED");
+        stored.GetProperty("status").GetString().Should().Be("COMPLETED");
     }
 
     // ---- Reassignment by non-admins

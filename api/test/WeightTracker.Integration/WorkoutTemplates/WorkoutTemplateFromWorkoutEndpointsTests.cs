@@ -256,6 +256,8 @@ public class WorkoutTemplateFromWorkoutEndpointsTests : WorkoutTemplateEndpointT
         // Arrange
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var custom = await GivenCustomExercise(trainer);
+        // Only a draft can be edited, so the trainer unpublishes the seeded workout first
+        (await trainer.PutAsJsonAsync($"/workouts/{SeedData.TrainedWorkoutId}/status", new { status = "DRAFT" })).EnsureSuccessStatusCode();
         (await trainer.PostAsJsonAsync($"/workouts/{SeedData.TrainedWorkoutId}/exercises", AnExerciseBody(custom, "MID", Reps(3, 10)))).EnsureSuccessStatusCode();
         (await trainer.DeleteAsync($"/exercises/{custom}")).EnsureSuccessStatusCode();
 
@@ -292,6 +294,8 @@ public class WorkoutTemplateFromWorkoutEndpointsTests : WorkoutTemplateEndpointT
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var created = await trainer.PostAsync(TemplatesOf(SeedData.PrescribedSuperSeriesWorkoutId), null);
         var templateId = (await Body(created)).GetProperty("id").GetGuid();
+        // Only a draft can be edited, so the trainer unpublishes the seeded workout first
+        (await trainer.PutAsJsonAsync($"/workouts/{SeedData.PrescribedSuperSeriesWorkoutId}/status", new { status = "DRAFT" })).EnsureSuccessStatusCode();
 
         // Act
         var response = await trainer.DeleteAsync($"/workouts/{SeedData.PrescribedSuperSeriesWorkoutId}/exercises/{SeedData.PlanchaId}");

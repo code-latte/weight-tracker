@@ -12,6 +12,12 @@ public class WorkoutRepository : IWorkoutRepository
 {
     private readonly WeightTrackerDbContext _context;
 
+    /// <summary>
+    /// Row version of each workout read through <see cref="GetById"/> in this scope. <see cref="Save"/> re-reads the row,
+    /// so without this the concurrency check would only cover the gap between that re-read and the commit.
+    /// </summary>
+    private readonly Dictionary<Guid, uint> _loadedVersions = [];
+
     public WorkoutRepository(WeightTrackerDbContext context)
     {
         _context = context;
@@ -41,6 +47,8 @@ public class WorkoutRepository : IWorkoutRepository
 
         if (entity is null)
             return null;
+
+        _loadedVersions[entity.Id] = entity.Version;
 
         return WorkoutMapper.MapToDomain(entity);
     }
@@ -72,6 +80,13 @@ public class WorkoutRepository : IWorkoutRepository
         tracked.Status = entity.Status;
         tracked.MesocycleId = entity.MesocycleId;
         tracked.MesocycleWeekNumber = entity.MesocycleWeekNumber;
+        tracked.ReviewedAtUtc = entity.ReviewedAtUtc;
+        tracked.ReviewedBy = entity.ReviewedBy;
+        tracked.ResultsUpdatedAtUtc = entity.ResultsUpdatedAtUtc;
+
+        // Compare against the version the caller decided on, not the one just re-read
+        if (_loadedVersions.TryGetValue(tracked.Id, out var loadedVersion))
+            _context.Entry(tracked).Property(stored => stored.Version).OriginalValue = loadedVersion;
 
         Reconcile(tracked, entity);
     }
@@ -124,6 +139,36 @@ public class WorkoutRepository : IWorkoutRepository
                 set.WorkoutExerciseId = existing.Id;
                 existing.Sets.Add(set);
             }
+
+            ReconcileSetRecords(existing, incomingItem);
+        }
+    }
+
+    /// <summary>
+    /// Set records have identity, so unlike the sets they are matched by id: new ones are inserted, the ones no
+    /// longer in the aggregate are cascaded as orphans, and the ones that survive take the reps, weight and
+    /// position of the aggregate, because they can be corrected and reordered. Their registration time never changes.
+    /// </summary>
+    private static void ReconcileSetRecords(WorkoutExerciseEntity tracked, WorkoutExerciseEntity incoming)
+    {
+        var incomingById = incoming.SetRecords.ToDictionary(setRecord => setRecord.Id);
+
+        tracked.SetRecords.RemoveAll(setRecord => incomingById.ContainsKey(setRecord.Id) == false);
+
+        var trackedById = tracked.SetRecords.ToDictionary(setRecord => setRecord.Id);
+
+        foreach (var setRecord in incoming.SetRecords)
+        {
+            if (trackedById.TryGetValue(setRecord.Id, out var existing))
+            {
+                existing.Position = setRecord.Position;
+                existing.Reps = setRecord.Reps;
+                existing.Weight = setRecord.Weight;
+                continue;
+            }
+
+            setRecord.WorkoutExerciseId = tracked.Id;
+            tracked.SetRecords.Add(setRecord);
         }
     }
 
@@ -138,8 +183,15 @@ public class WorkoutRepository : IWorkoutRepository
         return entities.Select(WorkoutMapper.MapToDomain).ToList();
     }
 
+    /// <remarks>
+    /// Sets and set records are sibling collections of each exercise. Loaded in one query they would
+    /// multiply into one row per set prescription and set record, so each collection gets its own query.
+    /// </remarks>
     private static IQueryable<WorkoutEntity> WithAggregateTables(IQueryable<WorkoutEntity> workouts)
         => workouts
             .Include(workout => workout.WorkoutExercises)
-            .ThenInclude(workoutExercise => workoutExercise.Sets);
+            .ThenInclude(workoutExercise => workoutExercise.Sets)
+            .Include(workout => workout.WorkoutExercises)
+            .ThenInclude(workoutExercise => workoutExercise.SetRecords)
+            .AsSplitQuery();
 }

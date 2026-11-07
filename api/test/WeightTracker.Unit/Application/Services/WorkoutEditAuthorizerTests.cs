@@ -144,12 +144,16 @@ public class WorkoutEditAuthorizerTests
     }
 
     private static Workout AWorkoutIn(WorkoutStatus status, Id? trainerId)
-        => Workout.Rehydrate(Id.New(), OwnerId, trainerId, Name, null, WorkoutDate, status, []);
+        => Workout.Rehydrate(Id.New(), OwnerId, trainerId, Name, null, WorkoutDate, status, [],
+            reviewedAt: status == WorkoutStatus.REVIEWED ? WorkoutDate : null,
+            reviewedBy: status == WorkoutStatus.REVIEWED ? trainerId : null);
 
     [Theory]
+    [InlineData(WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
-    public void EnsureCanEdit_ShouldRejectThePrescribingTrainerOnceTheWorkoutHasStarted(WorkoutStatus status)
+    [InlineData(WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void EnsureCanEdit_ShouldRejectThePrescribingTrainerOnceTheWorkoutIsNoLongerADraft(WorkoutStatus status)
     {
         // Arrange
         var workout = AWorkoutIn(status, TrainerId);
@@ -162,9 +166,10 @@ public class WorkoutEditAuthorizerTests
     }
 
     [Theory]
+    [InlineData(WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
-    public void EnsureCanEdit_ShouldRejectTheOwnerOfASelfCreatedWorkoutOnceItHasStarted(WorkoutStatus status)
+    [InlineData(WorkoutStatus.COMPLETED)]
+    public void EnsureCanEdit_ShouldRejectTheOwnerOfASelfCreatedWorkoutOnceItIsNoLongerADraft(WorkoutStatus status)
     {
         // Arrange
         var workout = AWorkoutIn(status, null);
@@ -177,8 +182,9 @@ public class WorkoutEditAuthorizerTests
     }
 
     [Theory]
+    [InlineData(WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
     public void EnsureCanEdit_ShouldAllowAnAdminOnALockedWorkout(WorkoutStatus status)
     {
         // Arrange
@@ -189,6 +195,32 @@ public class WorkoutEditAuthorizerTests
 
         // Assert
         act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureCanEdit_ShouldRejectAnAdminOnAReviewedWorkout()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.REVIEWED, TrainerId);
+
+        // Act
+        var act = () => _authorizer.EnsureCanEdit(workout, Id.New(), Role.ADMIN, Operation);
+
+        // Assert
+        act.Should().Throw<WorkoutLockedException>();
+    }
+
+    [Fact]
+    public void EnsureCanEdit_ShouldRefuseACallerWhoMayNotEditAReviewedWorkoutWithoutRevealingTheLock()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.REVIEWED, TrainerId);
+
+        // Act
+        var act = () => _authorizer.EnsureCanEdit(workout, OwnerId, Role.USER, Operation);
+
+        // Assert
+        act.Should().Throw<UnauthorizedOperationException>();
     }
 
     [Fact]
@@ -204,13 +236,11 @@ public class WorkoutEditAuthorizerTests
         act.Should().Throw<UnauthorizedOperationException>();
     }
 
-    [Theory]
-    [InlineData(WorkoutStatus.DRAFT)]
-    [InlineData(WorkoutStatus.PUBLISHED)]
-    public void EnsureCanEdit_ShouldKeepAllowingTheTrainerWhileTheWorkoutIsDraftOrPublished(WorkoutStatus status)
+    [Fact]
+    public void EnsureCanEdit_ShouldKeepAllowingTheTrainerWhileTheWorkoutIsADraft()
     {
         // Arrange
-        var workout = AWorkoutIn(status, TrainerId);
+        var workout = AWorkoutIn(WorkoutStatus.DRAFT, TrainerId);
 
         // Act
         var act = () => _authorizer.EnsureCanEdit(workout, TrainerId, Role.TRAINER, Operation);

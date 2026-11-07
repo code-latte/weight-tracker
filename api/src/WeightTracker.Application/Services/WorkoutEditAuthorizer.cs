@@ -12,22 +12,27 @@ namespace WeightTracker.Application.Services;
 /// <remarks>
 /// An admin may always edit. A prescribed workout may only be edited by its trainer, not even by its owner.
 /// A workout without a trainer may be edited by its owner, whatever the owner's role.
-/// Once a workout has started nobody but an admin may edit it.
+/// Once a workout leaves draft nobody but an admin may edit it, and once it is reviewed nobody may, not even an admin.
 /// </remarks>
 public class WorkoutEditAuthorizer
 {
     /// <param name="operation">Operation being attempted, used in the error message.</param>
     /// <exception cref="UnauthorizedOperationException">When the caller may not edit the workout.</exception>
-    /// <exception cref="WorkoutLockedException">When the caller may edit the workout but it has already started.</exception>
+    /// <exception cref="WorkoutLockedException">When the caller may edit the workout but it is no longer a draft, or it is reviewed.</exception>
     public void EnsureCanEdit(Workout workout, Id callerId, Role callerRole, string operation)
     {
         if (CanEdit(workout, callerId, callerRole) == false)
             throw new UnauthorizedOperationException(operation);
 
         // Checked after the permission so a caller who may not edit never learns the status
-        if (callerRole != Role.ADMIN && workout.IsLocked)
+        if (IsLockedFor(workout, callerRole))
             throw new WorkoutLockedException(workout.Id, workout.Status);
     }
+
+    // A reviewed workout keeps the prescription that was reviewed, so the admin bypass does not reach it
+    private static bool IsLockedFor(Workout workout, Role callerRole)
+        => workout.Status == WorkoutStatus.REVIEWED
+            || (callerRole != Role.ADMIN && workout.IsLocked);
 
     private static bool CanEdit(Workout workout, Id callerId, Role callerRole)
     {

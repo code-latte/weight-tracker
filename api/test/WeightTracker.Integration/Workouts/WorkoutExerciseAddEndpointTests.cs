@@ -60,6 +60,8 @@ public class WorkoutExerciseAddEndpointTests : WorkoutExerciseEndpointTest
     public async Task Post_ShouldAppendTheExerciseLastForThePrescribingTrainer()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -342,7 +344,7 @@ public class WorkoutExerciseAddEndpointTests : WorkoutExerciseEndpointTest
     public async Task Post_ShouldRejectTheOwnerOfAFinishedWorkoutWithoutTrainerWithConflict()
     {
         // Arrange
-        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "FINISHED");
+        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "COMPLETED");
         var user = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act
@@ -381,17 +383,50 @@ public class WorkoutExerciseAddEndpointTests : WorkoutExerciseEndpointTest
     }
 
     [Fact]
-    public async Task Post_ShouldKeepAllowingThePrescribingTrainerOnAPublishedWorkout()
+    public async Task Post_ShouldConflictForThePrescribingTrainerOnAPublishedWorkoutAndAddNothing()
     {
         // Arrange
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
+        var before = (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("exercises").GetArrayLength();
 
         // Act
         var response = await trainer.PostAsJsonAsync(ExercisesRoute(SeedData.TrainedWorkoutId), ACurl());
 
         // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var stored = await WorkoutAsAdmin(SeedData.TrainedWorkoutId);
+        stored.GetProperty("exercises").GetArrayLength().Should().Be(before);
+        stored.GetProperty("status").GetString().Should().Be("PUBLISHED");
+    }
+
+    [Fact]
+    public async Task Post_ShouldLetAnAdminAddToAPublishedWorkout()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.PostAsJsonAsync(ExercisesRoute(SeedData.TrainedWorkoutId), ACurl());
+
+        // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("status").GetString().Should().Be("PUBLISHED");
+    }
+
+    [Fact]
+    public async Task Post_ShouldConflictForAnAdminOnAReviewedWorkoutAndAddNothing()
+    {
+        // Arrange
+        await GivenReviewed(SeedData.TrainedWorkoutId);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+        var before = (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("exercises").GetArrayLength();
+
+        // Act
+        var response = await admin.PostAsJsonAsync(ExercisesRoute(SeedData.TrainedWorkoutId), ACurl());
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await WorkoutAsAdmin(SeedData.TrainedWorkoutId)).GetProperty("exercises").GetArrayLength().Should().Be(before);
     }
 
     [Theory]
@@ -574,6 +609,8 @@ public class WorkoutExerciseAddEndpointTests : WorkoutExerciseEndpointTest
     public async Task Post_ShouldAcceptACustomExerciseOwnedByThePrescribingTrainer()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var custom = await CreateCustomExercise(trainer);
 

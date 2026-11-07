@@ -11,8 +11,9 @@ namespace WeightTracker.Api.Endpoints.Workouts.Dtos;
 public sealed record ChangeWorkoutStatusRequest
 {
     /// <summary>
-    /// Status to move the workout to: <c>DRAFT</c>, <c>PUBLISHED</c>, <c>STARTED</c> or <c>FINISHED</c>,
-    /// or their number (1 to 4).
+    /// Status to move the workout to: <c>DRAFT</c>, <c>PUBLISHED</c>, <c>STARTED</c>, <c>COMPLETED</c> or
+    /// <c>REVIEWED</c>, or their number (1 to 5). <c>REVIEWED</c> is always refused here: a workout is
+    /// reviewed through <c>PUT /workouts/{workoutId}/review</c>.
     /// </summary>
     [Required]
     [JsonConverter(typeof(JsonStringEnumConverter<WorkoutStatus>))]

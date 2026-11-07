@@ -214,7 +214,7 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
     [Theory]
     [InlineData("PUBLISHED")]
     [InlineData("STARTED")]
-    [InlineData("FINISHED")]
+    [InlineData("COMPLETED")]
     public async Task Get_ShouldShowAPrescribedWorkoutToItsAthleteOnceItIsNoLongerADraft(string status)
     {
         // Arrange
@@ -227,6 +227,37 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         body.GetProperty("status").GetString().Should().Be(status);
+    }
+
+    [Fact]
+    public async Task Get_ShouldShowAReviewedWorkoutToItsAthleteWithItsReview()
+    {
+        // Arrange
+        await GivenReviewed(SeedData.PrescribedDraftWorkoutId);
+
+        // Act
+        var response = await Get(SeedCredentials.User, SeedData.PrescribedDraftWorkoutId);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("status").GetString().Should().Be("REVIEWED");
+        body.GetProperty("reviewedBy").GetGuid().Should().Be(SeedData.AdminId);
+        body.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.String);
+    }
+
+    [Fact]
+    public async Task Get_ShouldReturnEmptyReviewAndResultsForAWorkoutThatNeverHadThem()
+    {
+        // Arrange & Act
+        var response = await Get(SeedCredentials.User, SeedData.OwnedWorkoutId);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.Null);
+        body.GetProperty("reviewedBy").ValueKind.Should().Be(JsonValueKind.Null);
+        body.GetProperty("resultsUpdatedAt").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]
@@ -294,6 +325,8 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
     public async Task Update_ShouldKeepItsResponseWithoutAthleteOrTrainer()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -312,5 +345,34 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         body.TryGetProperty("athlete", out _).Should().BeFalse();
         body.TryGetProperty("trainer", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Get_ShouldListTheSetRecordsOfEachExerciseInOrder()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.SelfCreatedPairWorkoutId, "STARTED");
+        var athlete = await AuthenticatedClientFor(SeedCredentials.User);
+        var route = $"/workouts/{SeedData.SelfCreatedPairWorkoutId}/exercises/{SeedData.SentadillaId}/set-records";
+        (await athlete.PostAsJsonAsync(route, new { reps = 6, weight = 100m })).EnsureSuccessStatusCode();
+        (await athlete.PostAsJsonAsync(route, new { reps = 5, weight = 102.5m })).EnsureSuccessStatusCode();
+
+        // Act
+        var response = await Get(SeedCredentials.Admin, SeedData.SelfCreatedPairWorkoutId);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var exercises = (await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions)).GetProperty("exercises").EnumerateArray().ToList();
+        var sentadilla = exercises.Single(entry => entry.GetProperty("exerciseId").GetGuid() == SeedData.SentadillaId);
+        var setRecords = sentadilla.GetProperty("setRecords").EnumerateArray().ToList();
+        setRecords.Select(record => record.GetProperty("reps").GetInt32()).Should().Equal(6, 5);
+        setRecords.Select(record => record.GetProperty("weight").GetDecimal()).Should().Equal(100m, 102.5m);
+        setRecords.Should().AllSatisfy(record =>
+        {
+            record.GetProperty("id").GetGuid().Should().NotBeEmpty();
+            record.GetProperty("registeredAtUtc").GetDateTime().Kind.Should().Be(DateTimeKind.Utc);
+        });
+        var plancha = exercises.Single(entry => entry.GetProperty("exerciseId").GetGuid() == SeedData.PlanchaId);
+        plancha.GetProperty("setRecords").EnumerateArray().Should().BeEmpty();
     }
 }

@@ -15,7 +15,7 @@ namespace WeightTracker.Integration.Workouts;
 /// Wednesdays 2026-09-30, 2026-10-07, 2026-10-14 and 2026-10-21. The published trained workout is placed in week 1 and
 /// the started prescribed workout in week 2.
 /// </summary>
-public class WorkoutMesocyclePlacementEndpointTests : IntegrationTest
+public class WorkoutMesocyclePlacementEndpointTests : WorkoutEndpointTest
 {
     public WorkoutMesocyclePlacementEndpointTests(ApiFactory factory) : base(factory)
     { }
@@ -301,6 +301,8 @@ public class WorkoutMesocyclePlacementEndpointTests : IntegrationTest
     public async Task Update_ShouldMoveAWorkoutToAnotherWeek()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -316,6 +318,8 @@ public class WorkoutMesocyclePlacementEndpointTests : IntegrationTest
     public async Task Update_ShouldUnlinkWhenThePairIsOmitted()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -371,6 +375,50 @@ public class WorkoutMesocyclePlacementEndpointTests : IntegrationTest
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         ShouldBePlacedIn(await WorkoutAsAdmin(SeedData.PrescribedStartedWorkoutId), SeedData.MesocycleId, 2);
+    }
+
+    [Fact]
+    public async Task Update_ShouldRefuseAnAdminMovingACompletedWorkout()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.PrescribedStartedWorkoutId, "COMPLETED");
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.PutAsJsonAsync(StartedWorkoutRoute, AnUpdate(SeedData.MesocycleId, 3));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        ShouldBePlacedIn(await WorkoutAsAdmin(SeedData.PrescribedStartedWorkoutId), SeedData.MesocycleId, 2);
+    }
+
+    [Fact]
+    public async Task Update_ShouldRefuseAnAdminMovingAReviewedWorkout()
+    {
+        // Arrange
+        await GivenReviewed(SeedData.PrescribedStartedWorkoutId);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.PutAsJsonAsync(StartedWorkoutRoute, AnUpdate(SeedData.MesocycleId, 3));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        ShouldBePlacedIn(await WorkoutAsAdmin(SeedData.PrescribedStartedWorkoutId), SeedData.MesocycleId, 2);
+    }
+
+    [Fact]
+    public async Task Update_ShouldLetAnAdminMoveAPublishedWorkout()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await admin.PutAsJsonAsync(TrainedWorkoutRoute, AnUpdate(SeedData.MesocycleId, 3));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        ShouldBePlacedIn(await WorkoutAsAdmin(SeedData.TrainedWorkoutId), SeedData.MesocycleId, 3);
     }
 
     [Fact]
@@ -438,6 +486,8 @@ public class WorkoutMesocyclePlacementEndpointTests : IntegrationTest
     public async Task Update_ShouldDateAMovedWorkoutByItsNewWeek()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -453,6 +503,8 @@ public class WorkoutMesocyclePlacementEndpointTests : IntegrationTest
     public async Task Update_ShouldAcceptAPlacedWorkoutWithoutADate()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -474,6 +526,8 @@ public class WorkoutMesocyclePlacementEndpointTests : IntegrationTest
     public async Task Update_ShouldRedateAnUnchangedPlacementAfterAReschedule()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         await GivenSeededMesocycleRescheduledTo("2026-10-08");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
@@ -502,6 +556,8 @@ public class WorkoutMesocyclePlacementEndpointTests : IntegrationTest
     public async Task Update_ShouldKeepTheSentDateWhenUnlinking()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act

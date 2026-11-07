@@ -247,7 +247,7 @@ public class ExerciseWriteEndpointsTests : ExerciseEndpointTest
         // Arrange
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var id = await CreateExercise(trainer);
-        await AddToWorkout(trainer, SeedData.TrainedWorkoutId, id);
+        await AddToPublishedWorkout(trainer, SeedData.TrainedWorkoutId, id);
         var user = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act
@@ -354,7 +354,7 @@ public class ExerciseWriteEndpointsTests : ExerciseEndpointTest
         // Arrange
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var id = await CreateExercise(trainer);
-        await AddToWorkout(trainer, SeedData.TrainedWorkoutId, id);
+        await AddToPublishedWorkout(trainer, SeedData.TrainedWorkoutId, id);
 
         // Act
         var response = await trainer.DeleteAsync($"/exercises/{id}");
@@ -418,7 +418,7 @@ public class ExerciseWriteEndpointsTests : ExerciseEndpointTest
         // Arrange
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var id = await CreateExercise(trainer);
-        await AddToWorkout(trainer, SeedData.TrainedWorkoutId, id);
+        await AddToPublishedWorkout(trainer, SeedData.TrainedWorkoutId, id);
         var user = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act

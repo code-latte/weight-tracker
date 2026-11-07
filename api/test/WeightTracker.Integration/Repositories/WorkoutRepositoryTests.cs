@@ -2,10 +2,12 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WeightTracker.Application.Common;
+using WeightTracker.Application.Exceptions;
 using WeightTracker.Application.Interfaces;
 using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Mesocycles;
 using WeightTracker.Domain.Workouts;
+using WeightTracker.Infra.Entities;
 using WeightTracker.Infra.Seed;
 using WeightTracker.Integration.Bootstrap;
 using Xunit;
@@ -638,5 +640,315 @@ public class WorkoutRepositoryTests : IntegrationTest
 
         // Assert
         exists.Should().BeFalse();
+    }
+
+    private static readonly DateTime RecordedAt = new(2026, 11, 7, 10, 0, 0, DateTimeKind.Utc);
+
+    private static Workout AStartedWorkoutWith(params Id[] exerciseIds)
+    {
+        var workout = Workout.Create(Id.From(SeedData.UserId), null, Name, null, new DateTime(2026, 11, 7));
+
+        foreach (var exerciseId in exerciseIds)
+            workout.AddExercise(exerciseId, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))]);
+
+        workout.ChangeStatus(WorkoutStatus.PUBLISHED);
+        workout.ChangeStatus(WorkoutStatus.STARTED);
+
+        return workout;
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistTheSetRecordsOfANewAggregate()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca, Sentadilla);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(62.5m), RecordedAt);
+        workout.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(65), RecordedAt.AddMinutes(3));
+        workout.AddSetRecord(Sentadilla, RepCount.From(12), Weight.From(0), RecordedAt.AddMinutes(9));
+
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        foreach (var exerciseId in new[] { PressBanca, Sentadilla })
+        {
+            var expected = EntryFor(workout, exerciseId).SetRecords;
+            var actual = EntryFor(stored!, exerciseId).SetRecords;
+            actual.Select(setRecord => setRecord.Id).Should().Equal(expected.Select(setRecord => setRecord.Id));
+            actual.Select(setRecord => setRecord.Reps).Should().Equal(expected.Select(setRecord => setRecord.Reps));
+            actual.Select(setRecord => setRecord.Weight).Should().Equal(expected.Select(setRecord => setRecord.Weight));
+            actual.Select(setRecord => setRecord.RegisteredAtUtc).Should().Equal(expected.Select(setRecord => setRecord.RegisteredAtUtc));
+        }
+    }
+
+    [Fact]
+    public async Task Save_ShouldAddASetRecordToAStoredAggregateAndKeepTheEarlierOnes()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+        var earlier = EntryFor(workout, PressBanca).SetRecords.Single();
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(2));
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        var setRecords = EntryFor(stored!, PressBanca).SetRecords;
+        setRecords.Should().HaveCount(2);
+        setRecords[0].Id.Should().Be(earlier.Id);
+        setRecords[0].Reps.Value.Should().Be(8);
+        setRecords[1].Reps.Value.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Save_ShouldAppendSetRecordsAddedLaterWhateverTheirRegistrationTime()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt.AddMinutes(5));
+        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(5));
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.AddSetRecord(PressBanca, RepCount.From(10), Weight.From(55), RecordedAt);
+        reloaded.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(60), RecordedAt.AddMinutes(5));
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        EntryFor(stored!, PressBanca).SetRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(8, 7, 10, 6);
+    }
+
+    [Fact]
+    public async Task Save_ShouldDeleteTheSetRecordsOfARemovedExercise()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca, Sentadilla);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(Sentadilla, RepCount.From(5), Weight.From(100), RecordedAt);
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+        var removedEntryId = EntryFor(workout, PressBanca).Id.Value;
+        var keptEntryId = EntryFor(workout, Sentadilla).Id.Value;
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.RemoveExercise(PressBanca);
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var removedRows = await Factory.CountRows<SetRecordEntity>(row => row.WorkoutExerciseId == removedEntryId);
+
+        // Assert
+        removedRows.Should().Be(0);
+        (await Factory.CountRows<SetRecordEntity>(row => row.WorkoutExerciseId == keptEntryId)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetAllByUserId_ShouldRestoreTheSetRecordsAlongsideTheSets()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(2));
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        // Act
+        var workouts = await Factory.WithScope(services =>
+            services.GetRequiredService<IWorkoutRepository>().GetAllByUserId(Id.From(SeedData.UserId), CancellationToken.None));
+
+        // Assert
+        var entry = EntryFor(workouts.Single(item => item.Id == workout.Id), PressBanca);
+        entry.Sets.Should().Equal(new SetPrescription(3, new SetTarget.Reps(10)));
+        entry.SetRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(8, 7);
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistAnEditedSetRecordAndKeepItsRegistrationTime()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(2));
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+        var edited = EntryFor(workout, PressBanca).SetRecords[0];
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.UpdateSetRecord(PressBanca, edited.Id, RepCount.From(10), Weight.From(62.5m), RecordedAt);
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        var setRecords = EntryFor(stored!, PressBanca).SetRecords;
+        setRecords[0].Id.Should().Be(edited.Id);
+        setRecords[0].Reps.Value.Should().Be(10);
+        setRecords[0].Weight.Value.Should().Be(62.5m);
+        setRecords[0].RegisteredAtUtc.Should().Be(RecordedAt);
+        setRecords[1].Reps.Value.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Save_ShouldDeleteOnlyTheRemovedSetRecord()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(60), RecordedAt.AddMinutes(4));
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+        var setRecordIds = EntryFor(workout, PressBanca).SetRecords.Select(setRecord => setRecord.Id).ToList();
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.RemoveSetRecord(PressBanca, setRecordIds[1], RecordedAt);
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        EntryFor(stored!, PressBanca).SetRecords.Select(setRecord => setRecord.Id).Should().Equal(setRecordIds[0], setRecordIds[2]);
+        (await Factory.CountRows<SetRecordEntity>(row => row.Id == setRecordIds[1].Value)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistTheNewOrderOfReorderedSetRecords()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(62.5m), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(65), RecordedAt.AddMinutes(4));
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+        var setRecordIds = EntryFor(workout, PressBanca).SetRecords.Select(setRecord => setRecord.Id).ToList();
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.ReorderSetRecords(PressBanca, [setRecordIds[2], setRecordIds[0], setRecordIds[1]], RecordedAt);
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        var setRecords = EntryFor(stored!, PressBanca).SetRecords;
+        setRecords.Select(setRecord => setRecord.Id).Should().Equal(setRecordIds[2], setRecordIds[0], setRecordIds[1]);
+        setRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(6, 8, 7);
+        setRecords.Select(setRecord => setRecord.Weight.Value).Should().Equal(65, 60, 62.5m);
+    }
+
+    private static readonly DateTime ReviewedAt = new(2026, 11, 8, 9, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>A workout prescribed by the seeded trainer, completed with one set record registered at <see cref="RecordedAt"/>.</summary>
+    private static Workout ACompletedPrescribedWorkout()
+    {
+        var workout = Workout.Create(Id.From(SeedData.UserId), Id.From(SeedData.TrainerId), Name, null, new DateTime(2026, 11, 7));
+        workout.AddExercise(PressBanca, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))]);
+        workout.ChangeStatus(WorkoutStatus.PUBLISHED);
+        workout.ChangeStatus(WorkoutStatus.STARTED);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.ChangeStatus(WorkoutStatus.COMPLETED);
+
+        return workout;
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistTheReviewAndTheResultsTime()
+    {
+        // Arrange
+        var workout = ACompletedPrescribedWorkout();
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.MarkReviewed(Id.From(SeedData.TrainerId), ReviewedAt, reloaded.ResultsUpdatedAt);
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        stored!.Status.Should().Be(WorkoutStatus.REVIEWED);
+        stored.ReviewedAt.Should().Be(ReviewedAt);
+        stored.ReviewedBy.Should().Be(Id.From(SeedData.TrainerId));
+        stored.ResultsUpdatedAt.Should().Be(RecordedAt);
+    }
+
+    [Fact]
+    public async Task Save_ShouldKeepTheResultsTimeEqualToTheOneHeldInMemory()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt.AddTicks(1234567));
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        stored!.ResultsUpdatedAt.Should().Be(workout.ResultsUpdatedAt);
+    }
+
+    [Fact]
+    public async Task SaveChanges_ShouldRefuseAWorkoutThatChangedAfterItWasRead()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        using var slowScope = Factory.Services.CreateScope();
+        var slowRepository = slowScope.ServiceProvider.GetRequiredService<IWorkoutRepository>();
+        var slowCopy = await slowRepository.GetById(workout.Id, CancellationToken.None);
+
+        var fastCopy = await Read(workout.Id);
+        fastCopy!.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        await Write(repository => repository.Save(fastCopy, CancellationToken.None));
+
+        slowCopy!.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(65), RecordedAt.AddMinutes(1));
+        await slowRepository.Save(slowCopy, CancellationToken.None);
+
+        // Act
+        var act = () => slowScope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<WorkoutConcurrencyConflictException>();
+        var stored = await Read(workout.Id);
+        EntryFor(stored!, PressBanca).SetRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(8);
+    }
+
+    [Fact]
+    public async Task SaveChanges_ShouldRefuseAReviewWhenTheResultsChangedConcurrently()
+    {
+        // Arrange
+        var workout = ACompletedPrescribedWorkout();
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        using var reviewScope = Factory.Services.CreateScope();
+        var reviewRepository = reviewScope.ServiceProvider.GetRequiredService<IWorkoutRepository>();
+        var reviewed = await reviewRepository.GetById(workout.Id, CancellationToken.None);
+
+        var corrected = await Read(workout.Id);
+        var setRecordId = EntryFor(corrected!, PressBanca).SetRecords.Single().Id;
+        corrected!.UpdateSetRecord(PressBanca, setRecordId, RepCount.From(10), Weight.From(60), RecordedAt.AddMinutes(30));
+        await Write(repository => repository.Save(corrected, CancellationToken.None));
+
+        // The reviewer still holds the results it read, so the aggregate alone cannot notice the correction
+        reviewed!.MarkReviewed(Id.From(SeedData.TrainerId), ReviewedAt, RecordedAt);
+        await reviewRepository.Save(reviewed, CancellationToken.None);
+
+        // Act
+        var act = () => reviewScope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<WorkoutConcurrencyConflictException>();
+        var stored = await Read(workout.Id);
+        stored!.Status.Should().Be(WorkoutStatus.COMPLETED);
+        EntryFor(stored, PressBanca).SetRecords.Single().Reps.Value.Should().Be(10);
     }
 }

@@ -30,6 +30,20 @@ public class WorkoutEntity
 
     public int? MesocycleWeekNumber { get; set; }
 
+    /// <summary>When the workout was reviewed, in UTC. Null, together with <c>ReviewedBy</c>, until it is reviewed.</summary>
+    public DateTime? ReviewedAtUtc { get; set; }
+
+    /// <summary>User who reviewed the workout. A plain foreign key column, like <c>UserId</c>.</summary>
+    public Guid? ReviewedBy { get; set; }
+
+    /// <summary>Last time the set records of the workout changed, in UTC.</summary>
+    public DateTime? ResultsUpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// Postgres <c>xmin</c> system column, used as an optimistic concurrency token. It changes on every write of the row.
+    /// </summary>
+    public uint Version { get; set; }
+
     /// <summary>Navigation inside the Workout aggregate boundary.</summary>
     public List<WorkoutExerciseEntity> WorkoutExercises { get; set; } = [];
 }

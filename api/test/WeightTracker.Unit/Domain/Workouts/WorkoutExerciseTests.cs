@@ -217,4 +217,98 @@ public class WorkoutExerciseTests
         entry.PerSide.Should().BeTrue();
         entry.Rest.Should().Be(rest);
     }
+
+    private static readonly DateTime TenOClock = new(2026, 11, 7, 10, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void SetRecordCreate_ShouldMarkTheSetRecordAsNewWithAFreshIdAndKeepItsValues()
+    {
+        // Arrange
+        var reps = RepCount.From(8);
+        var weight = Weight.From(62.5m);
+
+        // Act
+        var setRecord = SetRecord.Create(reps, weight, TenOClock);
+
+        // Assert
+        setRecord.IsNew.Should().BeTrue();
+        setRecord.Id.Should().NotBeNull();
+        setRecord.Reps.Should().Be(reps);
+        setRecord.Weight.Should().Be(weight);
+        setRecord.RegisteredAtUtc.Should().Be(TenOClock);
+    }
+
+    [Fact]
+    public void SetRecordRehydrate_ShouldRestoreTheStoredValuesWithoutMarkingItAsNew()
+    {
+        // Arrange
+        var id = Id.New();
+
+        // Act
+        var setRecord = SetRecord.Rehydrate(id, RepCount.From(12), Weight.From(0), TenOClock);
+
+        // Assert
+        setRecord.IsNew.Should().BeFalse();
+        setRecord.Id.Should().Be(id);
+        setRecord.Reps.Value.Should().Be(12);
+        setRecord.Weight.Value.Should().Be(0);
+        setRecord.RegisteredAtUtc.Should().Be(TenOClock);
+    }
+
+    [Fact]
+    public void Create_ShouldStartWithoutSetRecords()
+    {
+        // Arrange
+        var exerciseId = Id.New();
+
+        // Act
+        var entry = WorkoutExercise.Create(exerciseId, Effort.MID, [TwoByTen]);
+
+        // Assert
+        entry.SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRestoreStoredSetRecordsInTheGivenOrder()
+    {
+        // Arrange
+        var atTenOFive = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), TenOClock.AddMinutes(5));
+        var atTenOOne = SetRecord.Rehydrate(Id.New(), RepCount.From(10), Weight.From(55), TenOClock.AddMinutes(1));
+        var atTenOThree = SetRecord.Rehydrate(Id.New(), RepCount.From(9), Weight.From(57.5m), TenOClock.AddMinutes(3));
+
+        // Act
+        var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [TwoByTen], setRecords: [atTenOFive, atTenOOne, atTenOThree]);
+
+        // Assert
+        entry.SetRecords.Should().Equal(atTenOFive, atTenOOne, atTenOThree);
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRestoreStoredSetRecordsWhateverThePrescriptions()
+    {
+        // Arrange
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(20), TenOClock);
+        var duration = new SetPrescription(3, new SetTarget.Duration(40));
+
+        // Act
+        var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [duration], setRecords: [stored]);
+
+        // Assert
+        entry.SetRecords.Should().Equal(stored);
+    }
+
+    [Fact]
+    public void SetRecords_ShouldNotExposeTheInternalCollectionForMutation()
+    {
+        // Arrange
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(20), TenOClock);
+        var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [TwoByTen], setRecords: [stored]);
+
+        // Act
+        var snapshot = entry.SetRecords;
+
+        // Assert
+        snapshot.Should().NotBeSameAs(entry.SetRecords);
+        snapshot.Should().BeAssignableTo<IReadOnlyList<SetRecord>>();
+    }
 }

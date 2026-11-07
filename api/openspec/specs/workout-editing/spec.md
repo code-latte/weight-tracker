@@ -57,16 +57,29 @@ An edit aimed at a workout that does not exist SHALL fail with `404 Not Found` f
 - **WHEN** an authenticated caller edits a workout id that does not exist
 - **THEN** the response is `404 Not Found`
 
-### Requirement: Started and finished workouts are locked for non-admins
-Every workout-editing operation (updating the name, description or date, adding, updating, removing or reordering exercises, creating or breaking superseries) on a `STARTED` or `FINISHED` workout SHALL be rejected with `409 Conflict` for every non-admin caller, including one the edit rule would otherwise allow. The workout SHALL be unchanged. Status changes are not edits and follow the workout status rules instead.
+### Requirement: Only draft workouts are editable for non-admins
+Every workout-editing operation (updating the name, description or date, adding, updating, removing or reordering exercises, creating or breaking superseries) on a `PUBLISHED`, `STARTED`, `COMPLETED` or `REVIEWED` workout SHALL be rejected with `409 Conflict` for every non-admin caller, including one the edit rule would otherwise allow. The workout SHALL be unchanged. Status changes are not edits and follow the workout status rules instead.
+
+#### Scenario: Trainer edits a published workout
+- **WHEN** the prescribing trainer updates an exercise of a `PUBLISHED` workout
+- **THEN** the response is `409 Conflict`
+- **AND** the workout is unchanged and still `PUBLISHED`
+
+#### Scenario: Trainer edits after unpublishing
+- **WHEN** the prescribing trainer moves a `PUBLISHED` workout back to `DRAFT` and then updates one of its exercises
+- **THEN** the edit is applied
+
+#### Scenario: Trainer edits a draft workout
+- **WHEN** the prescribing trainer updates an exercise of a `DRAFT` workout
+- **THEN** the edit is applied
 
 #### Scenario: Trainer edits a started workout
 - **WHEN** the prescribing trainer adds an exercise to a `STARTED` workout
 - **THEN** the response is `409 Conflict`
 - **AND** the workout is unchanged
 
-#### Scenario: Owner edits a finished self-planned workout
-- **WHEN** the owner of a `FINISHED` workout with no prescribing trainer updates one of its exercises
+#### Scenario: Owner edits a completed self-planned workout
+- **WHEN** the owner of a `COMPLETED` workout with no prescribing trainer updates one of its exercises
 - **THEN** the response is `409 Conflict`
 
 #### Scenario: Trainer renames a started workout
@@ -83,24 +96,26 @@ Every workout-editing operation (updating the name, description or date, adding,
 - **THEN** the response is `409 Conflict`
 - **AND** the order is unchanged
 
-### Requirement: Admins bypass the edit lock
-A caller with the `ADMIN` role SHALL be allowed to edit a workout in any status.
+### Requirement: Admins bypass the edit lock except on reviewed workouts
+A caller with the `ADMIN` role SHALL be allowed to edit a workout in any status except `REVIEWED`. Editing a `REVIEWED` workout SHALL be rejected with `409 Conflict` for an admin too, and the workout SHALL be unchanged.
 
-#### Scenario: Admin edits a finished workout
-- **WHEN** an admin removes an exercise from a `FINISHED` workout
+#### Scenario: Admin edits a completed workout
+- **WHEN** an admin removes an exercise from a `COMPLETED` workout
 - **THEN** the edit is applied
 
-#### Scenario: Admin renames a finished workout
-- **WHEN** an admin updates the name of a `FINISHED` workout
+#### Scenario: Admin renames a completed workout
+- **WHEN** an admin updates the name of a `COMPLETED` workout
 - **THEN** the update is applied
 
-### Requirement: Draft and published workouts stay editable
-The edit rule SHALL apply unchanged to `DRAFT` and `PUBLISHED` workouts. A `PUBLISHED` workout SHALL NOT need to go back to `DRAFT` before it is edited.
-
-#### Scenario: Trainer edits a published workout
-- **WHEN** the prescribing trainer updates an exercise of a `PUBLISHED` workout
+#### Scenario: Admin edits a published workout
+- **WHEN** an admin updates an exercise of a `PUBLISHED` workout
 - **THEN** the edit is applied
 - **AND** the status is still `PUBLISHED`
+
+#### Scenario: Admin edits a reviewed workout
+- **WHEN** an admin updates the name of a `REVIEWED` workout
+- **THEN** the response is `409 Conflict`
+- **AND** the workout is unchanged
 
 ### Requirement: Updating a workout's details is an edit
 Updating a workout's `name`, `description` or `workoutDate` through `PUT /workouts/{id}` SHALL follow the same edit rule as changing its content: admins always, the prescribing trainer of a prescribed workout, and the owner of a workout without trainer. Every other caller SHALL be rejected with `403 Forbidden` and the workout SHALL be unchanged.

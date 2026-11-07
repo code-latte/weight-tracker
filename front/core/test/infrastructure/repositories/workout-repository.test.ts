@@ -3,9 +3,14 @@ import type { HttpClientInterface, HttpRequest } from "../../../src/application"
 import {
   ok,
   type AddExerciseRequest,
+  type AddOrUpdateSetRecordRequest,
+  type ChangeWorkoutStatusRequest,
   type CreateSuperSeriesRequest,
   type CreateWorkoutRequest,
+  type ReorderSetRecordsRequest,
   type ReorderWorkoutExercisesRequest,
+  type ReviewWorkoutRequest,
+  type SetRecord,
   type UpdateWorkoutRequest,
   type Workout,
   type WorkoutById,
@@ -25,6 +30,9 @@ const workout: Workout = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  reviewedAt: null,
+  reviewedBy: null,
+  resultsUpdatedAt: null,
   exercises: [],
 };
 
@@ -57,6 +65,7 @@ const workoutExercise: WorkoutExerciseDetail = {
     { count: 1, target: { type: "Minutes", minutes: 2 } },
   ],
   superSeriesId: null,
+  setRecords: [],
 };
 
 const workoutDetail: WorkoutDetail = {
@@ -105,6 +114,30 @@ const createSuperSeriesRequest: CreateSuperSeriesRequest = {
 };
 
 const superSeriesId = 3;
+
+const setRecord: SetRecord = {
+  id: "4c5d6e7f-8091-4b2c-9d3e-4f5a6b7c8d9e",
+  reps: 8,
+  weight: 60.5,
+  registeredAtUtc: "2026-11-02T10:15:00Z",
+};
+
+const workoutWithResults: WorkoutDetail = {
+  ...workoutDetail,
+  status: "STARTED",
+  resultsUpdatedAt: setRecord.registeredAtUtc,
+  exercises: [{ ...workoutExercise, setRecords: [setRecord] }],
+};
+
+const setRecordRequest: AddOrUpdateSetRecordRequest = { reps: 8, weight: 60.5 };
+
+const reorderSetRecordsRequest: ReorderSetRecordsRequest = {
+  setRecordIds: ["5d6e7f80-91a2-4c3d-8e4f-5a6b7c8d9e0f", setRecord.id],
+};
+
+const reviewRequest: ReviewWorkoutRequest = { resultsUpdatedAt: setRecord.registeredAtUtc };
+
+const changeStatusRequest: ChangeWorkoutStatusRequest = { status: "STARTED" };
 
 class FakeHttpClient implements HttpClientInterface {
   readonly requests: HttpRequest[] = [];
@@ -860,6 +893,437 @@ describe("WorkoutRepository", () => {
 
       // Act
       const result = await repository.breakSuperSeries(workout.id, superSeriesId);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("addSetRecord", () => {
+    it("posts the request to /workouts/{workoutId}/exercises/{exerciseId}/set-records unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.addSetRecord(workout.id, workoutExercise.exerciseId, setRecordRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "POST",
+          path: `/workouts/${workout.id}/exercises/${workoutExercise.exerciseId}/set-records`,
+          body: setRecordRequest,
+        },
+      ]);
+    });
+
+    it("returns the workout with its set records on success", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutWithResults));
+
+      // Act
+      const result = await repository.addSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecordRequest,
+      );
+
+      // Assert
+      expect(result).toEqual(ok(workoutWithResults));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.addSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecordRequest,
+      );
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.addSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecordRequest,
+      );
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("updateSetRecord", () => {
+    it("puts the request to .../set-records/{setRecordId} unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.updateSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecord.id,
+        setRecordRequest,
+      );
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "PUT",
+          path: `/workouts/${workout.id}/exercises/${workoutExercise.exerciseId}/set-records/${setRecord.id}`,
+          body: setRecordRequest,
+        },
+      ]);
+    });
+
+    it("returns the workout with the corrected set record on success", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutWithResults));
+
+      // Act
+      const result = await repository.updateSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecord.id,
+        setRecordRequest,
+      );
+
+      // Assert
+      expect(result).toEqual(ok(workoutWithResults));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.updateSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecord.id,
+        setRecordRequest,
+      );
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.updateSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecord.id,
+        setRecordRequest,
+      );
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("removeSetRecord", () => {
+    it("deletes .../set-records/{setRecordId} without a body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.removeSetRecord(workout.id, workoutExercise.exerciseId, setRecord.id);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "DELETE",
+          path: `/workouts/${workout.id}/exercises/${workoutExercise.exerciseId}/set-records/${setRecord.id}`,
+        },
+      ]);
+    });
+
+    it("returns the workout the API answers with 200", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutWithResults));
+
+      // Act
+      const result = await repository.removeSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecord.id,
+      );
+
+      // Assert
+      expect(result).toEqual(ok(workoutWithResults));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.removeSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecord.id,
+      );
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.removeSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        setRecord.id,
+      );
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("reorderSetRecords", () => {
+    it("puts the request to .../set-records/order unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.reorderSetRecords(
+        workout.id,
+        workoutExercise.exerciseId,
+        reorderSetRecordsRequest,
+      );
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "PUT",
+          path: `/workouts/${workout.id}/exercises/${workoutExercise.exerciseId}/set-records/order`,
+          body: reorderSetRecordsRequest,
+        },
+      ]);
+    });
+
+    it("returns the reordered workout on success", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutWithResults));
+
+      // Act
+      const result = await repository.reorderSetRecords(
+        workout.id,
+        workoutExercise.exerciseId,
+        reorderSetRecordsRequest,
+      );
+
+      // Assert
+      expect(result).toEqual(ok(workoutWithResults));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.reorderSetRecords(
+        workout.id,
+        workoutExercise.exerciseId,
+        reorderSetRecordsRequest,
+      );
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.reorderSetRecords(
+        workout.id,
+        workoutExercise.exerciseId,
+        reorderSetRecordsRequest,
+      );
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("review", () => {
+    it("puts the request to /workouts/{workoutId}/review unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.review(workout.id, reviewRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "PUT",
+          path: `/workouts/${workout.id}/review`,
+          body: reviewRequest,
+        },
+      ]);
+    });
+
+    it("returns the reviewed workout on success", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutWithResults));
+
+      // Act
+      const result = await repository.review(workout.id, reviewRequest);
+
+      // Assert
+      expect(result).toEqual(ok(workoutWithResults));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.review(workout.id, reviewRequest);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("keeps a null resultsUpdatedAt in the body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.review(workout.id, { resultsUpdatedAt: null });
+
+      // Assert
+      expect(httpClient.requests[0]?.body).toEqual({ resultsUpdatedAt: null });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.review(workout.id, reviewRequest);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("changeStatus", () => {
+    it("puts the request to /workouts/{workoutId}/status unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.changeStatus(workout.id, changeStatusRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "PUT",
+          path: `/workouts/${workout.id}/status`,
+          body: changeStatusRequest,
+        },
+      ]);
+    });
+
+    it("returns the workout in its new status on success", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutWithResults));
+
+      // Act
+      const result = await repository.changeStatus(workout.id, changeStatusRequest);
+
+      // Assert
+      expect(result).toEqual(ok(workoutWithResults));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.changeStatus(workout.id, changeStatusRequest);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.changeStatus(workout.id, changeStatusRequest);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

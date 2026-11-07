@@ -26,6 +26,7 @@ const workoutExercise: WorkoutExerciseDetail = {
   restMinutes: 0.75,
   sets: [{ count: 2, target: { type: "Reps", value: 15, maxValue: null } }],
   superSeriesId: null,
+  setRecords: [],
 };
 
 const body: AddExerciseRequest & { exerciseId: string } = {
@@ -95,6 +96,36 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
   }
 
   async breakSuperSeries(): Promise<Result<void, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async addSetRecord(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async updateSetRecord(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async removeSetRecord(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async reorderSetRecords(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async review(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async changeStatus(): Promise<Result<WorkoutDetail, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }

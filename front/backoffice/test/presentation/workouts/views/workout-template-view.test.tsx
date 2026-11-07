@@ -55,6 +55,7 @@ function entry(id: string, exerciseId: string): WorkoutExerciseDetail {
     restMinutes: null,
     sets: [{ count: 3, target: { type: "Reps", value: 10, maxValue: null } }],
     superSeriesId: null,
+    setRecords: [],
   };
 }
 

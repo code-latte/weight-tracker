@@ -26,6 +26,7 @@ const templateExercise: WorkoutExerciseDetail = {
   restMinutes: null,
   sets: [{ count: 3, target: { type: "REPS", value: 10, maxValue: null } }],
   superSeriesId: null,
+  setRecords: [],
 };
 
 const template: WorkoutTemplate = {
@@ -46,6 +47,9 @@ const workout: Workout = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  reviewedAt: null,
+  reviewedBy: null,
+  resultsUpdatedAt: null,
   exercises: [],
 };
 

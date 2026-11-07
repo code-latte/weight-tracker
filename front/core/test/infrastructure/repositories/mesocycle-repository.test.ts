@@ -54,6 +54,9 @@ const weekWorkout: WorkoutListItem = {
   trainer,
   mesocycleId: mesocycle.id,
   mesocycleWeekNumber: 1,
+  reviewedAt: null,
+  reviewedBy: null,
+  resultsUpdatedAt: null,
 };
 
 const createRequest: CreateMesocycleRequest = {

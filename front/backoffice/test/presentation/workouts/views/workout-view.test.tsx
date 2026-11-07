@@ -145,7 +145,16 @@ function workoutExercise(
   sets: WorkoutExerciseDetail["sets"],
   { perSide = false, restMinutes = null }: Partial<WorkoutExerciseDetail> = {},
 ): WorkoutExerciseDetail {
-  return { id, exerciseId, effort, perSide, restMinutes, sets, superSeriesId: null };
+  return {
+    id,
+    exerciseId,
+    effort,
+    perSide,
+    restMinutes,
+    sets,
+    superSeriesId: null,
+    setRecords: [],
+  };
 }
 
 const squatInWorkout = workoutExercise("we-1", squat.id, "HIGH", [
@@ -174,6 +183,9 @@ const workout: WorkoutById = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  reviewedAt: null,
+  reviewedBy: null,
+  resultsUpdatedAt: null,
   exercises: [squatInWorkout, benchInWorkout, pressInWorkout],
   athlete: ana,
   trainer: null,
@@ -203,6 +215,7 @@ function entryOf(
     perSide: perSide ?? false,
     restMinutes: restMinutes ?? null,
     superSeriesId: null,
+    setRecords: [],
     sets: (sets ?? []).map(({ count, targetType, target, maxTarget, targetMinutes }) => ({
       count: count ?? 0,
       target:

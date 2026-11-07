@@ -32,6 +32,7 @@ function newItemOf(exercise: Exercise): WorkoutExerciseItem {
       restMinutes: null,
       sets: [],
       superSeriesId: null,
+      setRecords: [],
     },
     exercise,
   };

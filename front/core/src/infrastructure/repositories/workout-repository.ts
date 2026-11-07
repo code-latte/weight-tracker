@@ -1,13 +1,17 @@
 import type { HttpClientInterface, WorkoutRepositoryInterface } from "../../application";
 import {
   type AddExerciseRequest,
+  type AddOrUpdateSetRecordRequest,
+  type ChangeWorkoutStatusRequest,
   type CreateSuperSeriesRequest,
   type CreateWorkoutRequest,
   type DomainError,
   fail,
   ok,
+  type ReorderSetRecordsRequest,
   type ReorderWorkoutExercisesRequest,
   type Result,
+  type ReviewWorkoutRequest,
   type SuperSeries,
   type SuperSeriesId,
   type UpdateWorkoutRequest,
@@ -170,6 +174,112 @@ export default class WorkoutRepository implements WorkoutRepositoryInterface {
       });
 
       return ok(undefined);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async addSetRecord(
+    workoutId: string,
+    exerciseId: string,
+    request: AddOrUpdateSetRecordRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>> {
+    try {
+      const response = await this.httpClient.request<WorkoutDetail>({
+        method: "POST",
+        path: `/workouts/${workoutId}/exercises/${exerciseId}/set-records`,
+        body: request,
+      });
+
+      return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async updateSetRecord(
+    workoutId: string,
+    exerciseId: string,
+    setRecordId: string,
+    request: AddOrUpdateSetRecordRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>> {
+    try {
+      const response = await this.httpClient.request<WorkoutDetail>({
+        method: "PUT",
+        path: `/workouts/${workoutId}/exercises/${exerciseId}/set-records/${setRecordId}`,
+        body: request,
+      });
+
+      return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async removeSetRecord(
+    workoutId: string,
+    exerciseId: string,
+    setRecordId: string,
+  ): Promise<Result<WorkoutDetail, DomainError>> {
+    try {
+      const response = await this.httpClient.request<WorkoutDetail>({
+        method: "DELETE",
+        path: `/workouts/${workoutId}/exercises/${exerciseId}/set-records/${setRecordId}`,
+      });
+
+      return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async reorderSetRecords(
+    workoutId: string,
+    exerciseId: string,
+    request: ReorderSetRecordsRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>> {
+    try {
+      const response = await this.httpClient.request<WorkoutDetail>({
+        method: "PUT",
+        path: `/workouts/${workoutId}/exercises/${exerciseId}/set-records/order`,
+        body: request,
+      });
+
+      return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async review(
+    workoutId: string,
+    request: ReviewWorkoutRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>> {
+    try {
+      const response = await this.httpClient.request<WorkoutDetail>({
+        method: "PUT",
+        path: `/workouts/${workoutId}/review`,
+        body: request,
+      });
+
+      return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async changeStatus(
+    workoutId: string,
+    request: ChangeWorkoutStatusRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>> {
+    try {
+      const response = await this.httpClient.request<WorkoutDetail>({
+        method: "PUT",
+        path: `/workouts/${workoutId}/status`,
+        body: request,
+      });
+
+      return ok(response);
     } catch (error) {
       return fail(mapHttpError(error));
     }

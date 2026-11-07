@@ -41,6 +41,9 @@ const created: Workout = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  reviewedAt: null,
+  reviewedBy: null,
+  resultsUpdatedAt: null,
   exercises: [],
 };
 
@@ -91,6 +94,7 @@ function templateOf(id: string, name: string, description: string | null, exerci
     restMinutes: null,
     sets: [],
     superSeriesId: null,
+    setRecords: [],
   };
   return {
     id,

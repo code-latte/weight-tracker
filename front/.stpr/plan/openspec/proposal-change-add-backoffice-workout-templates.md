@@ -247,7 +247,7 @@ None. No new port and no new package.
 ## Notes
 
 - **Task order.** 1) snapshot refresh (own commit), 2) core aliases, repository, use cases and tests, plus backoffice
-   wiring, 3) templates list and editor, 4) create workout from template, 5) save workout as template.
+  wiring, 3) templates list and editor, 4) create workout from template, 5) save workout as template.
 - **Shared editor.** "Edit a template = edit a workout" is the core of the change. The workout editor organisms
   (`workout-details-card`, `workout-exercises-card`, `workout-exercises-list`, `exercise-configuration-dialog`,
   `exercise-catalog-dialog`, `super-series-card`, `break-super-series-dialog`) are bound to workouts through their

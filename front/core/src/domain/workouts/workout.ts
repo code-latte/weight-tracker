@@ -17,6 +17,13 @@ export type CreateSuperSeriesRequest = components["schemas"]["CreateSuperSeriesR
 export type SuperSeries = components["schemas"]["SuperSeriesResponse"];
 /** The id that groups the members of a superseries, unique within its workout. */
 export type SuperSeriesId = NonNullable<WorkoutExerciseDetail["superSeriesId"]>;
+/** A set actually performed by the athlete, as opposed to the prescribed sets. */
+export type SetRecord = components["schemas"]["SetRecordResponse"];
+export type AddOrUpdateSetRecordRequest = components["schemas"]["AddOrUpdateSetRecordRequest"];
+export type ReorderSetRecordsRequest = components["schemas"]["ReorderSetRecordsRequest"];
+export type ReviewWorkoutRequest = components["schemas"]["ReviewWorkoutRequest"];
+export type ChangeWorkoutStatusRequest = components["schemas"]["ChangeWorkoutStatusRequest"];
+export type WorkoutStatus = components["schemas"]["WorkoutStatus"];
 
 /** The workout id travels in the path, the rest of the input in the body. */
 export type UpdateWorkoutInput = UpdateWorkoutRequest & { id: string };
@@ -37,3 +44,25 @@ export type ReorderWorkoutExercisesInput = ReorderWorkoutExercisesRequest & { wo
 export type CreateSuperSeriesInput = { workoutId: string; exerciseIds: string[] };
 /** Both ids travel in the path. */
 export type BreakSuperSeriesInput = { workoutId: string; superSeriesId: SuperSeriesId };
+/** Both ids travel in the path, `reps` and `weight` in the body; `exerciseId` is the catalog exercise. */
+export type AddSetRecordInput = AddOrUpdateSetRecordRequest & {
+  workoutId: string;
+  exerciseId: string;
+};
+/** The three ids travel in the path, `reps` and `weight` in the body; `exerciseId` is the catalog exercise. */
+export type UpdateSetRecordInput = AddOrUpdateSetRecordRequest & {
+  workoutId: string;
+  exerciseId: string;
+  setRecordId: string;
+};
+/** The three ids travel in the path; `exerciseId` is the catalog exercise. */
+export type RemoveSetRecordInput = { workoutId: string; exerciseId: string; setRecordId: string };
+/** Both ids travel in the path; the body holds every set record id of the exercise, in the new order. */
+export type ReorderSetRecordsInput = ReorderSetRecordsRequest & {
+  workoutId: string;
+  exerciseId: string;
+};
+/** The workout id travels in the path; `resultsUpdatedAt` is the value last read, sent unchanged. */
+export type ReviewWorkoutInput = ReviewWorkoutRequest & { workoutId: string };
+/** The workout id travels in the path, the target status in the body. */
+export type ChangeWorkoutStatusInput = ChangeWorkoutStatusRequest & { workoutId: string };

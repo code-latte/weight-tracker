@@ -21,6 +21,7 @@ const entry: WorkoutExerciseDetail = {
   restMinutes: null,
   sets: [{ count: 3, target: { type: "REPS", value: 10, maxValue: null } }],
   superSeriesId: null,
+  setRecords: [],
 };
 
 const exerciseRequest: AddExerciseRequest = {

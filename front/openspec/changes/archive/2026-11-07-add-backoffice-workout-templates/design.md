@@ -52,7 +52,7 @@ See `proposal.md` for the motivation, scope and the decisions taken from the bri
     `RemoveExerciseFromWorkoutTemplateInput`, `ReorderWorkoutTemplateExercisesInput`,
     `CreateWorkoutTemplateSuperSeriesInput`, `BreakWorkoutTemplateSuperSeriesInput` (the workout inputs with
     `templateId` instead of `workoutId`), `CreateWorkoutFromTemplateInput = CreateWorkoutFromTemplateRequest &
-    { templateId }`, `CreateWorkoutTemplateFromWorkoutInput = { workoutId }`.
+{ templateId }`, `CreateWorkoutTemplateFromWorkoutInput = { workoutId }`.
   - The exercise and superseries bodies reuse `AddExerciseRequest`, `ReorderWorkoutExercisesRequest`,
     `CreateSuperSeriesRequest`, `SuperSeries`, `SuperSeriesId` and `WorkoutExerciseDetail` from the workout domain.
 - `WorkoutTemplateRepositoryInterface` (`core/src/application/ports/workout-template-repository-interface.ts`): one
@@ -125,17 +125,17 @@ Imports flow downward; only atoms import MUI widgets.
 
 ### Backoffice: state hooks and held state
 
-| Hook | Folder | Holds | Changed by | Resets |
-| --- | --- | --- | --- | --- |
-| `useWorkoutTemplates` | `workouts/hooks` | list, status, errorCode | mount, `reload` | screen exit |
-| `useWorkoutTemplate` | `workouts/hooks` | template, status, errorCode | mount, `reload` | screen exit |
-| `useCreateWorkoutTemplate` | `workouts/hooks` | saving, errorCode | dialog `create` | dialog close |
-| `useUpdateWorkoutTemplate` | `workouts/hooks` | saving, saved, errorCode | `save`, `clearSaved` | screen exit |
-| `useDeleteWorkoutTemplate` | `workouts/hooks` | pending, errorCode | `remove` | screen exit |
-| `useSaveWorkoutAsTemplate` | `workouts/hooks` | pending, created template id, errorCode | `save`, field edit | screen exit |
-| `useExercisesEditor` | `workouts/hooks` | entries, dialog, selection, break target | editor handlers | screen exit |
-| `useWorkoutTemplateOptions(trainerId?, enabled)` | `common/hooks` | templates, status, errorCode | `enabled` / `trainerId` change, `reload` | dialog close |
-| `useCreateWorkoutFromTemplate` | `common/hooks` | saving, errorCode | `create` | dialog close |
+| Hook                                             | Folder           | Holds                                    | Changed by                               | Resets       |
+| ------------------------------------------------ | ---------------- | ---------------------------------------- | ---------------------------------------- | ------------ |
+| `useWorkoutTemplates`                            | `workouts/hooks` | list, status, errorCode                  | mount, `reload`                          | screen exit  |
+| `useWorkoutTemplate`                             | `workouts/hooks` | template, status, errorCode              | mount, `reload`                          | screen exit  |
+| `useCreateWorkoutTemplate`                       | `workouts/hooks` | saving, errorCode                        | dialog `create`                          | dialog close |
+| `useUpdateWorkoutTemplate`                       | `workouts/hooks` | saving, saved, errorCode                 | `save`, `clearSaved`                     | screen exit  |
+| `useDeleteWorkoutTemplate`                       | `workouts/hooks` | pending, errorCode                       | `remove`                                 | screen exit  |
+| `useSaveWorkoutAsTemplate`                       | `workouts/hooks` | pending, created template id, errorCode  | `save`, field edit                       | screen exit  |
+| `useExercisesEditor`                             | `workouts/hooks` | entries, dialog, selection, break target | editor handlers                          | screen exit  |
+| `useWorkoutTemplateOptions(trainerId?, enabled)` | `common/hooks`   | templates, status, errorCode             | `enabled` / `trainerId` change, `reload` | dialog close |
+| `useCreateWorkoutFromTemplate`                   | `common/hooks`   | saving, errorCode                        | `create`                                 | dialog close |
 
 All mutation hooks follow `use-update-workout.ts` (status / errorCode cleared on start, `runWithSession`). The dialogs'
 section, selected template and form values are local `useState`, reset on close. Nothing outlives its screen or logout.

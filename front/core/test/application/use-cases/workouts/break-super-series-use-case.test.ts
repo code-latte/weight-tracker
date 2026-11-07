@@ -76,6 +76,36 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
     this.breaks.push({ workoutId: workoutIdOfCall, superSeriesId });
     return this.result;
   }
+
+  async addSetRecord(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async updateSetRecord(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async removeSetRecord(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async reorderSetRecords(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async review(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async changeStatus(): Promise<Result<WorkoutDetail, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
 }
 
 describe("BreakSuperSeriesUseCase", () => {

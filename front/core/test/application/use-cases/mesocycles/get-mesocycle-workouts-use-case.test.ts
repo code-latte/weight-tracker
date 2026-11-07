@@ -33,6 +33,9 @@ const firstWeek: WorkoutListItem = {
   trainer: null,
   mesocycleId,
   mesocycleWeekNumber: 1,
+  reviewedAt: null,
+  reviewedBy: null,
+  resultsUpdatedAt: null,
 };
 
 const secondWeek: WorkoutListItem = {

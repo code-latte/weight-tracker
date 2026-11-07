@@ -63,6 +63,9 @@ const legs: WorkoutListItem = {
   trainer: luis,
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  reviewedAt: null,
+  reviewedBy: null,
+  resultsUpdatedAt: null,
 };
 
 const pushDay: WorkoutListItem = {

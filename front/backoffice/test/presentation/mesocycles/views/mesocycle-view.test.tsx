@@ -116,6 +116,9 @@ function weekWorkoutOf(id: string, name: string, week: number): WorkoutListItem 
     trainer: luis,
     mesocycleId: "m-1",
     mesocycleWeekNumber: week,
+    reviewedAt: null,
+    reviewedBy: null,
+    resultsUpdatedAt: null,
   };
 }
 
@@ -153,6 +156,9 @@ function createdWorkout(request: CreateWorkoutRequest): Workout {
     exercises: [],
     mesocycleId: request.mesocycleId ?? null,
     mesocycleWeekNumber: request.mesocycleWeekNumber ?? null,
+    reviewedAt: null,
+    reviewedBy: null,
+    resultsUpdatedAt: null,
   };
 }
 

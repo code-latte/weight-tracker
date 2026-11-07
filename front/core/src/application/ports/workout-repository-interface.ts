@@ -1,11 +1,15 @@
 import type {
   AddExerciseRequest,
+  AddOrUpdateSetRecordRequest,
+  ChangeWorkoutStatusRequest,
   CreateSuperSeriesRequest,
   CreateWorkoutRequest,
   DomainError,
   GetWorkoutsInput,
+  ReorderSetRecordsRequest,
   ReorderWorkoutExercisesRequest,
   Result,
+  ReviewWorkoutRequest,
   SuperSeries,
   SuperSeriesId,
   UpdateWorkoutRequest,
@@ -43,4 +47,33 @@ export default interface WorkoutRepositoryInterface {
     workoutId: string,
     superSeriesId: SuperSeriesId,
   ): Promise<Result<void, DomainError>>;
+  addSetRecord(
+    workoutId: string,
+    exerciseId: string,
+    request: AddOrUpdateSetRecordRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>>;
+  updateSetRecord(
+    workoutId: string,
+    exerciseId: string,
+    setRecordId: string,
+    request: AddOrUpdateSetRecordRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>>;
+  removeSetRecord(
+    workoutId: string,
+    exerciseId: string,
+    setRecordId: string,
+  ): Promise<Result<WorkoutDetail, DomainError>>;
+  reorderSetRecords(
+    workoutId: string,
+    exerciseId: string,
+    request: ReorderSetRecordsRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>>;
+  review(
+    workoutId: string,
+    request: ReviewWorkoutRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>>;
+  changeStatus(
+    workoutId: string,
+    request: ChangeWorkoutStatusRequest,
+  ): Promise<Result<WorkoutDetail, DomainError>>;
 }

@@ -33,6 +33,7 @@ const entry = {
   restMinutes: null,
   sets: [],
   superSeriesId: null,
+  setRecords: [],
 } satisfies WorkoutTemplate["exercises"][number];
 
 const legs: WorkoutTemplate = {

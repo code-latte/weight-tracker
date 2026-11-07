@@ -24,6 +24,12 @@ import type {
   RedefineMesocycleWeekInput,
   RemoveExerciseFromWorkoutInput,
   ReorderWorkoutExercisesInput,
+  AddSetRecordInput,
+  UpdateSetRecordInput,
+  RemoveSetRecordInput,
+  ReorderSetRecordsInput,
+  ReviewWorkoutInput,
+  ChangeWorkoutStatusInput,
   LoginRequest,
   Session,
   SignupCredentials,
@@ -113,6 +119,12 @@ export default interface Dependencies {
   reorderWorkoutExercisesUseCase: UseCaseInterface<ReorderWorkoutExercisesInput, WorkoutDetail>;
   createSuperSeriesUseCase: UseCaseInterface<CreateSuperSeriesInput, SuperSeries>;
   breakSuperSeriesUseCase: UseCaseInterface<BreakSuperSeriesInput, void>;
+  addSetRecordUseCase: UseCaseInterface<AddSetRecordInput, WorkoutDetail>;
+  updateSetRecordUseCase: UseCaseInterface<UpdateSetRecordInput, WorkoutDetail>;
+  removeSetRecordUseCase: UseCaseInterface<RemoveSetRecordInput, WorkoutDetail>;
+  reorderSetRecordsUseCase: UseCaseInterface<ReorderSetRecordsInput, WorkoutDetail>;
+  reviewWorkoutUseCase: UseCaseInterface<ReviewWorkoutInput, WorkoutDetail>;
+  changeWorkoutStatusUseCase: UseCaseInterface<ChangeWorkoutStatusInput, WorkoutDetail>;
   getWorkoutTemplatesUseCase: UseCaseInterface<GetWorkoutTemplatesInput, WorkoutTemplate[]>;
   getWorkoutTemplateByIdUseCase: UseCaseInterface<GetWorkoutTemplateByIdInput, WorkoutTemplate>;
   createWorkoutTemplateUseCase: UseCaseInterface<CreateWorkoutTemplateRequest, WorkoutTemplate>;

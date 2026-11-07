@@ -20,6 +20,7 @@ const entry: WorkoutExerciseDetail = {
   restMinutes: null,
   sets: [{ count: 3, target: { type: "REPS", value: 10, maxValue: null } }],
   superSeriesId: null,
+  setRecords: [],
 };
 
 /** Records every call by method name and answers each with the configured result. */

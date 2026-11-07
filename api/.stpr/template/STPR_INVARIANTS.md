@@ -190,21 +190,54 @@ These rules decide who may perform an operation. They are permissions, so they l
     **not** edit a prescribed workout;
   - the workout's owner (`UserId`), when the workout has no prescribing trainer, whatever the owner's role.
   - Anyone else is rejected with `UnauthorizedOperationException` (403).
-  - Once a workout is `STARTED` or `FINISHED` it is locked: a caller who passes the rule above, other than an
-    `ADMIN`, is rejected with `WorkoutLockedException` (409). The permission check runs first, so a caller who
-    may not edit the workout gets 403 and never learns its status.
+  - Only a `DRAFT` workout can be edited. Once it is `PUBLISHED`, `STARTED` or `COMPLETED`, a caller who passes the
+    rule above, other than an `ADMIN`, is rejected with `WorkoutLockedException` (409); the trainer moves a published
+    workout back to `DRAFT` first. A `REVIEWED` workout is locked for every caller, an `ADMIN` included. The
+    permission check runs first, so a caller who may not edit the workout gets 403 and never learns its status.
+  - The edit lock is not the placement lock: only an executed workout (`STARTED`, `COMPLETED`, `REVIEWED`) keeps its
+    mesocycle placement, whoever asks.
   - The rule lives in a single Application service shared by every workout-editing use case; use cases must not
     restate it inline.
+  - Recording sets is not an edit, so neither this rule nor the lock applies to it. It follows the recording rule below.
+- **Recording sets.** Adding, editing, removing and reordering the set records of a workout (the reps and weight
+  actually performed) is allowed only to:
+  - an `ADMIN`, always;
+  - the workout's owner (`UserId`), whether or not the workout has a prescribing trainer, unless the owner's role is
+    `TRAINER`;
+  - every `TRAINER` is rejected, including the prescribing trainer and a trainer who owns the workout. Anyone else
+    is rejected as well, with `UnauthorizedOperationException` (403).
+  - It is allowed only while the workout is `STARTED` or `COMPLETED`, for every caller including an `ADMIN`;
+    `COMPLETED` lets the athlete correct the results, and `REVIEWED` keeps them as they were reviewed. The aggregate
+    enforces that with `WorkoutResultsLockedException` (409). The permission check runs first, so a caller who may
+    not record gets 403 and never learns the workout's status.
+  - Every change to the set records updates the workout's `ResultsUpdatedAt`, with the time passed in by the caller.
+  - The rule lives in a single Application service shared by every set record use case; use cases must not restate
+    it inline.
 - **Changing a workout's status.** A status change is not an edit of the content, so it is governed by its own
   Application service and not by the editing rule. The lifecycle is `DRAFT -> PUBLISHED`, `PUBLISHED -> DRAFT`,
-  `PUBLISHED -> STARTED` and `STARTED -> FINISHED`; the aggregate refuses any other move with a domain exception (409).
-  - an `ADMIN` may set any status, skipping the lifecycle;
+  `PUBLISHED -> STARTED` and `STARTED -> COMPLETED`; the aggregate refuses any other move with a domain exception (409).
+  `COMPLETED -> REVIEWED` is not a status change: it happens only through the review rule below.
+  - an `ADMIN` may set any status except `REVIEWED`, skipping the lifecycle, and may not move a `REVIEWED` workout
+    away; unlocking a reviewed workout needs its own authorized and audited operation;
   - the prescribing trainer may only publish and unpublish (`DRAFT <-> PUBLISHED`);
-  - the athlete (`UserId`) of a prescribed workout may only move it forward (`PUBLISHED -> STARTED -> FINISHED`),
+  - the athlete (`UserId`) of a prescribed workout may only move it forward (`PUBLISHED -> STARTED -> COMPLETED`),
     and never touches it while it is a `DRAFT`;
   - the athlete of a workout without trainer may make every lifecycle move;
   - anyone else is rejected with `UnauthorizedOperationException` (403). A valid move the caller's role cannot make
     is 403; a move outside the lifecycle is 409.
+- **Reviewing a workout.** Marking a `COMPLETED` workout as `REVIEWED` is allowed only to:
+  - an `ADMIN`;
+  - the workout's prescribing trainer (`TrainerId`).
+  - Anyone else, the athlete included, is rejected with `UnauthorizedOperationException` (403), before the status is
+    looked at.
+  - A workout without a prescribing trainer is never reviewed: `COMPLETED` is its final status (409 for every caller).
+  - The review records `ReviewedAt` and `ReviewedBy`; the aggregate's `MarkReviewed` is the only way to reach `REVIEWED`.
+  - The caller sends the `ResultsUpdatedAt` it read. If the results changed since, the review is refused (409), so
+    nobody reviews outdated results.
+- **Saving a workout.** Every workout carries an optimistic concurrency token (the Postgres row version), checked
+  against the version the repository loaded. A save of a workout that another request changed in the meantime fails
+  with `WorkoutConcurrencyConflictException` (409) instead of overwriting, whatever the operation: edits, status
+  changes, set records and reviews alike.
 - **Reading a workout.** A prescribed workout (one with a `TrainerId`) in `DRAFT` is hidden from its athlete in
   every read path (by id and in lists). Self-planned drafts, and drafts seen by the trainer or an `ADMIN`, are
   never hidden. The check is the aggregate's `IsHiddenFrom`; read use cases must not restate it inline.

@@ -42,6 +42,33 @@ public class WorkoutScopingTests : WorkoutEndpointTest
     }
 
     [Fact]
+    public async Task GetAll_ShouldCarryTheReviewOfAReviewedWorkout()
+    {
+        // Arrange
+        await GivenReviewed(SeedData.TrainedWorkoutId);
+
+        // Act
+        var workout = await WorkoutVisibleTo(SeedCredentials.Trainer, SeedData.TrainedWorkoutId);
+
+        // Assert
+        workout.GetProperty("status").GetString().Should().Be("REVIEWED");
+        workout.GetProperty("reviewedBy").GetGuid().Should().Be(SeedData.AdminId);
+        workout.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.String);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldCarryEmptyReviewAndResultsForAWorkoutThatNeverHadThem()
+    {
+        // Arrange & Act
+        var workout = await WorkoutVisibleTo(SeedCredentials.Trainer, SeedData.TrainedWorkoutId);
+
+        // Assert
+        workout.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.Null);
+        workout.GetProperty("reviewedBy").ValueKind.Should().Be(JsonValueKind.Null);
+        workout.GetProperty("resultsUpdatedAt").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task GetAll_ShouldRejectATokenWhoseUserNoLongerExists()
     {
         // Arrange

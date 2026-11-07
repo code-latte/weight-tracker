@@ -49,6 +49,8 @@ public class ExceptionMapper
             or InvalidWorkoutAssignmentException
             or InvalidSetPrescriptionException
             or InvalidTimeInMinutesException
+            or InvalidRepCountException
+            or InvalidWeightException
             or WorkoutExerciseRequiresSetsException
             or ExerciseIdMismatchException
             or InvalidMesocycleNameException
@@ -87,7 +89,8 @@ public class ExceptionMapper
                 or SuperSeriesNotFoundException or WorkoutNotFoundException
                 or WorkoutExerciseNotInWorkoutException or TrainerAthleteNotFoundException
                 or TrainerInvitationNotFoundException or MesocycleWeekNotFoundException
-                or MesocycleNotFoundException or WorkoutTemplateNotFoundException => Problem(
+                or MesocycleNotFoundException or WorkoutTemplateNotFoundException
+                or SetRecordNotFoundException => Problem(
                 StatusCodes.Status404NotFound,
                 exception.Message
             ),
@@ -95,7 +98,7 @@ public class ExceptionMapper
             RefreshTokenAlreadyRevokedException or EmailAlreadyExistException
                 or ExerciseAlreadyInWorkoutException or ExerciseAlreadyInSuperSeriesException
                 or InvalidWorkoutStatusTransitionException or WorkoutLockedException
-                or WorkoutExerciseOrderMismatchException or UserAlreadyActiveException
+                or WorkoutExerciseOrderMismatchException or SetRecordOrderMismatchException or UserAlreadyActiveException
                 or UserAlreadyDeactivatedException or AthleteAlreadyHasTrainerException
                 or InvalidTrainerAthleteRoleException or InvalidTrainerAthleteStatusTransitionException
                 or PendingInvitationAlreadyExistsException or InvalidTrainerInvitationStatusTransitionException
@@ -104,7 +107,10 @@ public class ExceptionMapper
                 or MesocycleWeekOutOfRangeException or DuplicateMesocycleWeekException
                 or MesocycleDurationTooShortException or WorkoutPlacementLockedException
                 or IncompleteWorkoutPlacementException or MesocycleAthleteMismatchException
-                or MesocycleTrainerMismatchException or MesocycleWeekHasWorkoutsException => Problem(
+                or MesocycleTrainerMismatchException or MesocycleWeekHasWorkoutsException
+                or WorkoutResultsLockedException or SetRecordNotAllowedForTargetException
+                or WorkoutReviewNotAllowedException or WorkoutResultsChangedException
+                or WorkoutConcurrencyConflictException => Problem(
                 StatusCodes.Status409Conflict,
                 exception.Message
             ),

@@ -8,6 +8,9 @@ namespace WeightTracker.Api.Endpoints.Workouts.Dtos;
 
 /// <param name="MesocycleId">Mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
 /// <param name="MesocycleWeekNumber">Week of the mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
+/// <param name="ReviewedAt">When the workout was reviewed, in UTC, <c>null</c> until it is reviewed.</param>
+/// <param name="ReviewedBy">User who reviewed the workout, <c>null</c> until it is reviewed.</param>
+/// <param name="ResultsUpdatedAt">Last time its set records changed, in UTC, <c>null</c> while they never changed. Send it back when reviewing.</param>
 public sealed record WorkoutResponse(
     Guid Id,
     string Name,
@@ -18,7 +21,10 @@ public sealed record WorkoutResponse(
     string Status,
     IReadOnlyList<WorkoutExerciseResponse> Exercises,
     Guid? MesocycleId,
-    int? MesocycleWeekNumber)
+    int? MesocycleWeekNumber,
+    DateTime? ReviewedAt,
+    Guid? ReviewedBy,
+    DateTime? ResultsUpdatedAt)
 {
     /// <param name="workout">Workout to project.</param>
     /// <param name="exercises">Exercises referenced by the workout, keyed by identifier.</param>
@@ -35,7 +41,10 @@ public sealed record WorkoutResponse(
                 .Select(entry => WorkoutExerciseResponse.From(entry, exercises[entry.ExerciseId]))
                 .ToList(),
             workout.MesocycleId?.Value,
-            workout.MesocycleWeekNumber?.Value);
+            workout.MesocycleWeekNumber?.Value,
+            workout.ReviewedAt,
+            workout.ReviewedBy?.Value,
+            workout.ResultsUpdatedAt);
 }
 
 /// <summary>
@@ -44,6 +53,9 @@ public sealed record WorkoutResponse(
 /// </summary>
 /// <param name="MesocycleId">Mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
 /// <param name="MesocycleWeekNumber">Week of the mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
+/// <param name="ReviewedAt">When the workout was reviewed, in UTC, <c>null</c> until it is reviewed.</param>
+/// <param name="ReviewedBy">User who reviewed the workout, <c>null</c> until it is reviewed.</param>
+/// <param name="ResultsUpdatedAt">Last time its set records changed, in UTC, <c>null</c> while they never changed. Send it back when reviewing.</param>
 public sealed record WorkoutDetailResponse(
     Guid Id,
     string Name,
@@ -54,7 +66,10 @@ public sealed record WorkoutDetailResponse(
     string Status,
     IReadOnlyList<WorkoutExerciseDetailResponse> Exercises,
     Guid? MesocycleId,
-    int? MesocycleWeekNumber)
+    int? MesocycleWeekNumber,
+    DateTime? ReviewedAt,
+    Guid? ReviewedBy,
+    DateTime? ResultsUpdatedAt)
 {
     public static WorkoutDetailResponse From(Workout workout)
         => new(
@@ -67,7 +82,10 @@ public sealed record WorkoutDetailResponse(
             workout.Status.ToString(),
             workout.Exercises.Select(WorkoutExerciseDetailResponse.From).ToList(),
             workout.MesocycleId?.Value,
-            workout.MesocycleWeekNumber?.Value);
+            workout.MesocycleWeekNumber?.Value,
+            workout.ReviewedAt,
+            workout.ReviewedBy?.Value,
+            workout.ResultsUpdatedAt);
 }
 
 /// <param name="Id">Identifier of this entry of the workout.</param>
@@ -75,6 +93,7 @@ public sealed record WorkoutDetailResponse(
 /// <param name="PerSide">Whether the targets of the sets are per side (1x8 reps means 8 on each side).</param>
 /// <param name="RestMinutes">Rest between sets in minutes, <c>null</c> when none is prescribed.</param>
 /// <param name="SuperSeriesId">Superseries this entry belongs to, <c>null</c> when it is performed on its own.</param>
+/// <param name="SetRecords">Sets actually performed, in their order. Always empty for a workout template.</param>
 public sealed record WorkoutExerciseDetailResponse(
     Guid Id,
     Guid ExerciseId,
@@ -82,7 +101,8 @@ public sealed record WorkoutExerciseDetailResponse(
     bool PerSide,
     decimal? RestMinutes,
     IReadOnlyList<SetResponse> Sets,
-    int? SuperSeriesId)
+    int? SuperSeriesId,
+    IReadOnlyList<SetRecordResponse> SetRecords)
 {
     public static WorkoutExerciseDetailResponse From(WorkoutExercise entry)
         => new(
@@ -92,7 +112,18 @@ public sealed record WorkoutExerciseDetailResponse(
             entry.PerSide,
             entry.Rest?.Value,
             entry.Sets.Select(SetResponse.From).ToList(),
-            entry.SuperSeriesId?.Value);
+            entry.SuperSeriesId?.Value,
+            entry.SetRecords.Select(SetRecordResponse.From).ToList());
+}
+
+/// <param name="Id">Identifier of the set record, used to edit, remove or reorder it.</param>
+/// <param name="Reps">Reps actually performed.</param>
+/// <param name="Weight">Weight lifted, in kilograms.</param>
+/// <param name="RegisteredAtUtc">When the set was registered, in UTC.</param>
+public sealed record SetRecordResponse(Guid Id, int Reps, decimal Weight, DateTime RegisteredAtUtc)
+{
+    public static SetRecordResponse From(SetRecord setRecord)
+        => new(setRecord.Id.Value, setRecord.Reps.Value, setRecord.Weight.Value, setRecord.RegisteredAtUtc);
 }
 
 /// <param name="Id">Identifier of this entry of the workout, used to address it (for example to group it in a superseries).</param>

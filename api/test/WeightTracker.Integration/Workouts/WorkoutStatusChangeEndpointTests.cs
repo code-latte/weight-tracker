@@ -207,7 +207,7 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
 
     [Theory]
     [InlineData("PUBLISHED", "STARTED")]
-    [InlineData("STARTED", "FINISHED")]
+    [InlineData("STARTED", "COMPLETED")]
     public async Task PrescribingTrainer_ShouldNotBeAbleToMoveAWorkoutForward(string from, string to)
     {
         // Arrange
@@ -224,7 +224,7 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
 
     [Theory]
     [InlineData("PUBLISHED", "STARTED")]
-    [InlineData("STARTED", "FINISHED")]
+    [InlineData("STARTED", "COMPLETED")]
     public async Task AthleteOfAPrescribedWorkout_ShouldMoveItForward(string from, string to)
     {
         // Arrange
@@ -273,7 +273,7 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
     [InlineData("DRAFT", "PUBLISHED")]
     [InlineData("PUBLISHED", "DRAFT")]
     [InlineData("PUBLISHED", "STARTED")]
-    [InlineData("STARTED", "FINISHED")]
+    [InlineData("STARTED", "COMPLETED")]
     public async Task AthleteOfAWorkoutWithoutTrainer_ShouldMakeEveryBusinessTransition(string from, string to)
     {
         // Arrange
@@ -290,14 +290,14 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
 
     [Theory]
     [InlineData("DRAFT", "STARTED")]
-    [InlineData("DRAFT", "FINISHED")]
+    [InlineData("DRAFT", "COMPLETED")]
     [InlineData("DRAFT", "DRAFT")]
     [InlineData("PUBLISHED", "PUBLISHED")]
-    [InlineData("PUBLISHED", "FINISHED")]
+    [InlineData("PUBLISHED", "COMPLETED")]
     [InlineData("STARTED", "DRAFT")]
     [InlineData("STARTED", "PUBLISHED")]
-    [InlineData("FINISHED", "DRAFT")]
-    [InlineData("FINISHED", "STARTED")]
+    [InlineData("COMPLETED", "DRAFT")]
+    [InlineData("COMPLETED", "STARTED")]
     public async Task AthleteOfAWorkoutWithoutTrainer_ShouldBeRefusedAnyOtherMoveWithConflict(string from, string to)
     {
         // Arrange
@@ -319,7 +319,7 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
-        var response = await PutStatus(trainer, SeedData.TrainedWorkoutId, "FINISHED");
+        var response = await PutStatus(trainer, SeedData.TrainedWorkoutId, "COMPLETED");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
@@ -342,8 +342,8 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
     }
 
     [Theory]
-    [InlineData("FINISHED", "DRAFT")]
-    [InlineData("DRAFT", "FINISHED")]
+    [InlineData("COMPLETED", "DRAFT")]
+    [InlineData("DRAFT", "COMPLETED")]
     [InlineData("STARTED", "PUBLISHED")]
     public async Task Admin_ShouldSkipTheLifecycle(string from, string to)
     {
@@ -414,5 +414,40 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await StoredStatusOf(SeedData.TrainerOwnWorkoutId)).Should().Be("STARTED");
+    }
+
+    [Theory]
+    [InlineData(SeedCredentials.Trainer)]
+    [InlineData(SeedCredentials.User)]
+    [InlineData(SeedCredentials.Admin)]
+    public async Task Put_ShouldConflictWhenAnyoneSetsReviewedThroughTheStatusRoute(string callerEmail)
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "COMPLETED");
+        var client = await AuthenticatedClientFor(callerEmail);
+
+        // Act
+        var response = await PutStatus(client, SeedData.TrainedWorkoutId, "REVIEWED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await StoredStatusOf(SeedData.TrainedWorkoutId)).Should().Be("COMPLETED");
+    }
+
+    [Theory]
+    [InlineData("COMPLETED")]
+    [InlineData("DRAFT")]
+    public async Task Admin_ShouldConflictWhenMovingAReviewedWorkoutAway(string to)
+    {
+        // Arrange
+        await GivenReviewed(SeedData.TrainedWorkoutId);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await PutStatus(admin, SeedData.TrainedWorkoutId, to);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await StoredStatusOf(SeedData.TrainedWorkoutId)).Should().Be("REVIEWED");
     }
 }

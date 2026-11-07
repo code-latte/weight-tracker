@@ -41,6 +41,17 @@ public abstract class ExerciseEndpointTest : IntegrationTest
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// Adds the exercise to a published workout the trainer prescribes. Only a draft can be edited, so the trainer
+    /// unpublishes it, adds the exercise and publishes it again, all through the API.
+    /// </summary>
+    protected async Task AddToPublishedWorkout(HttpClient trainer, Guid workoutId, Guid exerciseId)
+    {
+        (await trainer.PutAsJsonAsync($"/workouts/{workoutId}/status", new { status = "DRAFT" })).EnsureSuccessStatusCode();
+        await AddToWorkout(trainer, workoutId, exerciseId);
+        (await trainer.PutAsJsonAsync($"/workouts/{workoutId}/status", new { status = "PUBLISHED" })).EnsureSuccessStatusCode();
+    }
+
     protected async Task<JsonElement> ExercisesSeenBy(HttpClient client)
         => await client.GetFromJsonAsync<JsonElement>("/exercises", JsonOptions);
 

@@ -89,6 +89,8 @@ public class SuperSeriesCreateEndpointTests : WorkoutEndpointTest
     public async Task Post_ShouldGroupTheEntriesForThePrescribingTrainer()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedPairWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
 
         // Act
@@ -176,6 +178,8 @@ public class SuperSeriesCreateEndpointTests : WorkoutEndpointTest
     public async Task Post_ShouldReturnNotFoundForAnEntryOfAnotherWorkoutAndGroupNothing()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedPairWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var body = new
         {
@@ -194,6 +198,8 @@ public class SuperSeriesCreateEndpointTests : WorkoutEndpointTest
     public async Task Post_ShouldReturnNotFoundForCatalogExerciseIds()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedPairWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var body = new { exerciseIds = new[] { SeedData.PressBancaId, SeedData.SentadillaId } };
 
@@ -227,6 +233,8 @@ public class SuperSeriesCreateEndpointTests : WorkoutEndpointTest
     public async Task Post_ShouldRejectASingleEntry()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedPairWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var body = new { exerciseIds = new[] { SeedData.PrescribedPairPressBancaEntryId } };
 
@@ -241,6 +249,8 @@ public class SuperSeriesCreateEndpointTests : WorkoutEndpointTest
     public async Task Post_ShouldRejectTheSameEntryTwice()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.PrescribedPairWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var body = new
         {
@@ -258,6 +268,8 @@ public class SuperSeriesCreateEndpointTests : WorkoutEndpointTest
     public async Task Post_ShouldRejectEntriesWithDifferentNumberOfSetsAndGroupNothing()
     {
         // Arrange
+        // The trainer may only edit a draft, so the published seed goes back to draft first
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "DRAFT");
         var client = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var body = new { exerciseIds = new[] { SeedData.TrainedSentadillaEntryId, SeedData.TrainedPlanchaEntryId } };
 
@@ -315,7 +327,7 @@ public class SuperSeriesCreateEndpointTests : WorkoutEndpointTest
     public async Task Post_ShouldRejectTheOwnerOfAFinishedWorkoutWithoutTrainerWithConflict()
     {
         // Arrange
-        await GivenWorkoutStatus(SeedData.SelfCreatedPairWorkoutId, "FINISHED");
+        await GivenWorkoutStatus(SeedData.SelfCreatedPairWorkoutId, "COMPLETED");
         var user = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act

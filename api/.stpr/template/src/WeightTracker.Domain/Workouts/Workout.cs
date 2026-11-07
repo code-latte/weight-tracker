@@ -35,9 +35,29 @@ public sealed class Workout : AggregateRoot
     public WorkoutStatus Status { get; private set; }
 
     /// <summary>
-    /// A started or finished workout no longer accepts changes to its content.
+    /// Only a draft accepts changes to its content. A published workout must go back to draft first.
     /// </summary>
-    public bool IsLocked => Status is WorkoutStatus.STARTED or WorkoutStatus.FINISHED;
+    public bool IsLocked => Status != WorkoutStatus.DRAFT;
+
+    /// <summary>
+    /// A started, completed or reviewed workout has been executed, so its planning context is kept.
+    /// </summary>
+    public bool IsExecuted => Status is WorkoutStatus.STARTED or WorkoutStatus.COMPLETED or WorkoutStatus.REVIEWED;
+
+    /// <summary>
+    /// When the workout was reviewed, in UTC, <c>null</c> until it is reviewed.
+    /// </summary>
+    public DateTime? ReviewedAt { get; private set; }
+
+    /// <summary>
+    /// User who reviewed the workout, <c>null</c> until it is reviewed.
+    /// </summary>
+    public Id? ReviewedBy { get; private set; }
+
+    /// <summary>
+    /// Last time the set records of the workout changed, in UTC, <c>null</c> while they never changed.
+    /// </summary>
+    public DateTime? ResultsUpdatedAt { get; private set; }
 
     /// <summary>
     /// Mesocycle this workout is planned in, <c>null</c> for a standalone workout.
@@ -122,6 +142,7 @@ public sealed class Workout : AggregateRoot
     /// <exception cref="SuperSeriesRequiresTwoExercisesException">When a stored superseries has a single member.</exception>
     /// <exception cref="SuperSeriesSetCountMismatchException">When the members of a stored superseries have different set totals.</exception>
     /// <exception cref="IncompleteWorkoutPlacementException">When only one of the mesocycle id and week number is given.</exception>
+    /// <exception cref="InvalidWorkoutStatusException">When the review metadata does not match the status.</exception>
     public static Workout Rehydrate(
         Id id,
         Id userId,
@@ -132,10 +153,20 @@ public sealed class Workout : AggregateRoot
         WorkoutStatus status,
         IEnumerable<WorkoutExercise> exercises,
         Id? mesocycleId = null,
-        WeekNumber? mesocycleWeekNumber = null
+        WeekNumber? mesocycleWeekNumber = null,
+        DateTime? reviewedAt = null,
+        Id? reviewedBy = null,
+        DateTime? resultsUpdatedAt = null
     )
     {
         EnsureDefined(status);
+
+        // A reviewed workout always carries who reviewed it and when, and nothing else does
+        var hasReview = reviewedAt is not null && reviewedBy is not null;
+        var hasPartialReview = (reviewedAt is null) != (reviewedBy is null);
+
+        if (hasPartialReview || hasReview != (status == WorkoutStatus.REVIEWED))
+            throw new InvalidWorkoutStatusException((int)status);
 
         if ((mesocycleId is null) != (mesocycleWeekNumber is null))
             throw new IncompleteWorkoutPlacementException(id);
@@ -159,6 +190,9 @@ public sealed class Workout : AggregateRoot
             _exercises = entries,
             MesocycleId = mesocycleId,
             MesocycleWeekNumber = mesocycleWeekNumber,
+            ReviewedAt = reviewedAt,
+            ReviewedBy = reviewedBy,
+            ResultsUpdatedAt = resultsUpdatedAt,
         };
     }
 
@@ -191,7 +225,7 @@ public sealed class Workout : AggregateRoot
     /// Places the workout in a week of a mesocycle, or moves it there when it is already placed.
     /// Whether the mesocycle exists and the week fits it is checked by the caller, which knows both aggregates.
     /// </summary>
-    /// <exception cref="WorkoutPlacementLockedException">When the workout is started or finished.</exception>
+    /// <exception cref="WorkoutPlacementLockedException">When the workout is started, completed or reviewed.</exception>
     public void LinkToMesocycle(Id mesocycleId, WeekNumber weekNumber)
     {
         EnsurePlacementCanChange();
@@ -203,7 +237,7 @@ public sealed class Workout : AggregateRoot
     /// <summary>
     /// Takes the workout out of its mesocycle, leaving it standalone.
     /// </summary>
-    /// <exception cref="WorkoutPlacementLockedException">When the workout is started or finished.</exception>
+    /// <exception cref="WorkoutPlacementLockedException">When the workout is started, completed or reviewed.</exception>
     public void UnlinkFromMesocycle()
     {
         EnsurePlacementCanChange();
@@ -214,7 +248,8 @@ public sealed class Workout : AggregateRoot
 
     /// <summary>
     /// Moves the workout along its lifecycle: draft to published, published back to draft or on to started,
-    /// and started to finished. Anything else, including staying in the same status, is refused.
+    /// and started to completed. Anything else, including staying in the same status, is refused.
+    /// A completed workout becomes reviewed only through <see cref="MarkReviewed"/>.
     /// </summary>
     /// <exception cref="InvalidWorkoutStatusException">When the target is not a defined value.</exception>
     /// <exception cref="InvalidWorkoutStatusTransitionException">When the move is not part of the lifecycle.</exception>
@@ -229,7 +264,8 @@ public sealed class Workout : AggregateRoot
     }
 
     /// <summary>
-    /// Whether moving from the current status to the target is part of the lifecycle.
+    /// Whether moving from the current status to the target is part of the lifecycle. Reviewing is not, because
+    /// it records who reviewed and when; see <see cref="MarkReviewed"/>.
     /// </summary>
     public bool CanTransitionTo(WorkoutStatus target)
         => (Status, target) switch
@@ -237,19 +273,51 @@ public sealed class Workout : AggregateRoot
             (WorkoutStatus.DRAFT, WorkoutStatus.PUBLISHED) => true,
             (WorkoutStatus.PUBLISHED, WorkoutStatus.DRAFT) => true,
             (WorkoutStatus.PUBLISHED, WorkoutStatus.STARTED) => true,
-            (WorkoutStatus.STARTED, WorkoutStatus.FINISHED) => true,
+            (WorkoutStatus.STARTED, WorkoutStatus.COMPLETED) => true,
             _ => false,
         };
 
     /// <summary>
     /// Sets the status skipping the lifecycle. Reserved for callers that are entitled to correct a workout.
+    /// A review is never set or undone this way: reviewing goes through <see cref="MarkReviewed"/>, and
+    /// unlocking a reviewed workout needs its own audited operation.
     /// </summary>
     /// <exception cref="InvalidWorkoutStatusException">When the target is not a defined value.</exception>
+    /// <exception cref="InvalidWorkoutStatusTransitionException">When the target or the current status is reviewed.</exception>
     public void OverrideStatus(WorkoutStatus target)
     {
         EnsureDefined(target);
 
+        if (target == WorkoutStatus.REVIEWED || Status == WorkoutStatus.REVIEWED)
+            throw new InvalidWorkoutStatusTransitionException(Status, target);
+
         Status = target;
+    }
+
+    /// <summary>
+    /// Marks a completed workout as reviewed by its trainer, recording who reviewed it and when. The review is
+    /// refused when the results changed after the reviewer read them, so nobody reviews outdated results.
+    /// </summary>
+    /// <param name="reviewerId">User reviewing the workout</param>
+    /// <param name="reviewedAtUtc">When the review happens, in UTC</param>
+    /// <param name="expectedResultsUpdatedAt">Last change of the results the reviewer read, <c>null</c> when there was none</param>
+    /// <exception cref="WorkoutReviewNotAllowedException">When the workout is not completed or has no prescribing trainer.</exception>
+    /// <exception cref="WorkoutResultsChangedException">When the results changed after the reviewer read them.</exception>
+    public void MarkReviewed(Id reviewerId, DateTime reviewedAtUtc, DateTime? expectedResultsUpdatedAt)
+    {
+        if (Status != WorkoutStatus.COMPLETED)
+            throw new WorkoutReviewNotAllowedException(this.Id, Status, $"only a {WorkoutStatus.COMPLETED} workout can be reviewed");
+
+        // Without a trainer, completed is the final status
+        if (TrainerId is null)
+            throw new WorkoutReviewNotAllowedException(this.Id, Status, "it has no prescribing trainer");
+
+        if (ToStoredPrecision(expectedResultsUpdatedAt) != ResultsUpdatedAt)
+            throw new WorkoutResultsChangedException(this.Id);
+
+        Status = WorkoutStatus.REVIEWED;
+        ReviewedAt = ToStoredPrecision(reviewedAtUtc);
+        ReviewedBy = reviewerId;
     }
 
     /// <summary>
@@ -286,6 +354,7 @@ public sealed class Workout : AggregateRoot
     /// <exception cref="SuperSeriesSetCountMismatchException">When the entry is in a superseries and the new total of sets differs from the other members.</exception>
     /// <exception cref="InvalidEffortException">When the effort is not a defined value.</exception>
     /// <exception cref="WorkoutExerciseRequiresSetsException">When no set prescription is given.</exception>
+    /// <exception cref="SetRecordNotAllowedForTargetException">When the entry has set records and a new prescription is not rep-based.</exception>
     public void UpdateExercise(Id exerciseId, Effort effort, IEnumerable<SetPrescription> sets, bool perSide = false, TimeInMinutes? rest = null)
     {
         var entry = _exercises.FirstOrDefault(item => item.ExerciseId == exerciseId)
@@ -322,6 +391,90 @@ public sealed class Workout : AggregateRoot
                 remaining[0].LeaveSuperSeries();
         }
     }
+
+    /// <summary>
+    /// Records the reps and weight actually performed in one set of an exercise. Recording is not a content edit,
+    /// so it is not affected by <see cref="IsLocked"/>; it is only allowed while the workout is started or completed.
+    /// </summary>
+    /// <param name="exerciseId">Catalog exercise of this workout the set was performed for</param>
+    /// <param name="reps">Reps performed, which may differ from the prescription</param>
+    /// <param name="weight">Weight lifted, in kilograms</param>
+    /// <param name="registeredAtUtc">When the set was registered, in UTC</param>
+    /// <exception cref="WorkoutResultsLockedException">When the workout is not started or completed.</exception>
+    /// <exception cref="ExerciseNotInWorkoutException">When the exercise is not in the workout.</exception>
+    /// <exception cref="SetRecordNotAllowedForTargetException">When any prescription of the exercise is not rep-based.</exception>
+    public void AddSetRecord(Id exerciseId, RepCount reps, Weight weight, DateTime registeredAtUtc)
+    {
+        RecordingEntry(exerciseId).AddSetRecord(SetRecord.Create(reps, weight, registeredAtUtc));
+        TouchResults(registeredAtUtc);
+    }
+
+    /// <summary>
+    /// Corrects the reps and weight of a set already recorded. Its identity, registration time and position are kept.
+    /// Like recording, it is not a content edit and is only allowed while the workout is started or completed.
+    /// </summary>
+    /// <param name="exerciseId">Catalog exercise of this workout the set was recorded for</param>
+    /// <param name="setRecordId">Set record to correct</param>
+    /// <param name="reps">Reps performed</param>
+    /// <param name="weight">Weight lifted, in kilograms</param>
+    /// <param name="updatedAtUtc">When the correction happens, in UTC</param>
+    /// <exception cref="WorkoutResultsLockedException">When the workout is not started or completed.</exception>
+    /// <exception cref="ExerciseNotInWorkoutException">When the exercise is not in the workout.</exception>
+    /// <exception cref="SetRecordNotFoundException">When the set record is not recorded for that exercise.</exception>
+    public void UpdateSetRecord(Id exerciseId, Id setRecordId, RepCount reps, Weight weight, DateTime updatedAtUtc)
+    {
+        RecordingEntry(exerciseId).UpdateSetRecord(setRecordId, reps, weight);
+        TouchResults(updatedAtUtc);
+    }
+
+    /// <summary>
+    /// Removes a set already recorded; the other set records of the exercise keep their order.
+    /// Like recording, it is not a content edit and is only allowed while the workout is started or completed.
+    /// </summary>
+    /// <param name="updatedAtUtc">When the removal happens, in UTC</param>
+    /// <exception cref="WorkoutResultsLockedException">When the workout is not started or completed.</exception>
+    /// <exception cref="ExerciseNotInWorkoutException">When the exercise is not in the workout.</exception>
+    /// <exception cref="SetRecordNotFoundException">When the set record is not recorded for that exercise.</exception>
+    public void RemoveSetRecord(Id exerciseId, Id setRecordId, DateTime updatedAtUtc)
+    {
+        RecordingEntry(exerciseId).RemoveSetRecord(setRecordId);
+        TouchResults(updatedAtUtc);
+    }
+
+    /// <summary>
+    /// Puts the set records of one exercise in the given order. Ids, reps, weight and registration times are kept.
+    /// Like recording, it is not a content edit and is only allowed while the workout is started or completed.
+    /// </summary>
+    /// <param name="exerciseId">Catalog exercise of this workout whose set records are reordered</param>
+    /// <param name="setRecordIds">Set records of that exercise, every one exactly once, in the new order</param>
+    /// <param name="updatedAtUtc">When the reorder happens, in UTC</param>
+    /// <exception cref="WorkoutResultsLockedException">When the workout is not started or completed.</exception>
+    /// <exception cref="ExerciseNotInWorkoutException">When the exercise is not in the workout.</exception>
+    /// <exception cref="SetRecordOrderMismatchException">When the ids are not exactly the set records of that exercise.</exception>
+    public void ReorderSetRecords(Id exerciseId, IEnumerable<Id> setRecordIds, DateTime updatedAtUtc)
+    {
+        RecordingEntry(exerciseId).ReorderSetRecords(setRecordIds);
+        TouchResults(updatedAtUtc);
+    }
+
+    /// <summary>
+    /// Entry whose set records may change: the workout must be started or completed and hold the exercise.
+    /// Completed lets the athlete correct the results; a reviewed workout keeps them as they were reviewed.
+    /// </summary>
+    private WorkoutExercise RecordingEntry(Id exerciseId)
+    {
+        if (Status is not (WorkoutStatus.STARTED or WorkoutStatus.COMPLETED))
+            throw new WorkoutResultsLockedException(this.Id, Status);
+
+        return _exercises.FirstOrDefault(item => item.ExerciseId == exerciseId)
+            ?? throw new ExerciseNotInWorkoutException(exerciseId, this.Id);
+    }
+
+    /// <summary>
+    /// Called only after a set record change succeeded, so a refused change keeps the previous time.
+    /// </summary>
+    private void TouchResults(DateTime changedAtUtc)
+        => ResultsUpdatedAt = ToStoredPrecision(changedAtUtc);
 
     /// <summary>
     /// Puts the exercises of this workout in the given order. Entry ids, effort, sets and superseries are kept.
@@ -411,13 +564,23 @@ public sealed class Workout : AggregateRoot
     }
 
     /// <summary>
-    /// A started or finished workout keeps its planning context, whoever asks.
+    /// An executed workout keeps its planning context, whoever asks.
     /// </summary>
     private void EnsurePlacementCanChange()
     {
-        if (IsLocked)
+        if (IsExecuted)
             throw new WorkoutPlacementLockedException(this.Id, Status);
     }
+
+    /// <summary>
+    /// The database keeps timestamps to the microsecond. Truncating here makes a time read back from storage
+    /// equal to the one held in memory, which the review relies on to detect changed results.
+    /// </summary>
+    private static DateTime ToStoredPrecision(DateTime value)
+        => new(value.Ticks - value.Ticks % 10, DateTimeKind.Utc);
+
+    private static DateTime? ToStoredPrecision(DateTime? value)
+        => value is null ? null : ToStoredPrecision(value.Value);
 
     private static void EnsureDefined(WorkoutStatus status)
     {

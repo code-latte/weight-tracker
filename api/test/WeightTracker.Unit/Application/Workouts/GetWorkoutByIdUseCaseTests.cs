@@ -213,7 +213,7 @@ public class GetWorkoutByIdUseCaseTests
     [Theory]
     [InlineData(WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
     public async Task User_ShouldReadAPrescribedWorkoutOnceItIsPublished(WorkoutStatus status)
     {
         // Arrange

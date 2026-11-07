@@ -308,7 +308,7 @@ public class WorkoutCreateEndpointTests : IntegrationTest
         var client = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act
-        var response = await client.PostAsJsonAsync("/workouts", new { name = "Leg day", workoutDate = Date, status = "FINISHED" });
+        var response = await client.PostAsJsonAsync("/workouts", new { name = "Leg day", workoutDate = Date, status = "COMPLETED" });
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);

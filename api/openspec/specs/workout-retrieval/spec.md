@@ -74,7 +74,7 @@ An ADMIN SHALL read any workout. A TRAINER SHALL read workouts they own and work
 - **THEN** the response is `403 Forbidden`
 
 #### Scenario: User reads a published prescribed workout
-- **WHEN** a USER reads a `PUBLISHED`, `STARTED` or `FINISHED` workout they own that has a prescribing trainer
+- **WHEN** a USER reads a `PUBLISHED`, `STARTED`, `COMPLETED` or `REVIEWED` workout they own that has a prescribing trainer
 - **THEN** the response is `200 OK`
 
 #### Scenario: User reads another user's workout
@@ -275,3 +275,23 @@ The OpenAPI schema `WorkoutListItemResponse` SHALL declare `mesocycleId` as a nu
 - **WHEN** the OpenAPI document is read
 - **THEN** `WorkoutListItemResponse` has a nullable `mesocycleId` of format `uuid` and a nullable integer
   `mesocycleWeekNumber`
+
+### Requirement: Workout responses carry review and results metadata
+Every workout returned by `GET /workouts/{id}`, by `GET /workouts` and by the operations that respond with the whole workout SHALL carry:
+- `resultsUpdatedAt`, the last time its set records changed, or `null`;
+- `reviewedAt`, when it was reviewed, or `null`;
+- `reviewedBy`, the reviewer's user id, or `null`.
+
+Timestamps are in UTC.
+
+#### Scenario: Reviewed workout read by id
+- **WHEN** the athlete reads a `REVIEWED` workout by id
+- **THEN** the response carries its `resultsUpdatedAt`, `reviewedAt` and `reviewedBy`
+
+#### Scenario: New workout
+- **WHEN** a caller reads a `DRAFT` workout that was just created
+- **THEN** its `resultsUpdatedAt`, `reviewedAt` and `reviewedBy` are `null`
+
+#### Scenario: Reviewed workout in the list
+- **WHEN** the prescribing trainer lists workouts and one of them is `REVIEWED`
+- **THEN** that entry carries `status` `REVIEWED` with its `reviewedAt` and `reviewedBy`

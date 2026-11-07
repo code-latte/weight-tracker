@@ -188,7 +188,7 @@ public class ExerciseFavoritesEndpointTests : ExerciseEndpointTest
         // Arrange
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var custom = await CreateExercise(trainer);
-        await AddToWorkout(trainer, SeedData.TrainedWorkoutId, custom);
+        await AddToPublishedWorkout(trainer, SeedData.TrainedWorkoutId, custom);
         var user = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act

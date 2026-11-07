@@ -32,8 +32,8 @@ public class WorkoutStatusAuthorizerTests
         => _authorizer.EnsureCanChange(workout, callerId, role, target, Operation);
 
     [Theory]
-    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.FINISHED)]
-    [InlineData(WorkoutStatus.FINISHED, WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.DRAFT)]
     [InlineData(WorkoutStatus.STARTED, WorkoutStatus.STARTED)]
     public void Admin_ShouldBeAllowedAnyMove(WorkoutStatus from, WorkoutStatus to)
     {
@@ -64,7 +64,7 @@ public class WorkoutStatusAuthorizerTests
 
     [Theory]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.COMPLETED)]
     public void PrescribingTrainer_ShouldBeRefusedTheMovesThatBelongToTheAthlete(WorkoutStatus from, WorkoutStatus to)
     {
         // Arrange
@@ -78,7 +78,7 @@ public class WorkoutStatusAuthorizerTests
     }
 
     [Theory]
-    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.COMPLETED)]
     [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.DRAFT)]
     public void PrescribingTrainer_ShouldLeaveAMoveOutsideTheLifecycleToTheAggregate(WorkoutStatus from, WorkoutStatus to)
     {
@@ -94,7 +94,7 @@ public class WorkoutStatusAuthorizerTests
 
     [Theory]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.COMPLETED)]
     public void AthleteOfAPrescribedWorkout_ShouldBeAllowedToMoveItForward(WorkoutStatus from, WorkoutStatus to)
     {
         // Arrange
@@ -123,7 +123,7 @@ public class WorkoutStatusAuthorizerTests
     [Theory]
     [InlineData(WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
     [InlineData(WorkoutStatus.DRAFT)]
     public void AthleteOfAPrescribedDraft_ShouldBeRefusedWhateverTheTarget(WorkoutStatus target)
     {
@@ -154,8 +154,8 @@ public class WorkoutStatusAuthorizerTests
     [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.DRAFT)]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.FINISHED)]
-    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.COMPLETED)]
     public void AthleteOfASelfPlannedWorkout_ShouldBeAllowedEveryMove(WorkoutStatus from, WorkoutStatus to)
     {
         // Arrange
@@ -191,6 +191,92 @@ public class WorkoutStatusAuthorizerTests
 
         // Act
         var act = () => Ensure(workout, TrainerId, Role.TRAINER, WorkoutStatus.PUBLISHED);
+
+        // Assert
+        act.Should().Throw<UnauthorizedOperationException>();
+    }
+
+    private const string ReviewOperation = "review workout";
+
+    [Theory]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.REVIEWED)]
+    [InlineData(WorkoutStatus.REVIEWED, WorkoutStatus.COMPLETED)]
+    public void EnsureCanChange_ShouldLeaveReviewedMovesOnTheStatusRouteToTheAggregate(WorkoutStatus from, WorkoutStatus to)
+    {
+        // Arrange
+        var workout = Workout.Rehydrate(Id.New(), AthleteId, TrainerId, Name, null, WorkoutDate, from, [],
+            reviewedAt: from == WorkoutStatus.REVIEWED ? WorkoutDate : null,
+            reviewedBy: from == WorkoutStatus.REVIEWED ? TrainerId : null);
+
+        // Act
+        var act = () => _authorizer.EnsureCanChange(workout, TrainerId, Role.TRAINER, to, Operation);
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureCanReview_ShouldAllowThePrescribingTrainer()
+    {
+        // Arrange
+        var workout = APrescribedWorkoutIn(WorkoutStatus.COMPLETED);
+
+        // Act
+        var act = () => _authorizer.EnsureCanReview(workout, TrainerId, Role.TRAINER, ReviewOperation);
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EnsureCanReview_ShouldAllowAnAdminWhateverTheWorkout(bool prescribed)
+    {
+        // Arrange
+        var workout = prescribed ? APrescribedWorkoutIn(WorkoutStatus.COMPLETED) : ASelfPlannedWorkoutIn(WorkoutStatus.COMPLETED);
+
+        // Act
+        var act = () => _authorizer.EnsureCanReview(workout, Id.New(), Role.ADMIN, ReviewOperation);
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureCanReview_ShouldRejectTheAthlete()
+    {
+        // Arrange
+        var workout = APrescribedWorkoutIn(WorkoutStatus.COMPLETED);
+
+        // Act
+        var act = () => _authorizer.EnsureCanReview(workout, AthleteId, Role.USER, ReviewOperation);
+
+        // Assert
+        act.Should().Throw<UnauthorizedOperationException>();
+    }
+
+    [Fact]
+    public void EnsureCanReview_ShouldRejectATrainerWhoDidNotPrescribeTheWorkout()
+    {
+        // Arrange
+        var workout = APrescribedWorkoutIn(WorkoutStatus.COMPLETED);
+
+        // Act
+        var act = () => _authorizer.EnsureCanReview(workout, Id.New(), Role.TRAINER, ReviewOperation);
+
+        // Assert
+        act.Should().Throw<UnauthorizedOperationException>();
+    }
+
+    [Fact]
+    public void EnsureCanReview_ShouldRejectTheAthleteOfAWorkoutWithoutTrainer()
+    {
+        // Arrange
+        var workout = ASelfPlannedWorkoutIn(WorkoutStatus.COMPLETED);
+
+        // Act
+        var act = () => _authorizer.EnsureCanReview(workout, AthleteId, Role.USER, ReviewOperation);
 
         // Assert
         act.Should().Throw<UnauthorizedOperationException>();

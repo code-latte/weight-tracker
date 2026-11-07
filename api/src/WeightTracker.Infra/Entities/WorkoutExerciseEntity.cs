@@ -28,4 +28,7 @@ public class WorkoutExerciseEntity
 
     /// <summary>Navigation inside the Workout aggregate boundary.</summary>
     public List<WorkoutExerciseSetEntity> Sets { get; set; } = [];
+
+    /// <summary>Navigation inside the Workout aggregate boundary.</summary>
+    public List<SetRecordEntity> SetRecords { get; set; } = [];
 }

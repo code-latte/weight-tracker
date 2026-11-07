@@ -361,7 +361,7 @@ public class WorkoutMapperTests
     [InlineData(WorkoutStatus.DRAFT)]
     [InlineData(WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
     public void RoundTrip_ShouldPreserveEveryStatus(WorkoutStatus status)
     {
         // Arrange
@@ -554,6 +554,207 @@ public class WorkoutMapperTests
         // Arrange
         var entity = WorkoutMapper.MapToEntity(Workout.Create(Id.New(), null, Name, null, WorkoutDate));
         entity.MesocycleId = Id.New().Value;
+
+        // Act
+        var act = () => WorkoutMapper.MapToDomain(entity);
+
+        // Assert
+        act.Should().Throw<PersistenceMappingException>();
+    }
+
+    private static readonly DateTime RecordedAt = new(2026, 11, 7, 10, 0, 0, DateTimeKind.Utc);
+
+    private static Workout AStartedWorkoutWithSetRecords()
+    {
+        var workout = Workout.Rehydrate(
+            Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED,
+            [
+                WorkoutExercise.Rehydrate(Id.New(), SentadillaId, Effort.MIDHIGH, [new SetPrescription(3, new SetTarget.RepsRange(8, 12))]),
+                WorkoutExercise.Rehydrate(Id.New(), PlanchaId, Effort.LOW, [new SetPrescription(2, new SetTarget.MaxReps())]),
+            ]);
+        workout.AddSetRecord(SentadillaId, RepCount.From(8), Weight.From(80), RecordedAt.AddMinutes(4));
+        workout.AddSetRecord(SentadillaId, RepCount.From(12), Weight.From(72.5m), RecordedAt);
+        workout.AddSetRecord(PlanchaId, RepCount.From(15), Weight.From(0), RecordedAt.AddMinutes(9));
+
+        return workout;
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveTheSetRecordsOfEachExercise()
+    {
+        // Arrange
+        var original = AStartedWorkoutWithSetRecords();
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.Exercises.Zip(original.Exercises).Should().AllSatisfy(pair =>
+        {
+            var (copy, source) = pair;
+            copy.SetRecords.Select(setRecord => setRecord.Id).Should().Equal(source.SetRecords.Select(setRecord => setRecord.Id));
+            copy.SetRecords.Select(setRecord => setRecord.Reps).Should().Equal(source.SetRecords.Select(setRecord => setRecord.Reps));
+            copy.SetRecords.Select(setRecord => setRecord.Weight).Should().Equal(source.SetRecords.Select(setRecord => setRecord.Weight));
+            copy.SetRecords.Select(setRecord => setRecord.RegisteredAtUtc).Should().Equal(source.SetRecords.Select(setRecord => setRecord.RegisteredAtUtc));
+            copy.SetRecords.Should().AllSatisfy(setRecord => setRecord.IsNew.Should().BeFalse());
+        });
+    }
+
+    [Fact]
+    public void MapToEntity_ShouldKeepTheSetRecordIdAndStoreItsValues()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWithSetRecords();
+        var source = workout.Exercises[1].SetRecords.Single();
+
+        // Act
+        var entity = WorkoutMapper.MapToEntity(workout);
+
+        // Assert
+        var row = entity.WorkoutExercises[1].SetRecords.Should().ContainSingle().Subject;
+        row.Id.Should().Be(source.Id.Value);
+        row.WorkoutExerciseId.Should().Be(workout.Exercises[1].Id.Value);
+        row.Reps.Should().Be(15);
+        row.Weight.Should().Be(0);
+        row.RegisterDatetimeUtc.Should().Be(RecordedAt.AddMinutes(9));
+    }
+
+    [Fact]
+    public void MapToEntity_ShouldNumberSetRecordPositionsFromZeroInTheirOrder()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWithSetRecords();
+
+        // Act
+        var entity = WorkoutMapper.MapToEntity(workout);
+
+        // Assert
+        var rows = entity.WorkoutExercises[0].SetRecords;
+        rows.Select(row => row.Position).Should().Equal(0, 1);
+        rows.Select(row => row.RegisterDatetimeUtc).Should().Equal(RecordedAt.AddMinutes(4), RecordedAt);
+    }
+
+    [Fact]
+    public void MapToDomain_ShouldHonourStoredSetRecordPositionsRatherThanRowOrder()
+    {
+        // Arrange
+        var entity = WorkoutMapper.MapToEntity(AStartedWorkoutWithSetRecords());
+        var expected = entity.WorkoutExercises[0].SetRecords.Select(row => row.Id).ToList();
+        entity.WorkoutExercises[0].SetRecords.Reverse();
+
+        // Act
+        var restored = WorkoutMapper.MapToDomain(entity);
+
+        // Assert
+        restored.Exercises[0].SetRecords.Select(setRecord => setRecord.Id.Value).Should().Equal(expected);
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldKeepTheOrderAddedForSetRecordsWithTheSameRegistrationTime()
+    {
+        // Arrange
+        var workout = Workout.Rehydrate(
+            Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED,
+            [WorkoutExercise.Rehydrate(Id.New(), SentadillaId, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))])]);
+        foreach (var reps in new[] { 10, 9, 8, 7, 6 })
+            workout.AddSetRecord(SentadillaId, RepCount.From(reps), Weight.From(60), RecordedAt);
+
+        // Act
+        var restored = RoundTrip(workout);
+
+        // Assert
+        restored.Exercises[0].SetRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(10, 9, 8, 7, 6);
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldKeepReorderedAndEditedSetRecordsInTheirOrder()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWithSetRecords();
+        var setRecordIds = workout.Exercises[0].SetRecords.Select(setRecord => setRecord.Id).ToList();
+        workout.ReorderSetRecords(SentadillaId, [setRecordIds[1], setRecordIds[0]], RecordedAt);
+        workout.UpdateSetRecord(SentadillaId, setRecordIds[0], RepCount.From(9), Weight.From(82.5m), RecordedAt);
+
+        // Act
+        var restored = RoundTrip(workout);
+
+        // Assert
+        var setRecords = restored.Exercises[0].SetRecords;
+        setRecords.Select(setRecord => setRecord.Id).Should().Equal(setRecordIds[1], setRecordIds[0]);
+        setRecords[1].Reps.Value.Should().Be(9);
+        setRecords[1].Weight.Value.Should().Be(82.5m);
+        setRecords[1].RegisteredAtUtc.Should().Be(RecordedAt.AddMinutes(4));
+    }
+
+    [Fact]
+    public void MapToDomain_ShouldRejectAnInvalidStoredWeight()
+    {
+        // Arrange
+        var entity = WorkoutMapper.MapToEntity(AStartedWorkoutWithSetRecords());
+        entity.WorkoutExercises[0].SetRecords[0].Weight = -1;
+
+        // Act
+        var act = () => WorkoutMapper.MapToDomain(entity);
+
+        // Assert
+        act.Should().Throw<PersistenceMappingException>();
+    }
+
+    [Fact]
+    public void MapToDomain_ShouldRejectAnInvalidStoredRepCount()
+    {
+        // Arrange
+        var entity = WorkoutMapper.MapToEntity(AStartedWorkoutWithSetRecords());
+        entity.WorkoutExercises[0].SetRecords[0].Reps = 0;
+
+        // Act
+        var act = () => WorkoutMapper.MapToDomain(entity);
+
+        // Assert
+        act.Should().Throw<PersistenceMappingException>();
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveTheReviewAndTheResultsTime()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var reviewedAt = RecordedAt.AddHours(2);
+        var original = Workout.Rehydrate(Id.New(), Id.New(), trainerId, Name, null, WorkoutDate, WorkoutStatus.REVIEWED, [],
+            reviewedAt: reviewedAt, reviewedBy: trainerId, resultsUpdatedAt: RecordedAt);
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.Status.Should().Be(WorkoutStatus.REVIEWED);
+        restored.ReviewedAt.Should().Be(reviewedAt);
+        restored.ReviewedBy.Should().Be(trainerId);
+        restored.ResultsUpdatedAt.Should().Be(RecordedAt);
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveAWorkoutThatWasNeverReviewed()
+    {
+        // Arrange
+        var original = AStartedWorkoutWithSetRecords();
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.ReviewedAt.Should().BeNull();
+        restored.ReviewedBy.Should().BeNull();
+        restored.ResultsUpdatedAt.Should().Be(original.ResultsUpdatedAt);
+    }
+
+    [Fact]
+    public void MapToDomain_ShouldRejectAReviewedRowWithoutItsReviewer()
+    {
+        // Arrange
+        var entity = WorkoutMapper.MapToEntity(AStartedWorkoutWithSetRecords());
+        entity.Status = (int)WorkoutStatus.REVIEWED;
+        entity.ReviewedAtUtc = RecordedAt;
 
         // Act
         var act = () => WorkoutMapper.MapToDomain(entity);

@@ -5,5 +5,6 @@ public enum WorkoutStatus
     DRAFT = 1,
     PUBLISHED = 2,
     STARTED = 3,
-    FINISHED = 4,
+    COMPLETED = 4,
+    REVIEWED = 5,
 }

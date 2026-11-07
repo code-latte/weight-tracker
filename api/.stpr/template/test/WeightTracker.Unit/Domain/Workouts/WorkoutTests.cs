@@ -702,7 +702,13 @@ public class WorkoutTests
     }
 
     private static Workout AWorkoutIn(WorkoutStatus status, Id? trainerId = null)
-        => Workout.Rehydrate(Id.New(), Id.New(), trainerId, Name, null, WorkoutDate, status, []);
+        => Workout.Rehydrate(Id.New(), Id.New(), trainerId, Name, null, WorkoutDate, status, [],
+            reviewedAt: ReviewedAtFor(status), reviewedBy: ReviewerFor(status));
+
+    // A reviewed workout always carries its review metadata, so the factories add it for that status only
+    private static DateTime? ReviewedAtFor(WorkoutStatus status) => status == WorkoutStatus.REVIEWED ? WorkoutDate : null;
+
+    private static Id? ReviewerFor(WorkoutStatus status) => status == WorkoutStatus.REVIEWED ? Id.New() : null;
 
     [Fact]
     public void Create_ShouldStartAsDraft()
@@ -738,7 +744,7 @@ public class WorkoutTests
     [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.DRAFT)]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.COMPLETED)]
     public void ChangeStatus_ShouldAcceptTheBusinessTransitions(WorkoutStatus from, WorkoutStatus to)
     {
         // Arrange
@@ -754,16 +760,20 @@ public class WorkoutTests
     [Theory]
     [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.DRAFT)]
     [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.COMPLETED)]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.PUBLISHED)]
-    [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.COMPLETED)]
     [InlineData(WorkoutStatus.STARTED, WorkoutStatus.DRAFT)]
     [InlineData(WorkoutStatus.STARTED, WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.STARTED, WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED, WorkoutStatus.DRAFT)]
-    [InlineData(WorkoutStatus.FINISHED, WorkoutStatus.PUBLISHED)]
-    [InlineData(WorkoutStatus.FINISHED, WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.REVIEWED)]
+    [InlineData(WorkoutStatus.REVIEWED, WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED, WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.REVIEWED, WorkoutStatus.REVIEWED)]
     public void ChangeStatus_ShouldRejectEveryOtherTransitionAndKeepTheStatus(WorkoutStatus from, WorkoutStatus to)
     {
         // Arrange
@@ -792,8 +802,8 @@ public class WorkoutTests
     }
 
     [Theory]
-    [InlineData(WorkoutStatus.FINISHED, WorkoutStatus.DRAFT)]
-    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.COMPLETED)]
     [InlineData(WorkoutStatus.STARTED, WorkoutStatus.STARTED)]
     public void OverrideStatus_ShouldSkipTheLifecycle(WorkoutStatus from, WorkoutStatus to)
     {
@@ -805,6 +815,25 @@ public class WorkoutTests
 
         // Assert
         workout.Status.Should().Be(to);
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.REVIEWED)]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.REVIEWED)]
+    [InlineData(WorkoutStatus.REVIEWED, WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED, WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.REVIEWED, WorkoutStatus.REVIEWED)]
+    public void OverrideStatus_ShouldNeverSetOrLeaveReviewed(WorkoutStatus from, WorkoutStatus to)
+    {
+        // Arrange
+        var workout = AWorkoutIn(from, Id.New());
+
+        // Act
+        var act = () => workout.OverrideStatus(to);
+
+        // Assert
+        act.Should().Throw<InvalidWorkoutStatusTransitionException>();
+        workout.Status.Should().Be(from);
     }
 
     [Fact]
@@ -823,10 +852,11 @@ public class WorkoutTests
 
     [Theory]
     [InlineData(WorkoutStatus.DRAFT, false)]
-    [InlineData(WorkoutStatus.PUBLISHED, false)]
+    [InlineData(WorkoutStatus.PUBLISHED, true)]
     [InlineData(WorkoutStatus.STARTED, true)]
-    [InlineData(WorkoutStatus.FINISHED, true)]
-    public void IsLocked_ShouldBeTrueOnlyOnceTheWorkoutHasStarted(WorkoutStatus status, bool expected)
+    [InlineData(WorkoutStatus.COMPLETED, true)]
+    [InlineData(WorkoutStatus.REVIEWED, true)]
+    public void IsLocked_ShouldBeTrueForEveryStatusButDraft(WorkoutStatus status, bool expected)
     {
         // Arrange
         var workout = AWorkoutIn(status);
@@ -836,6 +866,24 @@ public class WorkoutTests
 
         // Assert
         locked.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT, false)]
+    [InlineData(WorkoutStatus.PUBLISHED, false)]
+    [InlineData(WorkoutStatus.STARTED, true)]
+    [InlineData(WorkoutStatus.COMPLETED, true)]
+    [InlineData(WorkoutStatus.REVIEWED, true)]
+    public void IsExecuted_ShouldBeTrueOnceTheWorkoutHasStarted(WorkoutStatus status, bool expected)
+    {
+        // Arrange
+        var workout = AWorkoutIn(status);
+
+        // Act
+        var executed = workout.IsExecuted;
+
+        // Assert
+        executed.Should().Be(expected);
     }
 
     [Fact]
@@ -885,7 +933,7 @@ public class WorkoutTests
     [Theory]
     [InlineData(WorkoutStatus.PUBLISHED)]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
     public void IsHiddenFrom_ShouldShowAPrescribedWorkoutOnceItIsPublished(WorkoutStatus status)
     {
         // Arrange
@@ -903,11 +951,13 @@ public class WorkoutTests
     [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.PUBLISHED, true)]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.DRAFT, true)]
     [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.STARTED, true)]
-    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.FINISHED, true)]
+    [InlineData(WorkoutStatus.STARTED, WorkoutStatus.COMPLETED, true)]
     [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.STARTED, false)]
     [InlineData(WorkoutStatus.STARTED, WorkoutStatus.PUBLISHED, false)]
-    [InlineData(WorkoutStatus.FINISHED, WorkoutStatus.DRAFT, false)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.DRAFT, false)]
     [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.DRAFT, false)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.REVIEWED, false)]
+    [InlineData(WorkoutStatus.REVIEWED, WorkoutStatus.COMPLETED, false)]
     public void CanTransitionTo_ShouldMatchTheLifecycle(WorkoutStatus from, WorkoutStatus to, bool expected)
     {
         // Arrange
@@ -1272,11 +1322,13 @@ public class WorkoutTests
         workout.MesocycleWeekNumber.Should().Be(WeekNumber.From(3));
     }
 
-    [Fact]
-    public void LinkToMesocycle_ShouldMoveADraftWorkoutToAnotherMesocycle()
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    public void LinkToMesocycle_ShouldMoveAWorkoutThatIsNotExecutedToAnotherMesocycle(WorkoutStatus status)
     {
         // Arrange
-        var workout = APlacedWorkoutIn(WorkoutStatus.DRAFT, Id.New(), WeekNumber.From(2));
+        var workout = APlacedWorkoutIn(status, Id.New(), WeekNumber.From(2));
         var otherMesocycleId = Id.New();
 
         // Act
@@ -1289,7 +1341,8 @@ public class WorkoutTests
 
     [Theory]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
     public void LinkToMesocycle_ShouldRejectMovingALockedWorkoutAndKeepItsPlacement(WorkoutStatus status)
     {
         // Arrange
@@ -1307,7 +1360,8 @@ public class WorkoutTests
 
     [Theory]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
     public void LinkToMesocycle_ShouldRejectPlacingALockedStandaloneWorkout(WorkoutStatus status)
     {
         // Arrange
@@ -1340,7 +1394,8 @@ public class WorkoutTests
 
     [Theory]
     [InlineData(WorkoutStatus.STARTED)]
-    [InlineData(WorkoutStatus.FINISHED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
     public void UnlinkFromMesocycle_ShouldRejectALockedWorkoutAndKeepItsPlacement(WorkoutStatus status)
     {
         // Arrange
@@ -1363,7 +1418,7 @@ public class WorkoutTests
         var mesocycleId = Id.New();
 
         // Act
-        var workout = APlacedWorkoutIn(WorkoutStatus.FINISHED, mesocycleId, WeekNumber.From(4));
+        var workout = APlacedWorkoutIn(WorkoutStatus.COMPLETED, mesocycleId, WeekNumber.From(4));
 
         // Assert
         workout.MesocycleId.Should().Be(mesocycleId);
@@ -1408,7 +1463,8 @@ public class WorkoutTests
     }
 
     private static Workout APlacedWorkoutIn(WorkoutStatus status, Id mesocycleId, WeekNumber weekNumber)
-        => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, status, [], mesocycleId, weekNumber);
+        => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, status, [], mesocycleId, weekNumber,
+            reviewedAt: ReviewedAtFor(status), reviewedBy: ReviewerFor(status));
 
     private static WorkoutTemplate ATemplateWithASuperSeries(Id trainerId)
     {
@@ -1522,5 +1578,904 @@ public class WorkoutTests
         workout.Exercises.Select(entry => entry.ExerciseId).Should().Contain(removed);
         workout.Exercises[0].SuperSeriesId.Should().NotBeNull();
         workout.Exercises[1].SuperSeriesId.Should().NotBeNull();
+    }
+
+    private static readonly DateTime RecordedAt = new(2026, 11, 7, 10, 0, 0, DateTimeKind.Utc);
+
+    private static Workout AStartedWorkoutWith(params (Id ExerciseId, SetPrescription[] Sets)[] entries)
+        => AWorkoutWith(WorkoutStatus.STARTED, entries);
+
+    private static Workout AWorkoutWith(WorkoutStatus status, params (Id ExerciseId, SetPrescription[] Sets)[] entries)
+        => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, status,
+            entries.Select(entry => WorkoutExercise.Rehydrate(Id.New(), entry.ExerciseId, Effort.MID, entry.Sets)).ToList(),
+            reviewedAt: ReviewedAtFor(status), reviewedBy: ReviewerFor(status));
+
+    private static WorkoutExercise EntryFor(Workout workout, Id exerciseId)
+        => workout.Exercises.Single(entry => entry.ExerciseId == exerciseId);
+
+    [Fact]
+    public void AddSetRecord_ShouldRecordTheSetOnTheExerciseAndLeaveTheOthersAlone()
+    {
+        // Arrange
+        var bench = Id.New();
+        var row = Id.New();
+        var workout = AStartedWorkoutWith((bench, [FourByTen]), (row, [ThreeByTen]));
+
+        // Act
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(62.5m), RecordedAt);
+
+        // Assert
+        var setRecord = EntryFor(workout, bench).SetRecords.Should().ContainSingle().Subject;
+        setRecord.IsNew.Should().BeTrue();
+        setRecord.Reps.Value.Should().Be(8);
+        setRecord.Weight.Value.Should().Be(62.5m);
+        setRecord.RegisteredAtUtc.Should().Be(RecordedAt);
+        EntryFor(workout, row).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldPutTheNewSetRecordLastWhateverItsRegistrationTime()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [FourByTen]));
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt.AddMinutes(5));
+        workout.AddSetRecord(bench, RepCount.From(10), Weight.From(55), RecordedAt.AddMinutes(1));
+
+        // Act
+        workout.AddSetRecord(bench, RepCount.From(9), Weight.From(57.5m), RecordedAt.AddMinutes(3));
+
+        // Assert
+        EntryFor(workout, bench).SetRecords.Select(record => record.RegisteredAtUtc)
+            .Should().Equal(RecordedAt.AddMinutes(5), RecordedAt.AddMinutes(1), RecordedAt.AddMinutes(3));
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldKeepTheOrderAddedForTheSameRegistrationTime()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [FourByTen]));
+        workout.AddSetRecord(bench, RepCount.From(10), Weight.From(60), RecordedAt);
+
+        // Act
+        workout.AddSetRecord(bench, RepCount.From(7), Weight.From(60), RecordedAt);
+
+        // Assert
+        EntryFor(workout, bench).SetRecords.Select(record => record.Reps.Value).Should().Equal(10, 7);
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void AddSetRecord_ShouldRejectAWorkoutThatIsNotStartedOrCompletedAndRecordNothing(WorkoutStatus status)
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AWorkoutWith(status, (bench, [FourByTen]));
+
+        // Act
+        var act = () => workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+
+        // Assert
+        act.Should().Throw<WorkoutResultsLockedException>();
+        EntryFor(workout, bench).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRejectAnExerciseNotInTheWorkout()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [FourByTen]));
+
+        // Act
+        var act = () => workout.AddSetRecord(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+
+        // Assert
+        act.Should().Throw<ExerciseNotInWorkoutException>();
+        EntryFor(workout, bench).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRejectAnExerciseWithADurationPrescription()
+    {
+        // Arrange
+        var plank = Id.New();
+        var workout = AStartedWorkoutWith((plank, [new SetPrescription(3, new SetTarget.Duration(40))]));
+
+        // Act
+        var act = () => workout.AddSetRecord(plank, RepCount.From(8), Weight.From(0), RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        EntryFor(workout, plank).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRejectAnExerciseMixingRepsAndMinutes()
+    {
+        // Arrange
+        var burpees = Id.New();
+        var oneByMinutes = new SetPrescription(1, new SetTarget.Minutes(TimeInMinutes.From(1.5m)));
+        var workout = AStartedWorkoutWith((burpees, [new SetPrescription(2, new SetTarget.Reps(10)), oneByMinutes]));
+
+        // Act
+        var act = () => workout.AddSetRecord(burpees, RepCount.From(10), Weight.From(0), RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        EntryFor(workout, burpees).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldAcceptAMixOfRepBasedPrescriptions()
+    {
+        // Arrange
+        var squat = Id.New();
+        var workout = AStartedWorkoutWith((squat,
+        [
+            new SetPrescription(1, new SetTarget.Reps(10)),
+            new SetPrescription(2, new SetTarget.RepsRange(8, 12)),
+            new SetPrescription(1, new SetTarget.MaxReps()),
+        ]));
+
+        // Act
+        workout.AddSetRecord(squat, RepCount.From(14), Weight.From(80), RecordedAt);
+
+        // Assert
+        EntryFor(workout, squat).SetRecords.Should().ContainSingle()
+            .Which.Reps.Value.Should().Be(14);
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldAcceptMoreSetRecordsThanPrescribedSets()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
+        workout.AddSetRecord(bench, RepCount.From(10), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, RepCount.From(10), Weight.From(60), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(bench, RepCount.From(9), Weight.From(60), RecordedAt.AddMinutes(4));
+
+        // Act
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt.AddMinutes(6));
+
+        // Assert
+        EntryFor(workout, bench).SetRecords.Should().HaveCount(4);
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldNotBeBlockedByTheLockOfAStartedWorkout()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [FourByTen]));
+
+        // Act
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+
+        // Assert
+        workout.IsLocked.Should().BeTrue();
+        EntryFor(workout, bench).SetRecords.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRestoreTheStoredSetRecordsOfEachExercise()
+    {
+        // Arrange
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var bench = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [FourByTen], setRecords: [stored]);
+
+        // Act
+        var workout = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.COMPLETED, [bench]);
+
+        // Assert
+        workout.Exercises.Single().SetRecords.Should().Equal(stored);
+        workout.Exercises.Single().SetRecords.Single().IsNew.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateFromTemplate_ShouldStartWithoutSetRecords()
+    {
+        // Arrange
+        var template = ATemplateWithASuperSeries(Id.New());
+
+        // Act
+        var workout = Workout.CreateFromTemplate(template, Id.New(), WorkoutDate);
+
+        // Assert
+        workout.Exercises.Should().AllSatisfy(entry => entry.SetRecords.Should().BeEmpty());
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldRejectADurationTargetForAnExerciseWithSetRecordsAndChangeNothing()
+    {
+        // Arrange
+        var bench = Id.New();
+        var rest = TimeInMinutes.From(2);
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var entry = WorkoutExercise.Rehydrate(Id.New(), bench, Effort.MID, [ThreeByTen], perSide: true, rest: rest, setRecords: [stored]);
+        var workout = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED, [entry]);
+
+        // Act
+        var act = () => workout.UpdateExercise(bench, Effort.HIGH, [new SetPrescription(3, new SetTarget.Duration(40))]);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        var unchanged = EntryFor(workout, bench);
+        unchanged.Effort.Should().Be(Effort.MID);
+        unchanged.Sets.Should().Equal(ThreeByTen);
+        unchanged.PerSide.Should().BeTrue();
+        unchanged.Rest.Should().Be(rest);
+        unchanged.SetRecords.Should().Equal(stored);
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldRejectAMinutesTargetForAnExerciseWithSetRecords()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+        var minutes = new SetPrescription(1, new SetTarget.Minutes(TimeInMinutes.From(1.5m)));
+
+        // Act
+        var act = () => workout.UpdateExercise(bench, Effort.MID, [ThreeByTen, minutes]);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        EntryFor(workout, bench).Sets.Should().Equal(ThreeByTen);
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldAcceptARepBasedChangeForAnExerciseWithSetRecordsAndKeepThem()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+        var range = new SetPrescription(3, new SetTarget.RepsRange(8, 12));
+
+        // Act
+        workout.UpdateExercise(bench, Effort.MID, [range]);
+
+        // Assert
+        var updated = EntryFor(workout, bench);
+        updated.Sets.Should().Equal(range);
+        updated.SetRecords.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldAcceptADurationTargetForAnExerciseWithoutSetRecords()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
+        var duration = new SetPrescription(3, new SetTarget.Duration(40));
+
+        // Act
+        workout.UpdateExercise(bench, Effort.MID, [duration]);
+
+        // Assert
+        EntryFor(workout, bench).Sets.Should().Equal(duration);
+    }
+
+    private static SetRecord AStoredSetRecord(int reps, decimal weight, int minutesAfter = 0)
+        => SetRecord.Rehydrate(Id.New(), RepCount.From(reps), Weight.From(weight), RecordedAt.AddMinutes(minutesAfter));
+
+    private static Workout AWorkoutWithSetRecords(WorkoutStatus status, Id exerciseId, params SetRecord[] setRecords)
+        => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, status,
+            [WorkoutExercise.Rehydrate(Id.New(), exerciseId, Effort.MID, [FourByTen], setRecords: setRecords)],
+            reviewedAt: ReviewedAtFor(status), reviewedBy: ReviewerFor(status));
+
+    [Fact]
+    public void UpdateSetRecord_ShouldReplaceRepsAndWeightAndKeepIdTimeAndPosition()
+    {
+        // Arrange
+        var bench = Id.New();
+        var first = AStoredSetRecord(10, 60);
+        var second = AStoredSetRecord(8, 60, 2);
+        var third = AStoredSetRecord(7, 60, 4);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, first, second, third);
+
+        // Act
+        workout.UpdateSetRecord(bench, second.Id, RepCount.From(10), Weight.From(62.5m), RecordedAt);
+
+        // Assert
+        var setRecords = EntryFor(workout, bench).SetRecords;
+        setRecords.Select(record => record.Id).Should().Equal(first.Id, second.Id, third.Id);
+        setRecords[1].Reps.Value.Should().Be(10);
+        setRecords[1].Weight.Value.Should().Be(62.5m);
+        setRecords[1].RegisteredAtUtc.Should().Be(RecordedAt.AddMinutes(2));
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void UpdateSetRecord_ShouldRejectAWorkoutThatIsNotStartedOrCompletedAndChangeNothing(WorkoutStatus status)
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(status, bench, stored);
+
+        // Act
+        var act = () => workout.UpdateSetRecord(bench, stored.Id, RepCount.From(10), Weight.From(70), RecordedAt);
+
+        // Assert
+        act.Should().Throw<WorkoutResultsLockedException>();
+        stored.Reps.Value.Should().Be(8);
+        stored.Weight.Value.Should().Be(60);
+    }
+
+    [Fact]
+    public void UpdateSetRecord_ShouldRejectAnExerciseNotInTheWorkout()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
+
+        // Act
+        var act = () => workout.UpdateSetRecord(Id.New(), stored.Id, RepCount.From(10), Weight.From(70), RecordedAt);
+
+        // Assert
+        act.Should().Throw<ExerciseNotInWorkoutException>();
+        stored.Reps.Value.Should().Be(8);
+    }
+
+    [Fact]
+    public void UpdateSetRecord_ShouldRejectASetRecordNotRecordedForTheExerciseAndChangeNothing()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
+
+        // Act
+        var act = () => workout.UpdateSetRecord(bench, Id.New(), RepCount.From(10), Weight.From(70), RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordNotFoundException>();
+        stored.Reps.Value.Should().Be(8);
+        stored.Weight.Value.Should().Be(60);
+    }
+
+    [Fact]
+    public void RemoveSetRecord_ShouldRemoveOnlyThatSetRecordAndKeepTheOrderOfTheRest()
+    {
+        // Arrange
+        var bench = Id.New();
+        var first = AStoredSetRecord(10, 60);
+        var second = AStoredSetRecord(8, 60, 2);
+        var third = AStoredSetRecord(7, 60, 4);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, first, second, third);
+
+        // Act
+        workout.RemoveSetRecord(bench, second.Id, RecordedAt);
+
+        // Assert
+        EntryFor(workout, bench).SetRecords.Should().Equal(first, third);
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void RemoveSetRecord_ShouldRejectAWorkoutThatIsNotStartedOrCompletedAndRemoveNothing(WorkoutStatus status)
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(status, bench, stored);
+
+        // Act
+        var act = () => workout.RemoveSetRecord(bench, stored.Id, RecordedAt);
+
+        // Assert
+        act.Should().Throw<WorkoutResultsLockedException>();
+        EntryFor(workout, bench).SetRecords.Should().Equal(stored);
+    }
+
+    [Fact]
+    public void RemoveSetRecord_ShouldRejectAnExerciseNotInTheWorkout()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
+
+        // Act
+        var act = () => workout.RemoveSetRecord(Id.New(), stored.Id, RecordedAt);
+
+        // Assert
+        act.Should().Throw<ExerciseNotInWorkoutException>();
+        EntryFor(workout, bench).SetRecords.Should().Equal(stored);
+    }
+
+    [Fact]
+    public void RemoveSetRecord_ShouldRejectASetRecordNotRecordedForTheExercise()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
+
+        // Act
+        var act = () => workout.RemoveSetRecord(bench, Id.New(), RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordNotFoundException>();
+        EntryFor(workout, bench).SetRecords.Should().Equal(stored);
+    }
+
+    [Fact]
+    public void ReorderSetRecords_ShouldPutTheSetRecordsInTheGivenOrderAndKeepTheirValues()
+    {
+        // Arrange
+        var bench = Id.New();
+        var first = AStoredSetRecord(10, 60);
+        var second = AStoredSetRecord(8, 62.5m, 2);
+        var third = AStoredSetRecord(7, 65, 4);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, first, second, third);
+
+        // Act
+        workout.ReorderSetRecords(bench, [third.Id, second.Id, first.Id], RecordedAt);
+
+        // Assert
+        var setRecords = EntryFor(workout, bench).SetRecords;
+        setRecords.Should().Equal(third, second, first);
+        setRecords.Select(record => record.Reps.Value).Should().Equal(7, 8, 10);
+        setRecords.Select(record => record.Weight.Value).Should().Equal(65, 62.5m, 60);
+    }
+
+    [Fact]
+    public void ReorderSetRecords_ShouldLeaveTheSetRecordsOfTheOtherExercisesAlone()
+    {
+        // Arrange
+        var bench = Id.New();
+        var row = Id.New();
+        var benchFirst = AStoredSetRecord(10, 60);
+        var benchSecond = AStoredSetRecord(8, 60, 2);
+        var rowFirst = AStoredSetRecord(12, 40, 1);
+        var rowSecond = AStoredSetRecord(10, 40, 3);
+        var workout = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED,
+        [
+            WorkoutExercise.Rehydrate(Id.New(), bench, Effort.MID, [FourByTen], setRecords: [benchFirst, benchSecond]),
+            WorkoutExercise.Rehydrate(Id.New(), row, Effort.MID, [ThreeByTen], setRecords: [rowFirst, rowSecond]),
+        ]);
+
+        // Act
+        workout.ReorderSetRecords(bench, [benchSecond.Id, benchFirst.Id], RecordedAt);
+
+        // Assert
+        EntryFor(workout, row).SetRecords.Should().Equal(rowFirst, rowSecond);
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void ReorderSetRecords_ShouldRejectAWorkoutThatIsNotStartedOrCompletedAndKeepTheOrder(WorkoutStatus status)
+    {
+        // Arrange
+        var bench = Id.New();
+        var first = AStoredSetRecord(10, 60);
+        var second = AStoredSetRecord(8, 60, 2);
+        var workout = AWorkoutWithSetRecords(status, bench, first, second);
+
+        // Act
+        var act = () => workout.ReorderSetRecords(bench, [second.Id, first.Id], RecordedAt);
+
+        // Assert
+        act.Should().Throw<WorkoutResultsLockedException>();
+        EntryFor(workout, bench).SetRecords.Should().Equal(first, second);
+    }
+
+    [Fact]
+    public void ReorderSetRecords_ShouldRejectAnExerciseNotInTheWorkout()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
+
+        // Act
+        var act = () => workout.ReorderSetRecords(Id.New(), [stored.Id], RecordedAt);
+
+        // Assert
+        act.Should().Throw<ExerciseNotInWorkoutException>();
+    }
+
+    [Fact]
+    public void ReorderSetRecords_ShouldRejectAMissingSetRecordAndKeepTheOrder()
+    {
+        // Arrange
+        var bench = Id.New();
+        var first = AStoredSetRecord(10, 60);
+        var second = AStoredSetRecord(8, 60, 2);
+        var third = AStoredSetRecord(7, 60, 4);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, first, second, third);
+
+        // Act
+        var act = () => workout.ReorderSetRecords(bench, [third.Id, first.Id], RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordOrderMismatchException>();
+        EntryFor(workout, bench).SetRecords.Should().Equal(first, second, third);
+    }
+
+    [Fact]
+    public void ReorderSetRecords_ShouldRejectAnExtraSetRecordAndKeepTheOrder()
+    {
+        // Arrange
+        var bench = Id.New();
+        var first = AStoredSetRecord(10, 60);
+        var second = AStoredSetRecord(8, 60, 2);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, first, second);
+
+        // Act
+        var act = () => workout.ReorderSetRecords(bench, [second.Id, first.Id, Id.New()], RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordOrderMismatchException>();
+        EntryFor(workout, bench).SetRecords.Should().Equal(first, second);
+    }
+
+    [Fact]
+    public void ReorderSetRecords_ShouldRejectARepeatedSetRecordAndKeepTheOrder()
+    {
+        // Arrange
+        var bench = Id.New();
+        var first = AStoredSetRecord(10, 60);
+        var second = AStoredSetRecord(8, 60, 2);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, first, second);
+
+        // Act
+        var act = () => workout.ReorderSetRecords(bench, [second.Id, second.Id], RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordOrderMismatchException>();
+        EntryFor(workout, bench).SetRecords.Should().Equal(first, second);
+    }
+
+    [Fact]
+    public void ReorderSetRecords_ShouldRejectASetRecordOfAnotherExerciseAndKeepTheOrder()
+    {
+        // Arrange
+        var bench = Id.New();
+        var row = Id.New();
+        var benchFirst = AStoredSetRecord(10, 60);
+        var benchSecond = AStoredSetRecord(8, 60, 2);
+        var rowRecord = AStoredSetRecord(12, 40, 1);
+        var workout = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED,
+        [
+            WorkoutExercise.Rehydrate(Id.New(), bench, Effort.MID, [FourByTen], setRecords: [benchFirst, benchSecond]),
+            WorkoutExercise.Rehydrate(Id.New(), row, Effort.MID, [ThreeByTen], setRecords: [rowRecord]),
+        ]);
+
+        // Act
+        var act = () => workout.ReorderSetRecords(bench, [benchSecond.Id, rowRecord.Id], RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordOrderMismatchException>();
+        EntryFor(workout, bench).SetRecords.Should().Equal(benchFirst, benchSecond);
+    }
+
+    private static readonly DateTime ReviewedAt = new(2026, 11, 8, 9, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>A completed workout prescribed by <paramref name="trainerId"/>, whose results last changed at <paramref name="resultsUpdatedAt"/>.</summary>
+    private static Workout ACompletedWorkout(Id? trainerId, DateTime? resultsUpdatedAt = null)
+        => Workout.Rehydrate(Id.New(), Id.New(), trainerId, Name, null, WorkoutDate, WorkoutStatus.COMPLETED, [],
+            resultsUpdatedAt: resultsUpdatedAt);
+
+    [Fact]
+    public void MarkReviewed_ShouldReviewACompletedPrescribedWorkoutAndRecordWhoAndWhen()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var workout = ACompletedWorkout(trainerId, RecordedAt);
+
+        // Act
+        workout.MarkReviewed(trainerId, ReviewedAt, RecordedAt);
+
+        // Assert
+        workout.Status.Should().Be(WorkoutStatus.REVIEWED);
+        workout.ReviewedBy.Should().Be(trainerId);
+        workout.ReviewedAt.Should().Be(ReviewedAt);
+    }
+
+    [Fact]
+    public void MarkReviewed_ShouldAcceptAWorkoutWithoutResultsWhenNoneWereExpected()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var workout = ACompletedWorkout(trainerId);
+
+        // Act
+        workout.MarkReviewed(trainerId, ReviewedAt, null);
+
+        // Assert
+        workout.Status.Should().Be(WorkoutStatus.REVIEWED);
+        workout.ResultsUpdatedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void MarkReviewed_ShouldCompareTheExpectedTimeAtTheStoredPrecision()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var workout = ACompletedWorkout(trainerId, RecordedAt);
+
+        // Act
+        workout.MarkReviewed(trainerId, ReviewedAt, RecordedAt.AddTicks(7));
+
+        // Assert
+        workout.Status.Should().Be(WorkoutStatus.REVIEWED);
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void MarkReviewed_ShouldRejectAWorkoutThatIsNotCompletedAndChangeNothing(WorkoutStatus status)
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var workout = AWorkoutIn(status, trainerId);
+        var reviewedAt = workout.ReviewedAt;
+        var reviewedBy = workout.ReviewedBy;
+
+        // Act
+        var act = () => workout.MarkReviewed(trainerId, ReviewedAt, null);
+
+        // Assert
+        act.Should().Throw<WorkoutReviewNotAllowedException>();
+        workout.Status.Should().Be(status);
+        workout.ReviewedAt.Should().Be(reviewedAt);
+        workout.ReviewedBy.Should().Be(reviewedBy);
+    }
+
+    [Fact]
+    public void MarkReviewed_ShouldRejectAWorkoutWithoutTrainerAndChangeNothing()
+    {
+        // Arrange
+        var workout = ACompletedWorkout(null);
+
+        // Act
+        var act = () => workout.MarkReviewed(Id.New(), ReviewedAt, null);
+
+        // Assert
+        act.Should().Throw<WorkoutReviewNotAllowedException>();
+        workout.Status.Should().Be(WorkoutStatus.COMPLETED);
+        workout.ReviewedAt.Should().BeNull();
+        workout.ReviewedBy.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MarkReviewed_ShouldRejectResultsThatChangedAfterTheyWereReadAndChangeNothing(bool readBeforeAnyResult)
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var workout = ACompletedWorkout(trainerId, RecordedAt.AddMinutes(5));
+        DateTime? expected = readBeforeAnyResult ? null : RecordedAt;
+
+        // Act
+        var act = () => workout.MarkReviewed(trainerId, ReviewedAt, expected);
+
+        // Assert
+        act.Should().Throw<WorkoutResultsChangedException>();
+        workout.Status.Should().Be(WorkoutStatus.COMPLETED);
+        workout.ReviewedAt.Should().BeNull();
+        workout.ReviewedBy.Should().BeNull();
+    }
+
+    [Fact]
+    public void MarkReviewed_ShouldRejectExpectedResultsWhenTheWorkoutHasNone()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var workout = ACompletedWorkout(trainerId);
+
+        // Act
+        var act = () => workout.MarkReviewed(trainerId, ReviewedAt, RecordedAt);
+
+        // Assert
+        act.Should().Throw<WorkoutResultsChangedException>();
+        workout.Status.Should().Be(WorkoutStatus.COMPLETED);
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldLetTheAthleteAddResultsToACompletedWorkout()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AWorkoutWith(WorkoutStatus.COMPLETED, (bench, [FourByTen]));
+
+        // Act
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+
+        // Assert
+        EntryFor(workout, bench).SetRecords.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void UpdateSetRecord_ShouldCorrectAResultOfACompletedWorkout()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.COMPLETED, bench, stored);
+
+        // Act
+        workout.UpdateSetRecord(bench, stored.Id, RepCount.From(10), Weight.From(60), RecordedAt.AddMinutes(30));
+
+        // Assert
+        EntryFor(workout, bench).SetRecords.Single().Reps.Value.Should().Be(10);
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldStampTheResultsWithTheRegistrationTime()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AWorkoutWith(WorkoutStatus.STARTED, (bench, [FourByTen]));
+
+        // Act
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+
+        // Assert
+        workout.ResultsUpdatedAt.Should().Be(RecordedAt);
+    }
+
+    [Fact]
+    public void UpdateSetRecord_ShouldStampTheResultsWithTheCorrectionTime()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.COMPLETED, bench, stored);
+        var correctedAt = RecordedAt.AddMinutes(30);
+
+        // Act
+        workout.UpdateSetRecord(bench, stored.Id, RepCount.From(10), Weight.From(60), correctedAt);
+
+        // Assert
+        workout.ResultsUpdatedAt.Should().Be(correctedAt);
+    }
+
+    [Fact]
+    public void RemoveSetRecord_ShouldStampTheResultsWithTheRemovalTime()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.COMPLETED, bench, stored);
+        var removedAt = RecordedAt.AddMinutes(30);
+
+        // Act
+        workout.RemoveSetRecord(bench, stored.Id, removedAt);
+
+        // Assert
+        workout.ResultsUpdatedAt.Should().Be(removedAt);
+    }
+
+    [Fact]
+    public void ReorderSetRecords_ShouldStampTheResultsWithTheReorderTime()
+    {
+        // Arrange
+        var bench = Id.New();
+        var first = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var second = SetRecord.Rehydrate(Id.New(), RepCount.From(6), Weight.From(65), RecordedAt.AddMinutes(2));
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.COMPLETED, bench, first, second);
+        var reorderedAt = RecordedAt.AddMinutes(30);
+
+        // Act
+        workout.ReorderSetRecords(bench, [second.Id, first.Id], reorderedAt);
+
+        // Assert
+        workout.ResultsUpdatedAt.Should().Be(reorderedAt);
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldTruncateTheResultsTimeToTheStoredPrecision()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AWorkoutWith(WorkoutStatus.STARTED, (bench, [FourByTen]));
+
+        // Act
+        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt.AddTicks(7));
+
+        // Assert
+        workout.ResultsUpdatedAt.Should().Be(RecordedAt);
+    }
+
+    [Fact]
+    public void UpdateSetRecord_ShouldKeepTheResultsTimeWhenTheChangeIsRefused()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var workout = Workout.Rehydrate(Id.New(), Id.New(), Id.New(), Name, null, WorkoutDate, WorkoutStatus.REVIEWED,
+            [WorkoutExercise.Rehydrate(Id.New(), bench, Effort.MID, [FourByTen], setRecords: [stored])],
+            reviewedAt: ReviewedAt, reviewedBy: Id.New(), resultsUpdatedAt: RecordedAt);
+
+        // Act
+        var act = () => workout.UpdateSetRecord(bench, stored.Id, RepCount.From(10), Weight.From(60), RecordedAt.AddMinutes(30));
+
+        // Assert
+        act.Should().Throw<WorkoutResultsLockedException>();
+        workout.ResultsUpdatedAt.Should().Be(RecordedAt);
+    }
+
+    [Fact]
+    public void RemoveSetRecord_ShouldKeepTheResultsTimeWhenTheSetRecordIsUnknown()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
+
+        // Act
+        var act = () => workout.RemoveSetRecord(bench, Id.New(), RecordedAt.AddMinutes(30));
+
+        // Assert
+        act.Should().Throw<SetRecordNotFoundException>();
+        workout.ResultsUpdatedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldRestoreTheReviewAndTheResultsTime()
+    {
+        // Arrange
+        var reviewerId = Id.New();
+
+        // Act
+        var workout = Workout.Rehydrate(Id.New(), Id.New(), reviewerId, Name, null, WorkoutDate, WorkoutStatus.REVIEWED, [],
+            reviewedAt: ReviewedAt, reviewedBy: reviewerId, resultsUpdatedAt: RecordedAt);
+
+        // Assert
+        workout.ReviewedAt.Should().Be(ReviewedAt);
+        workout.ReviewedBy.Should().Be(reviewerId);
+        workout.ResultsUpdatedAt.Should().Be(RecordedAt);
+    }
+
+    [Fact]
+    public void Create_ShouldStartWithoutReviewNorResults()
+    {
+        // Arrange & Act
+        var workout = Workout.Create(Id.New(), Id.New(), Name, null, WorkoutDate);
+
+        // Assert
+        workout.ReviewedAt.Should().BeNull();
+        workout.ReviewedBy.Should().BeNull();
+        workout.ResultsUpdatedAt.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.REVIEWED, false, false)]
+    [InlineData(WorkoutStatus.REVIEWED, true, false)]
+    [InlineData(WorkoutStatus.REVIEWED, false, true)]
+    [InlineData(WorkoutStatus.COMPLETED, true, true)]
+    [InlineData(WorkoutStatus.COMPLETED, true, false)]
+    public void Rehydrate_ShouldRejectReviewMetadataThatDoesNotMatchTheStatus(WorkoutStatus status, bool withReviewedAt, bool withReviewedBy)
+    {
+        // Arrange
+        DateTime? reviewedAt = withReviewedAt ? ReviewedAt : null;
+        Id? reviewedBy = withReviewedBy ? Id.New() : null;
+
+        // Act
+        var act = () => Workout.Rehydrate(Id.New(), Id.New(), Id.New(), Name, null, WorkoutDate, status, [],
+            reviewedAt: reviewedAt, reviewedBy: reviewedBy);
+
+        // Assert
+        act.Should().Throw<InvalidWorkoutStatusException>();
     }
 }

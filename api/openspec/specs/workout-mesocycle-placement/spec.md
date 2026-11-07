@@ -55,20 +55,28 @@ Unlinking a `DRAFT` or `PUBLISHED` workout SHALL clear both values, leaving a st
 - **WHEN** a `DRAFT` workout in mesocycle `M`, week 2 is unlinked
 - **THEN** its mesocycle id and week number are both empty
 
-### Requirement: Started and finished workouts keep their placement
-Linking, moving or unlinking a `STARTED` or `FINISHED` workout SHALL be refused with a conflict error, whatever the caller, and the workout's placement SHALL stay unchanged. This preserves the planning context of executed workouts.
+### Requirement: Executed workouts keep their placement
+Linking, moving or unlinking a `STARTED`, `COMPLETED` or `REVIEWED` workout SHALL be refused with a conflict error, whatever the caller, and the workout's placement SHALL stay unchanged. This preserves the planning context of executed workouts. `DRAFT` and `PUBLISHED` workouts are not affected by this rule.
 
 #### Scenario: Move a started workout
 - **WHEN** a `STARTED` workout in mesocycle `M`, week 2 is linked to week 3
 - **THEN** it is refused with a conflict error and it stays in mesocycle `M`, week 2
 
-#### Scenario: Unlink a finished workout
-- **WHEN** a `FINISHED` workout in mesocycle `M`, week 2 is unlinked
+#### Scenario: Unlink a completed workout
+- **WHEN** a `COMPLETED` workout in mesocycle `M`, week 2 is unlinked
 - **THEN** it is refused with a conflict error and it stays in mesocycle `M`, week 2
 
-#### Scenario: Link a finished standalone workout
-- **WHEN** a `FINISHED` standalone workout is linked to mesocycle `M`, week 1
+#### Scenario: Link a completed standalone workout
+- **WHEN** a `COMPLETED` standalone workout is linked to mesocycle `M`, week 1
 - **THEN** it is refused with a conflict error and it stays standalone
+
+#### Scenario: Move a reviewed workout
+- **WHEN** a `REVIEWED` workout in mesocycle `M`, week 2 is linked to week 3
+- **THEN** it is refused with a conflict error and it stays in mesocycle `M`, week 2
+
+#### Scenario: Move a published workout
+- **WHEN** a `PUBLISHED` workout in mesocycle `M`, week 2 is linked to week 3
+- **THEN** it is moved to week 3
 
 ### Requirement: Workouts and mesocycles stay independent
 A workout SHALL reference a mesocycle only by its id and a week number, and a mesocycle SHALL NOT hold its workouts. Loading or saving either SHALL NOT load or change the other.
@@ -200,7 +208,7 @@ A placement whose week number is above the mesocycle's duration SHALL be refused
 - **THEN** the response is `409`
 
 ### Requirement: Locked workouts keep their placement over HTTP
-Changing or clearing the placement of a `STARTED` or `FINISHED` workout through `PUT /workouts/{id}` SHALL be refused with `409`, also for admins. Sending back its current placement unchanged SHALL NOT be refused for that reason.
+Changing or clearing the placement of a `STARTED`, `COMPLETED` or `REVIEWED` workout through `PUT /workouts/{id}` SHALL be refused with `409`, also for admins. Sending back its current placement unchanged SHALL NOT be refused for that reason.
 
 #### Scenario: Admin moves a started workout
 - **WHEN** an admin updates the seeded started workout in week 2 sending week 3

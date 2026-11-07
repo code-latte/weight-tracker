@@ -323,7 +323,7 @@ public class ExceptionMapperTests
     public void Map_ShouldReturnConflictForAnInvalidWorkoutStatusTransition()
     {
         // Arrange
-        var exception = new InvalidWorkoutStatusTransitionException(WorkoutStatus.DRAFT, WorkoutStatus.FINISHED);
+        var exception = new InvalidWorkoutStatusTransitionException(WorkoutStatus.DRAFT, WorkoutStatus.COMPLETED);
 
         // Act
         var status = StatusOf(exception);
@@ -534,6 +534,46 @@ public class ExceptionMapperTests
     [Theory]
     [MemberData(nameof(WorkoutTemplateFailures))]
     public void Map_ShouldMapEveryWorkoutTemplateFailure(Exception exception, int expected)
+    {
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(expected);
+    }
+
+    public static TheoryData<Exception, int> SetRecordFailures() => new()
+    {
+        { new InvalidRepCountException("reps must be at least 1, got 0"), StatusCodes.Status400BadRequest },
+        { new InvalidWeightException("weight cannot be negative, got -5"), StatusCodes.Status400BadRequest },
+        { new WorkoutResultsLockedException(Id.New(), WorkoutStatus.PUBLISHED), StatusCodes.Status409Conflict },
+        { new SetRecordNotAllowedForTargetException(Id.New()), StatusCodes.Status409Conflict },
+        { new SetRecordNotFoundException(Id.New(), Id.New()), StatusCodes.Status404NotFound },
+        { new SetRecordOrderMismatchException(Id.New()), StatusCodes.Status409Conflict },
+    };
+
+    [Theory]
+    [MemberData(nameof(SetRecordFailures))]
+    public void Map_ShouldMapEverySetRecordFailure(Exception exception, int expected)
+    {
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(expected);
+    }
+
+    public static TheoryData<Exception, int> ReviewFailures() => new()
+    {
+        { new WorkoutReviewNotAllowedException(Id.New(), WorkoutStatus.STARTED, "only a completed workout can be reviewed"), StatusCodes.Status409Conflict },
+        { new WorkoutResultsChangedException(Id.New()), StatusCodes.Status409Conflict },
+        { new WorkoutResultsLockedException(Id.New(), WorkoutStatus.REVIEWED), StatusCodes.Status409Conflict },
+        { new WorkoutConcurrencyConflictException(new InvalidOperationException("row version changed")), StatusCodes.Status409Conflict },
+    };
+
+    [Theory]
+    [MemberData(nameof(ReviewFailures))]
+    public void Map_ShouldMapEveryReviewFailureToConflict(Exception exception, int expected)
     {
         // Act
         var status = StatusOf(exception);

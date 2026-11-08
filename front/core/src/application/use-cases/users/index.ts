@@ -2,5 +2,6 @@ export { default as ActivateUserUseCase } from "./activate-user-use-case";
 export { default as CreateUserUseCase } from "./create-user-use-case";
 export { default as DeactivateUserUseCase } from "./deactivate-user-use-case";
 export { default as GetMyProfileUseCase } from "./get-my-profile-use-case";
+export { default as GetUserTrainerUseCase } from "./get-user-trainer-use-case";
 export { default as GetUsersUseCase } from "./get-users-use-case";
 export { default as UpdateMyProfileUseCase } from "./update-my-profile-use-case";

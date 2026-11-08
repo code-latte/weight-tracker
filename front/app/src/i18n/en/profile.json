@@ -1,0 +1,25 @@
+{
+  "title": "Profile",
+  "settings": "Settings",
+  "trainer": {
+    "title": "My trainer"
+  },
+  "menu": {
+    "myData": {
+      "title": "My data",
+      "description": "Measurements, weights, age..."
+    },
+    "goals": {
+      "title": "My goals",
+      "description": "Fat, Muscle, Performance..."
+    },
+    "limitations": {
+      "title": "Limitations",
+      "description": "Injuries, discomfort, notes..."
+    },
+    "notifications": "Notifications",
+    "about": "About Trainera"
+  },
+  "logout": "Log out",
+  "retry": "Retry"
+}

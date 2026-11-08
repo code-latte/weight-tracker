@@ -1,21 +1,26 @@
 import { useEffect } from "react";
 import { SplashScreen, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
 import useSession from "@/presentation/auth/hooks/use-session";
 import AppProviders from "@/presentation/common/components/app-providers";
+import fonts from "@/presentation/common/fonts";
 
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { status } = useSession();
+  const [fontsLoaded, fontsError] = useFonts(fonts);
+  // A font failure only ends the wait: the app falls back to the system font.
+  const ready = status !== "restoring" && (fontsLoaded || fontsError !== null);
 
   useEffect(() => {
-    if (status !== "restoring") {
+    if (ready) {
       SplashScreen.hide();
     }
-  }, [status]);
+  }, [ready]);
 
-  if (status === "restoring") {
+  if (!ready) {
     return null;
   }
 

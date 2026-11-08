@@ -9,6 +9,7 @@ const keys: (keyof Dependencies)[] = [
   "getSessionUseCase",
   "refreshSessionUseCase",
   "getMyProfileUseCase",
+  "getUserTrainerUseCase",
   "updateMyProfileUseCase",
   "getUsersUseCase",
   "createUserUseCase",

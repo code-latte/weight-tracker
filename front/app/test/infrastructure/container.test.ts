@@ -21,6 +21,7 @@ const keys: (keyof Dependencies)[] = [
   "notificationService",
   "refreshSessionUseCase",
   "getMyProfileUseCase",
+  "getUserTrainerUseCase",
   "updateMyProfileUseCase",
   "getUsersUseCase",
   "createUserUseCase",

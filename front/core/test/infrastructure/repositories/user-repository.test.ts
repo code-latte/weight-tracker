@@ -111,6 +111,77 @@ describe("UserRepository", () => {
     });
   });
 
+  describe("getTrainer", () => {
+    const userId = "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f";
+
+    it("gets /users/{userId}/trainer without a body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => profile);
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      await repository.getTrainer(userId);
+
+      // Assert
+      expect(httpClient.requests).toEqual([{ method: "GET", path: `/users/${userId}/trainer` }]);
+    });
+
+    it("returns the trainer's profile on success", async () => {
+      // Arrange
+      const repository = new UserRepository(new FakeHttpClient(async () => profile));
+
+      // Act
+      const result = await repository.getTrainer(userId);
+
+      // Assert
+      expect(result).toEqual(ok(profile));
+    });
+
+    it("returns null when the API answers with no content", async () => {
+      // Arrange
+      const repository = new UserRepository(new FakeHttpClient(async () => undefined));
+
+      // Act
+      const result = await repository.getTrainer(userId);
+
+      // Assert
+      expect(result).toEqual(ok(null));
+    });
+
+    it.each([
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => {
+        throw new HttpError(status, { status, detail: "Something failed" });
+      });
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      const result = await repository.getTrainer(userId);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      const result = await repository.getTrainer(userId);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
   describe("updateMe", () => {
     it("puts the request to /users/me unchanged", async () => {
       // Arrange

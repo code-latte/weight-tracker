@@ -143,6 +143,7 @@ builder.Services.AddScoped<GetAllMesocyclesUseCase>();
 builder.Services.AddScoped<GetMesocycleByIdUseCase>();
 builder.Services.AddScoped<GetMesocycleWorkoutsUseCase>();
 builder.Services.AddScoped<GetUserMesocyclesUseCase>();
+builder.Services.AddScoped<GetUserTrainerUseCase>();
 builder.Services.AddScoped<CreateMesocycleUseCase>();
 builder.Services.AddScoped<UpdateMesocycleUseCase>();
 builder.Services.AddScoped<DefineMesocycleWeekUseCase>();

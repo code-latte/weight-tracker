@@ -104,6 +104,7 @@ export default interface Dependencies {
   getPreferredThemeModeUseCase: UseCaseInterface<void, string | null>;
   setPreferredThemeModeUseCase: UseCaseInterface<string, void>;
   getMyProfileUseCase: UseCaseInterface<void, UserProfile>;
+  getUserTrainerUseCase: UseCaseInterface<string, UserProfile | null>;
   updateMyProfileUseCase: UseCaseInterface<UpdateProfileRequest, UserProfile>;
   getUsersUseCase: UseCaseInterface<void, UserSummary[]>;
   createUserUseCase: UseCaseInterface<CreateUserRequest, CreatedUserResponse>;

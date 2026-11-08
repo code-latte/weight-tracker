@@ -22,6 +22,7 @@ const unusedDependencies: Registrations<Dependencies> = {
   }),
   userRepository: () => ({
     getMe: async () => undefined as never,
+    getTrainer: async () => undefined as never,
     updateMe: async () => undefined as never,
     getAll: async () => undefined as never,
     create: async () => undefined as never,
@@ -103,6 +104,7 @@ const unusedDependencies: Registrations<Dependencies> = {
   getPreferredThemeModeUseCase: () => ({ execute: async () => ok(null) }),
   setPreferredThemeModeUseCase: () => ({ execute: async () => ok(undefined) }),
   getMyProfileUseCase: () => ({ execute: async () => undefined as never }),
+  getUserTrainerUseCase: () => ({ execute: async () => undefined as never }),
   updateMyProfileUseCase: () => ({ execute: async () => undefined as never }),
   getUsersUseCase: () => ({ execute: async () => undefined as never }),
   createUserUseCase: () => ({ execute: async () => undefined as never }),

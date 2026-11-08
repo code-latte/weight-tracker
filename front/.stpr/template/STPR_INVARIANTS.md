@@ -420,8 +420,10 @@ Root layout and auth gate:
 - No code navigates on sign-in, sign-out or failed refresh. The use case result changes the session state, the guard
   flips, and Expo Router moves the user to the first available screen. `Redirect` and `router.replace` are never used
   for access control.
-- While the session is being restored, the root layout keeps the native splash up: `SplashScreen.preventAutoHideAsync()`
-  at module scope and `SplashScreen.hide()` once the session state is known, both from `expo-router`. There is no
+- While the session is being restored or the fonts are loading, the root layout keeps the native splash up:
+  `SplashScreen.preventAutoHideAsync()` at module scope and `SplashScreen.hide()`, both from `expo-router`, once the
+  session state is known and the fonts (`useFonts` from `expo-font`, with the map in `presentation/common/fonts.ts`)
+  are loaded or have failed. A font failure only ends the wait; the app falls back to the system font. There is no
   loading route.
 - Until the session state hook exists (the login slice), the root `Stack` is unguarded, but routes already sit in the
   groups above.

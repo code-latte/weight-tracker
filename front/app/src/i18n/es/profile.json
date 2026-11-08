@@ -1,0 +1,25 @@
+{
+  "title": "Perfil",
+  "settings": "Ajustes",
+  "trainer": {
+    "title": "Mi entrenador"
+  },
+  "menu": {
+    "myData": {
+      "title": "Mis Datos",
+      "description": "Medidas, pesos, edad..."
+    },
+    "goals": {
+      "title": "Mis Objetivos",
+      "description": "Grasa, Músculo, Rendimiento..."
+    },
+    "limitations": {
+      "title": "Limitaciones",
+      "description": "Lesiones, molestias, observaciones..."
+    },
+    "notifications": "Notificaciones",
+    "about": "Acerca de Trainera"
+  },
+  "logout": "Cerrar sesión",
+  "retry": "Reintentar"
+}

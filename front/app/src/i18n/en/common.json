@@ -1,11 +1,16 @@
 {
   "home": {
     "title": "Trainera",
-    "signedIn": "You are signed in.",
-    "logout": "Log out"
+    "signedIn": "You are signed in."
   },
   "notFound": {
     "title": "This screen does not exist.",
     "goHome": "Go to home"
+  },
+  "tabs": {
+    "home": "Home",
+    "workouts": "Workouts",
+    "progress": "Progress",
+    "profile": "Profile"
   }
 }

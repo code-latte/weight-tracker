@@ -48,6 +48,10 @@ class FakeUserRepository implements UserRepositoryInterface {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
+  async getTrainer(): Promise<Result<UserProfile | null, DomainError>> {
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
   async updateMe(): Promise<Result<UserProfile, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));

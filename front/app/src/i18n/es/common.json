@@ -1,11 +1,16 @@
 {
   "home": {
     "title": "Trainera",
-    "signedIn": "Has iniciado sesión.",
-    "logout": "Cerrar sesión"
+    "signedIn": "Has iniciado sesión."
   },
   "notFound": {
     "title": "Esta pantalla no existe.",
     "goHome": "Ir al inicio"
+  },
+  "tabs": {
+    "home": "Inicio",
+    "workouts": "Entrenamientos",
+    "progress": "Progreso",
+    "profile": "Perfil"
   }
 }

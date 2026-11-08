@@ -15,7 +15,8 @@ namespace WeightTracker.Api.Endpoints.Users;
 /// <c>GET /users</c> lets an administrator list every user, and <c>POST /users</c> lets an administrator
 /// create someone else's account. The <c>activate</c> and <c>deactivate</c> routes let an administrator
 /// switch another account on and off. <c>GET /users/{userId}/mesocycles</c> lets a trainer or an administrator
-/// list the mesocycles planned for one athlete.
+/// list the mesocycles planned for one athlete, and <c>GET /users/{userId}/trainer</c> lets a user read their own
+/// current trainer, or an administrator anyone's.
 /// </summary>
 [ApiController]
 [Route("users")]
@@ -27,6 +28,7 @@ public class UsersController : AuthorizedController
     private readonly ActivateUserUseCase _activateUser;
     private readonly DeactivateUserUseCase _deactivateUser;
     private readonly GetUserMesocyclesUseCase _getUserMesocycles;
+    private readonly GetUserTrainerUseCase _getUserTrainer;
 
     public UsersController(
         UpdateMyProfileUseCase updateMyProfile,
@@ -35,6 +37,7 @@ public class UsersController : AuthorizedController
         ActivateUserUseCase activateUser,
         DeactivateUserUseCase deactivateUser,
         GetUserMesocyclesUseCase getUserMesocycles,
+        GetUserTrainerUseCase getUserTrainer,
         GetAuthenticatedUserUseCase getAuthenticatedUser,
         ExceptionMapper exceptionMapper) : base(getAuthenticatedUser, exceptionMapper)
     {
@@ -44,6 +47,7 @@ public class UsersController : AuthorizedController
         _activateUser = activateUser;
         _deactivateUser = deactivateUser;
         _getUserMesocycles = getUserMesocycles;
+        _getUserTrainer = getUserTrainer;
     }
 
     /// <summary>
@@ -204,6 +208,31 @@ public class UsersController : AuthorizedController
             var views = await _getUserMesocycles.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(userId), cancellationToken);
 
             return Ok(views.Select(MesocycleResponse.From).ToList());
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Reads the current trainer of one user, the trainer of their active relationship. A user may ask only about
+    /// themselves and an administrator about anyone. Answers <c>204</c> when the user has no active trainer.
+    /// </summary>
+    [HttpGet("{userId:guid}/trainer")]
+    [RequireRole(Role.USER, Role.ADMIN)]
+    [ProducesResponseType<UserProfileResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetTrainer(Guid userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var trainer = await _getUserTrainer.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(userId), cancellationToken);
+
+            return trainer is null ? NoContent() : Ok(UserProfileResponse.From(trainer));
         }
         catch (Exception exception)
         {

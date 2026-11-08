@@ -29,6 +29,20 @@ export default class UserRepository implements UserRepositoryInterface {
     }
   }
 
+  async getTrainer(userId: string): Promise<Result<UserProfile | null, DomainError>> {
+    try {
+      const response = await this.httpClient.request<UserProfile | undefined>({
+        method: "GET",
+        path: `/users/${userId}/trainer`,
+      });
+
+      // The API answers 204 with no body when the user has no active trainer.
+      return ok(response ?? null);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
   async updateMe(request: UpdateProfileRequest): Promise<Result<UserProfile, DomainError>> {
     try {
       const response = await this.httpClient.request<UserProfile>({

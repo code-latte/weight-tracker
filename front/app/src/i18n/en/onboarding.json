@@ -1,0 +1,20 @@
+{
+  "progress": "Step {{current}} of {{total}}",
+  "next": "Next",
+  "finish": "Finish",
+  "retry": "Retry",
+  "steps": {
+    "name": {
+      "title": "Tell us your name"
+    }
+  },
+  "fields": {
+    "name": "Name",
+    "surname": "Surname"
+  },
+  "fieldErrors": {
+    "required": "This field is required.",
+    "minLength": "Must be at least 3 characters.",
+    "maxLength": "Cannot exceed 100 characters."
+  }
+}

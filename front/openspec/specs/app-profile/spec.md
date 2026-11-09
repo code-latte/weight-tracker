@@ -7,20 +7,20 @@ and how the screen behaves while loading or after a failure.
 
 ## Requirements
 
-### Requirement: The profile screen has a title row with a settings button
+### Requirement: The profile title row opens Ajustes
 
 The Perfil tab SHALL show the title "Perfil" and, on the same row at the right, a settings button with a cog icon and
-the accessible name "Ajustes". Tapping it SHALL do nothing yet.
+the accessible name "Ajustes". Tapping it SHALL open the Ajustes screen in the Perfil tab.
 
 #### Scenario: Title row
 
 - **WHEN** a signed-in athlete opens the Perfil tab
 - **THEN** the screen shows the heading "Perfil" and the "Ajustes" button on the same row
 
-#### Scenario: Settings not wired
+#### Scenario: Settings opens Ajustes
 
 - **WHEN** the athlete taps "Ajustes"
-- **THEN** the screen stays as it is and no request is made
+- **THEN** the Ajustes screen is shown, with the tab bar visible, and no request is made
 
 ### Requirement: The profile screen shows the athlete's identity
 

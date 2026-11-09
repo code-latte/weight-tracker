@@ -5,6 +5,12 @@ import i18n from "@/infrastructure/i18n";
 import ProfileView from "@/presentation/profile/views/profile-view";
 import renderWithProviders from "../../../support/render-with-providers";
 
+const mockPush = jest.fn();
+
+jest.mock("expo-router", () => ({
+  router: { push: (href: string) => mockPush(href) },
+}));
+
 // Paper's icons load their font through expo-font, which has no assets under Jest.
 jest.mock("expo-font", () => ({
   ...jest.requireActual("expo-font"),
@@ -142,20 +148,36 @@ describe("ProfileView", () => {
     expect(screen.getByText("Lesiones, molestias, observaciones...")).toBeOnTheScreen();
   });
 
-  it("does nothing when the settings button or a menu item is pressed", async () => {
+  it("opens Ajustes when the settings button is pressed", async () => {
     // Arrange
+    mockPush.mockClear();
+    const { getProfile, dependencies } = setup();
+    await renderWithProviders(<ProfileView />, dependencies);
+    await screen.findByText("Ana López");
+
+    // Act
+    await fireEvent.press(screen.getByRole("button", { name: "Ajustes" }));
+
+    // Assert
+    expect(mockPush).toHaveBeenCalledWith("/profile/settings");
+    expect(getProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing when a menu item is pressed", async () => {
+    // Arrange
+    mockPush.mockClear();
     const { getProfile, getTrainer, logout, dependencies } = setup();
     await renderWithProviders(<ProfileView />, dependencies);
     await screen.findByText("Mis Datos");
 
     // Act
-    await fireEvent.press(screen.getByRole("button", { name: "Ajustes" }));
     await fireEvent.press(screen.getByText("Mis Datos"));
 
     // Assert
     expect(getProfile).toHaveBeenCalledTimes(1);
     expect(getTrainer).toHaveBeenCalledTimes(1);
     expect(logout).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
     expect(screen.getByText("Ana López")).toBeOnTheScreen();
   });
 

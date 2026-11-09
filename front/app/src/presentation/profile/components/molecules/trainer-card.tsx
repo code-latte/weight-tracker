@@ -17,6 +17,7 @@ export default function TrainerCard({ title, name, surname }: TrainerCardProps) 
       <ListItem
         title={title}
         description={`${name} ${surname}`}
+        chevron
         left={() => (
           <View style={styles.avatar}>
             <Avatar label={initials(name, surname)} size={40} />

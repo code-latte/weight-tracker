@@ -249,7 +249,8 @@ Classify every planned piece as exactly one of these before writing code.
 
 - No user-visible string is hard-coded. Every string comes from a translation key.
 - Spanish (`es`) is the default language and English (`en`) the fallback. Both are required from the first key.
-- The initial language is detected from the device or browser, falling back to `es`.
+- The initial language is the one the user chose on this device, when one is stored; otherwise it is detected from
+  the device or browser, falling back to `es`.
 - Keys are namespaced by domain area; shared strings live in `common`. Each front owns its own translations.
 - `DomainError` codes are translated in presentation through `errors.<code>`.
 
@@ -420,11 +421,14 @@ Root layout and auth gate:
 - No code navigates on sign-in, sign-out or failed refresh. The use case result changes the session state, the guard
   flips, and Expo Router moves the user to the first available screen. `Redirect` and `router.replace` are never used
   for access control.
-- While the session is being restored or the fonts are loading, the root layout keeps the native splash up:
-  `SplashScreen.preventAutoHideAsync()` at module scope and `SplashScreen.hide()`, both from `expo-router`, once the
-  session state is known and the fonts (`useFonts` from `expo-font`, with the map in `presentation/common/fonts.ts`)
-  are loaded or have failed. A font failure only ends the wait; the app falls back to the system font. There is no
-  loading route.
+- While the session is being restored, the fonts are loading or the device preferences are being read, the root
+  layout keeps the native splash up: `SplashScreen.preventAutoHideAsync()` at module scope and `SplashScreen.hide()`,
+  both from `expo-router`, once the session state is known, the fonts (`useFonts` from `expo-font`, with the map in
+  `presentation/common/fonts.ts`) are loaded or have failed, and the device preferences (colour mode and language,
+  `ready` from the preferences state hook) are read or have failed, and, with a stored session, the current user's
+  profile read has ended (`settled` from the current-user state hook). A font failure only ends the wait; the app falls
+  back to the system font. A preferences failure only ends the wait; the app follows the device. A profile failure only
+  ends the wait; the gate then shows the onboarding. There is no loading route.
 - Until the session state hook exists (the login slice), the root `Stack` is unguarded, but routes already sit in the
   groups above.
 - `+not-found.tsx` sits at the root. No other `+` file is used (`+html`, `+middleware` and `+api` need web or a
@@ -470,7 +474,8 @@ Navigation:
   translated key. Values are trimmed before structural validation; any other normalisation is the API's. The
   submit `Button` shows `loading` and is disabled while the request is pending. A form view is wrapped in
   `KeyboardAvoidingView`.
-- The theme is the single `presentation/common/theme.ts`, built from Paper's `MD3LightTheme`. Views and components
-  read colours with `useTheme()`; no colour literal appears outside `theme.ts`.
+- The theme is the single `presentation/common/theme.ts`, built with `buildTheme` from Paper's `MD3LightTheme` and
+  `MD3DarkTheme`. The active mode is the one the user chose on this device, otherwise the device's colour scheme.
+  Views and components read colours with `useTheme()`; no colour literal appears outside `theme.ts`.
 - Styles are a `StyleSheet.create` at the bottom of the file. Inline style objects are allowed only for values read
   from the theme.

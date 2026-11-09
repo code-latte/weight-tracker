@@ -11,6 +11,7 @@ import type { DomainErrorCode } from "@weight-tracker/core/domain";
 import useContainer from "@/presentation/common/hooks/use-container";
 import LoginForm from "../components/organisms/login-form";
 import useSession from "../hooks/use-session";
+import SafeArea from "@/presentation/common/components/atoms/safe-area";
 
 const LOGIN_ERROR_CODES: readonly DomainErrorCode[] = ["UNAUTHORIZED"];
 
@@ -44,18 +45,20 @@ export default function LoginView() {
     : null;
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <LoginForm
-          submitting={submitting}
-          errorMessage={errorMessage}
-          onSubmit={(credentials) => void handleSubmit(credentials)}
-        />
-      </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+    <SafeArea>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <LoginForm
+            submitting={submitting}
+            errorMessage={errorMessage}
+            onSubmit={(credentials) => void handleSubmit(credentials)}
+          />
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+    </SafeArea>
   );
 }
 

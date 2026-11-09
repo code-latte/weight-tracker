@@ -2,12 +2,15 @@ import type { ReactElement } from "react";
 import { render } from "@testing-library/react-native";
 import { PaperProvider } from "react-native-paper";
 import { I18nextProvider } from "react-i18next";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import type { Dependencies } from "@weight-tracker/core/application";
 import { ok } from "@weight-tracker/core/domain";
 import { Container, type Registrations } from "@weight-tracker/core/infrastructure";
 import i18n from "@/infrastructure/i18n";
 import SessionProvider from "@/presentation/auth/context/session-provider";
 import ContainerProvider from "@/presentation/common/context/container-provider";
+import CurrentUserProvider from "@/presentation/common/context/current-user-provider";
+import PreferencesProvider from "@/presentation/common/context/preferences-provider";
 import theme from "@/presentation/common/theme";
 
 /** Registrations that do nothing; tests override the keys the view under test uses. */
@@ -103,7 +106,8 @@ const unusedDependencies: Registrations<Dependencies> = {
   setPreferredLanguageUseCase: () => ({ execute: async () => ok(undefined) }),
   getPreferredThemeModeUseCase: () => ({ execute: async () => ok(null) }),
   setPreferredThemeModeUseCase: () => ({ execute: async () => ok(undefined) }),
-  getMyProfileUseCase: () => ({ execute: async () => undefined as never }),
+  // Never answers, so a signed-in test that does not care about the profile sees none.
+  getMyProfileUseCase: () => ({ execute: () => new Promise<never>(() => {}) }),
   getUserTrainerUseCase: () => ({ execute: async () => undefined as never }),
   updateMyProfileUseCase: () => ({ execute: async () => undefined as never }),
   getUsersUseCase: () => ({ execute: async () => undefined as never }),
@@ -163,6 +167,12 @@ const unusedDependencies: Registrations<Dependencies> = {
   rejectAthleteInvitationUseCase: () => ({ execute: async () => undefined as never }),
 };
 
+/** Fixed safe-area metrics, so safe-area views render without a native measurement. */
+const safeAreaMetrics = {
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+  insets: { top: 47, left: 0, right: 0, bottom: 34 },
+};
+
 /** Renders a view in Spanish, with the real theme and a container of fakes. */
 export default async function renderWithProviders(
   ui: ReactElement,
@@ -172,12 +182,18 @@ export default async function renderWithProviders(
   const container = new Container<Dependencies>({ ...unusedDependencies, ...dependencies });
 
   return render(
-    <PaperProvider theme={theme}>
-      <I18nextProvider i18n={i18n}>
-        <ContainerProvider container={container}>
-          <SessionProvider>{ui}</SessionProvider>
-        </ContainerProvider>
-      </I18nextProvider>
-    </PaperProvider>,
+    <SafeAreaProvider initialMetrics={safeAreaMetrics}>
+      <PaperProvider theme={theme}>
+        <I18nextProvider i18n={i18n}>
+          <ContainerProvider container={container}>
+            <PreferencesProvider>
+              <SessionProvider>
+                <CurrentUserProvider>{ui}</CurrentUserProvider>
+              </SessionProvider>
+            </PreferencesProvider>
+          </ContainerProvider>
+        </I18nextProvider>
+      </PaperProvider>
+    </SafeAreaProvider>,
   );
 }

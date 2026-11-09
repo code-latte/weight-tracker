@@ -1,0 +1,20 @@
+{
+  "progress": "Paso {{current}} de {{total}}",
+  "next": "Siguiente",
+  "finish": "Finalizar",
+  "retry": "Reintentar",
+  "steps": {
+    "name": {
+      "title": "Dinos cómo te llamas"
+    }
+  },
+  "fields": {
+    "name": "Nombre",
+    "surname": "Apellidos"
+  },
+  "fieldErrors": {
+    "required": "Este campo es obligatorio.",
+    "minLength": "Debe tener al menos 3 caracteres.",
+    "maxLength": "No puede superar los 100 caracteres."
+  }
+}

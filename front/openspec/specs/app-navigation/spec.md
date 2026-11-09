@@ -29,17 +29,23 @@ Progreso and a user silhouette for Perfil.
 
 ### Requirement: Inicio is the default tab
 
-Inicio SHALL be the selected tab when the session becomes signed in and when the app starts with a stored session.
-Inicio SHALL show the home screen at `/`.
+Inicio SHALL be the selected tab when the session becomes signed in and when the app starts with a stored session,
+for an athlete whose profile is known to be complete, and when onboarding ends. Inicio SHALL show the home screen at
+`/`.
 
 #### Scenario: After login
 
-- **WHEN** the session becomes signed in on the login screen
+- **WHEN** the session becomes signed in on the login screen and the profile is complete
 - **THEN** the Inicio tab is selected and the home screen is shown
 
 #### Scenario: Launch with a session
 
-- **WHEN** the app starts with stored tokens
+- **WHEN** the app starts with stored tokens and the profile is complete
+- **THEN** the Inicio tab is selected and the home screen is shown
+
+#### Scenario: After onboarding
+
+- **WHEN** the athlete completes onboarding
 - **THEN** the Inicio tab is selected and the home screen is shown
 
 ### Requirement: Tapping a tab shows its screen
@@ -104,3 +110,40 @@ and "Perfil" in Spanish; "Home", "Workouts", "Progress" and "Profile" in English
 
 - **WHEN** the app language is English
 - **THEN** the tab bar shows "Home", "Workouts", "Progress" and "Profile"
+
+### Requirement: The Perfil tab pushes section screens
+
+The Perfil tab SHALL show the profile screen first and SHALL push section screens (Ajustes in this version) over it.
+The tab bar SHALL stay visible on section screens, with Perfil selected. Tapping "Perfil" while on a section screen
+SHALL return to the profile screen.
+
+#### Scenario: Open a section
+
+- **WHEN** the athlete opens Ajustes from the profile screen
+- **THEN** Ajustes is shown with the tab bar visible and "Perfil" selected
+
+#### Scenario: Tap Perfil on a section screen
+
+- **WHEN** the athlete is on Ajustes and taps "Perfil"
+- **THEN** the profile screen is shown
+
+### Requirement: Section screens share a header
+
+Every section screen of the Perfil tab SHALL show a header with a back caret on the left, with the accessible name
+"Volver", followed by the section title. Tapping the caret SHALL return to the profile screen. The profile screen
+SHALL NOT show this header.
+
+#### Scenario: Ajustes header
+
+- **WHEN** the athlete is on Ajustes
+- **THEN** the header shows the back caret and the title "Ajustes"
+
+#### Scenario: Back to the profile
+
+- **WHEN** the athlete taps the back caret on Ajustes
+- **THEN** the profile screen is shown
+
+#### Scenario: Header in English
+
+- **WHEN** the app language is English and the athlete is on Ajustes
+- **THEN** the header title is "Settings" and the caret's accessible name is "Back"

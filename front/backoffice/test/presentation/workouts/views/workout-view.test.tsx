@@ -27,6 +27,7 @@ import type {
 import i18n from "@/infrastructure/i18n";
 import theme from "@/presentation/common/theme";
 import WorkoutView from "@/presentation/workouts/views/workout-view";
+import LoadExerciseCatalog from "../../../support/load-exercise-catalog";
 import renderWithProviders, { completeProfile } from "../../../support/render-with-providers";
 
 const replace = vi.fn();
@@ -294,6 +295,7 @@ function favoriteOf(exerciseId: string): ExerciseFavorite {
 function renderWorkout({
   getWorkout = async () => ok(workout),
   getExercises = async () => ok(catalog),
+  catalogLoadedFirst = false,
   session = async () => ok({ accessToken: "a", refreshToken: "r" }),
   updateWorkout = async (input) => ok(savedWorkout(input)),
   addExercise = async (input) => ok(entryOf(input, "we-new")),
@@ -313,6 +315,8 @@ function renderWorkout({
   saveAsTemplate?: () => Promise<Result<WorkoutTemplate, DomainError>>;
   getWorkout?: () => Promise<Result<WorkoutById, DomainError>>;
   getExercises?: () => Promise<Result<Exercise[], DomainError>>;
+  /** Opens the screen after the session's catalog was read, as after sign-in. */
+  catalogLoadedFirst?: boolean;
   getFavorites?: () => Promise<Result<ExerciseFavorite[], DomainError>>;
   markFavorite?: (exerciseId: string) => Promise<Result<ExerciseFavorite, DomainError>>;
   unmarkFavorite?: (exerciseId: string) => Promise<Result<void, DomainError>>;
@@ -360,26 +364,35 @@ function renderWorkout({
     readMesocycle,
     favorites,
     mutations,
-    rendered: renderWithProviders(<WorkoutView />, {
-      getSessionUseCase: () => ({ execute: session }),
-      getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
-      getWorkoutByIdUseCase: () => ({ execute: readWorkout }),
-      getMesocycleByIdUseCase: () => ({ execute: readMesocycle }),
-      getExercisesUseCase: () => ({ execute: readCatalog }),
-      getExerciseFavoritesUseCase: () => ({ execute: favorites.read }),
-      markExerciseFavoriteUseCase: () => ({ execute: favorites.mark }),
-      unmarkExerciseFavoriteUseCase: () => ({ execute: favorites.unmark }),
-      createWorkoutUseCase: () => ({ execute: mutations.create }),
-      updateWorkoutUseCase: () => ({ execute: mutations.update }),
-      addExerciseToWorkoutUseCase: () => ({ execute: mutations.addExercise }),
-      updateWorkoutExerciseUseCase: () => ({ execute: mutations.updateExercise }),
-      removeExerciseFromWorkoutUseCase: () => ({ execute: mutations.removeExercise }),
-      reorderWorkoutExercisesUseCase: () => ({ execute: mutations.reorderExercises }),
-      createSuperSeriesUseCase: () => ({ execute: mutations.createSuperSeries }),
-      breakSuperSeriesUseCase: () => ({ execute: mutations.breakSuperSeries }),
-      createWorkoutTemplateFromWorkoutUseCase: () => ({ execute: mutations.saveAsTemplate }),
-      changeWorkoutStatusUseCase: () => ({ execute: mutations.changeStatus }),
-    }),
+    rendered: renderWithProviders(
+      catalogLoadedFirst ? (
+        <LoadExerciseCatalog>
+          <WorkoutView />
+        </LoadExerciseCatalog>
+      ) : (
+        <WorkoutView />
+      ),
+      {
+        getSessionUseCase: () => ({ execute: session }),
+        getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
+        getWorkoutByIdUseCase: () => ({ execute: readWorkout }),
+        getMesocycleByIdUseCase: () => ({ execute: readMesocycle }),
+        getExercisesUseCase: () => ({ execute: readCatalog }),
+        getExerciseFavoritesUseCase: () => ({ execute: favorites.read }),
+        markExerciseFavoriteUseCase: () => ({ execute: favorites.mark }),
+        unmarkExerciseFavoriteUseCase: () => ({ execute: favorites.unmark }),
+        createWorkoutUseCase: () => ({ execute: mutations.create }),
+        updateWorkoutUseCase: () => ({ execute: mutations.update }),
+        addExerciseToWorkoutUseCase: () => ({ execute: mutations.addExercise }),
+        updateWorkoutExerciseUseCase: () => ({ execute: mutations.updateExercise }),
+        removeExerciseFromWorkoutUseCase: () => ({ execute: mutations.removeExercise }),
+        reorderWorkoutExercisesUseCase: () => ({ execute: mutations.reorderExercises }),
+        createSuperSeriesUseCase: () => ({ execute: mutations.createSuperSeries }),
+        breakSuperSeriesUseCase: () => ({ execute: mutations.breakSuperSeries }),
+        createWorkoutTemplateFromWorkoutUseCase: () => ({ execute: mutations.saveAsTemplate }),
+        changeWorkoutStatusUseCase: () => ({ execute: mutations.changeStatus }),
+      },
+    ),
   };
 }
 
@@ -560,6 +573,19 @@ describe("WorkoutView", () => {
     expect(readWorkout).toHaveBeenCalledWith({ id: "w-1" });
     expect(readCatalog).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("navigation", { name: "Menú principal" })).toBeInTheDocument();
+  });
+
+  it("uses the session's catalog and does not read it on opening once it was read", async () => {
+    // Arrange
+    const { readWorkout, readCatalog, rendered } = renderWorkout({ catalogLoadedFirst: true });
+
+    // Act
+    await rendered;
+    await loaded();
+
+    // Assert
+    expect(readWorkout).toHaveBeenCalledTimes(1);
+    expect(readCatalog).toHaveBeenCalledTimes(1);
   });
 
   it("sends a visitor without a session to login and reads no workout", async () => {
@@ -2988,7 +3014,8 @@ describe("WorkoutView", () => {
         ok(ids.map(favoriteOf));
 
     const sectionList = () => within(catalogDialog()).getByRole("list", { name: "Secciones" });
-    const section = (name: string) => within(sectionList()).getByRole("button", { name });
+    const section = (name: string) =>
+      within(sectionList()).getByRole("button", { name: new RegExp(`^${name}( \\(\\d+\\))?$`) });
     const sectionNames = () =>
       within(sectionList())
         .getAllByRole("button")
@@ -3020,7 +3047,7 @@ describe("WorkoutView", () => {
       await openCatalog(user);
 
       // Assert
-      expect(sectionNames()).toEqual(["Todos", "Mis ejercicios", "Favoritos"]);
+      expect(sectionNames()).toEqual(["Todos (3)", "Mis ejercicios (0)", "Favoritos (0)"]);
       for (const name of ["Todos", "Mis ejercicios", "Favoritos"]) {
         expect(section(name).querySelector("svg")).not.toBeNull();
       }
@@ -3506,7 +3533,7 @@ describe("WorkoutView", () => {
         within(sections)
           .getAllByRole("button")
           .map((button) => button.textContent),
-      ).toEqual(["All", "My exercises", "Favorites"]);
+      ).toEqual(["All (3)", "My exercises (0)", "Favorites (0)"]);
       expect(within(dialog).getAllByRole("button", { name: "Add to favorites" })).toHaveLength(3);
     });
 

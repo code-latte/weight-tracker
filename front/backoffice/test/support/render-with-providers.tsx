@@ -8,6 +8,7 @@ import { Container, type Registrations } from "@weight-tracker/core/infrastructu
 import i18n from "@/infrastructure/i18n";
 import SessionProvider from "@/presentation/auth/components/session-provider";
 import CurrentUserProvider from "@/presentation/common/components/current-user-provider";
+import ExerciseCatalogProvider from "@/presentation/common/components/exercise-catalog-provider";
 import ContainerProvider from "@/presentation/common/context/container-provider";
 import theme from "@/presentation/common/theme";
 
@@ -159,7 +160,8 @@ const unusedDependencies: Registrations<Dependencies> = {
   updateMesocycleUseCase: () => ({ execute: async () => undefined as never }),
   defineMesocycleWeekUseCase: () => ({ execute: async () => undefined as never }),
   redefineMesocycleWeekUseCase: () => ({ execute: async () => undefined as never }),
-  getExercisesUseCase: () => ({ execute: async () => undefined as never }),
+  // Every signed-in shell reads the catalog in the background, so the default answers an empty one.
+  getExercisesUseCase: () => ({ execute: async () => ok([]) }),
   createExerciseUseCase: () => ({ execute: async () => undefined as never }),
   getExerciseFavoritesUseCase: () => ({ execute: async () => undefined as never }),
   markExerciseFavoriteUseCase: () => ({ execute: async () => undefined as never }),
@@ -188,7 +190,9 @@ export default async function renderWithProviders(
       <I18nextProvider i18n={i18n}>
         <ContainerProvider container={container}>
           <SessionProvider>
-            <CurrentUserProvider>{ui}</CurrentUserProvider>
+            <CurrentUserProvider>
+              <ExerciseCatalogProvider>{ui}</ExerciseCatalogProvider>
+            </CurrentUserProvider>
           </SessionProvider>
         </ContainerProvider>
       </I18nextProvider>

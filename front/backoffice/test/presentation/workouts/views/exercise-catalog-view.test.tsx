@@ -103,7 +103,7 @@ const rowRequest: CreateExerciseRequest = {
 };
 
 function renderCatalog({
-  getExercises = async () => ok(catalog),
+  getExercises,
   getFavorites = favoritesOf(),
   markFavorite = async (exerciseId: string) => ok(favoriteOf(exerciseId)),
   unmarkFavorite = async () => ok(undefined as void),
@@ -117,12 +117,20 @@ function renderCatalog({
   profile?: UserProfile;
   createExercise?: (request: CreateExerciseRequest) => Promise<Result<Exercise, DomainError>>;
 } = {}) {
+  // What the API holds after a creation, so a read that follows one lists it, as the real catalog does.
+  const created: Exercise[] = [];
   const calls = {
-    catalog: vi.fn(getExercises),
+    catalog: vi.fn(getExercises ?? (async () => ok([...catalog, ...created]))),
     favorites: vi.fn(getFavorites),
     mark: vi.fn(markFavorite),
     unmark: vi.fn(unmarkFavorite),
-    create: vi.fn(createExercise),
+    create: vi.fn(async (request: CreateExerciseRequest) => {
+      const result = await createExercise(request);
+      if (result.ok) {
+        created.push(result.value);
+      }
+      return result;
+    }),
   };
 
   return {
@@ -146,7 +154,8 @@ type User = ReturnType<typeof userEvent.setup>;
 const heading = () => screen.getByRole("heading", { name: "Catálogo de ejercicios", level: 1 });
 const addButton = () => screen.queryByRole("button", { name: "Añadir ejercicio" });
 const sectionList = () => screen.getByRole("list", { name: "Secciones" });
-const section = (name: string) => within(sectionList()).getByRole("button", { name });
+const section = (name: string) =>
+  within(sectionList()).getByRole("button", { name: new RegExp(`^${name}( \\(\\d+\\))?$`) });
 const cardList = () =>
   screen.queryByRole("list", { name: /^(Catálogo de ejercicios|Exercise catalog)$/ });
 const cards = () => (cardList() ? within(cardList()!).queryAllByRole("listitem") : []);
@@ -202,9 +211,41 @@ describe("ExerciseCatalogView", () => {
         within(sectionList())
           .getAllByRole("button")
           .map((button) => button.textContent),
-      ).toEqual(["Todos", "Mis ejercicios", "Favoritos"]);
+      ).toEqual(["Todos (4)", "Mis ejercicios (1)", "Favoritos (0)"]);
       expect(section("Todos")).toHaveAttribute("aria-current", "true");
       expect(names()).toEqual(["Sentadilla", "Press de banca", "Mi curl", "Fondos de otro"]);
+    });
+
+    it("counts each section's exercises whatever the filters", async () => {
+      // Arrange
+      await renderCatalog({ getFavorites: favoritesOf("ex-bench", "ex-squat") }).rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.type(screen.getByRole("searchbox", { name: "Buscar ejercicio" }), "curl");
+
+      // Assert
+      expect(
+        within(sectionList())
+          .getAllByRole("button")
+          .map((button) => button.textContent),
+      ).toEqual(["Todos (4)", "Mis ejercicios (1)", "Favoritos (2)"]);
+    });
+
+    it("shows Favoritos without a count when the favorites fail to load", async () => {
+      // Arrange & Act
+      await renderCatalog({
+        getFavorites: async () => fail(new DomainError("NETWORK", "")),
+      }).rendered;
+
+      // Assert
+      await loaded();
+      expect(
+        within(sectionList())
+          .getAllByRole("button")
+          .map((button) => button.textContent),
+      ).toEqual(["Todos (4)", "Mis ejercicios (1)", "Favoritos"]);
     });
 
     it("reads the catalog and the favorites once", async () => {
@@ -872,7 +913,33 @@ describe("ExerciseCatalogView", () => {
       expect(names()).toContain("Remo con banda");
       await user.click(section("Mis ejercicios"));
       expect(names()).toEqual(["Mi curl", "Remo con banda"]);
-      expect(readCatalog).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(readCatalog).toHaveBeenCalledTimes(2));
+      expect(names()).toEqual(["Mi curl", "Remo con banda"]);
+    });
+
+    it("keeps the list, with the created exercise, while the catalog is read again", async () => {
+      // Arrange
+      const reads = [
+        async () => ok(catalog),
+        () => new Promise<Result<Exercise[], DomainError>>(() => {}),
+      ];
+      const { catalog: readCatalog, rendered } = renderCatalog({
+        getExercises: () => reads.shift()!(),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await openCreate(user);
+      await fillExercise(user, "Remo con banda", "Espalda media", "Fuerza");
+
+      // Act
+      await submit(user);
+
+      // Assert
+      await waitFor(() => expect(readCatalog).toHaveBeenCalledTimes(2));
+      expect(names()).toContain("Remo con banda");
+      expect(names()).toContain("Sentadilla");
+      expect(screen.getByRole("list", { name: "Secciones" })).toBeInTheDocument();
     });
 
     it("keeps the selected section when an exercise is created", async () => {

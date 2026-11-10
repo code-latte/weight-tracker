@@ -8,6 +8,7 @@ import i18n, { detectLanguage, supportedLanguages } from "@/infrastructure/i18n"
 import SessionProvider from "@/presentation/auth/components/session-provider";
 import ContainerProvider from "../context/container-provider";
 import CurrentUserProvider from "./current-user-provider";
+import ExerciseCatalogProvider from "./exercise-catalog-provider";
 import ThemeModeProvider from "./theme-mode-provider";
 import NavigationDrawerProvider from "./navigation-drawer-provider";
 
@@ -49,7 +50,9 @@ export default function AppProviders({ children }: AppProvidersProps) {
           <ThemeModeProvider>
             <SessionProvider>
               <CurrentUserProvider>
-                <NavigationDrawerProvider>{children}</NavigationDrawerProvider>
+                <ExerciseCatalogProvider>
+                  <NavigationDrawerProvider>{children}</NavigationDrawerProvider>
+                </ExerciseCatalogProvider>
               </CurrentUserProvider>
             </SessionProvider>
           </ThemeModeProvider>

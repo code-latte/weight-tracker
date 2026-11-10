@@ -176,12 +176,31 @@ export default function ExerciseCatalogBrowser({
     [typeLabel, typeColor],
   );
 
+  // How many exercises each section holds, before the text and the pills narrow it.
+  const sectionCounts = useMemo(
+    () => ({
+      ALL: exercises.length,
+      MINE: exercises.filter(
+        (exercise) => currentUserId !== null && exercise.ownerId === currentUserId,
+      ).length,
+      FAVORITES: exercises.filter((exercise) => favoriteIds.has(exercise.id)).length,
+    }),
+    [exercises, currentUserId, favoriteIds],
+  );
+  const sectionLabel = (section: ExerciseSection, counted = true) => {
+    const label = t(`workout.catalog.sections.${section}`);
+    return counted
+      ? t("workout.catalog.sections.withCount", { label, count: sectionCounts[section] })
+      : label;
+  };
+
   const sections: SectionOption<ExerciseSection>[] = [
-    { value: "ALL", label: t("workout.catalog.sections.ALL"), icon: <AppsOutlined /> },
-    { value: "MINE", label: t("workout.catalog.sections.MINE"), icon: <PersonOutlined /> },
+    { value: "ALL", label: sectionLabel("ALL"), icon: <AppsOutlined /> },
+    { value: "MINE", label: sectionLabel("MINE"), icon: <PersonOutlined /> },
     {
       value: "FAVORITES",
-      label: t("workout.catalog.sections.FAVORITES"),
+      // Counted only once the favorites are in, so it never shows a count it does not know.
+      label: sectionLabel("FAVORITES", favoritesStatus === "loaded"),
       icon: <StarBorder />,
       // Without the favorites there is nothing to list in this section.
       disabled: favoritesStatus === "failed",

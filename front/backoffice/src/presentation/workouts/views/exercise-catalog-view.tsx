@@ -104,6 +104,8 @@ function ExerciseCatalogContent() {
         open={creating}
         onCreated={(exercise) => {
           catalog.add(exercise);
+          // Listed at once; the catalog is then read again in the background, as the API now holds it.
+          catalog.refresh();
           setCreating(false);
         }}
         onClose={() => setCreating(false)}

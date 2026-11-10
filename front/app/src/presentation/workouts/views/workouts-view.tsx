@@ -1,4 +1,5 @@
 import { FlatList, StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import type { WorkoutListItem } from "@weight-tracker/core/domain";
 import RefreshControl from "@/presentation/common/components/atoms/refresh-control";
@@ -52,7 +53,7 @@ export default function WorkoutsView() {
     workout.trainer ? `${workout.trainer.name} ${workout.trainer.surname}` : t("author.me");
 
   return (
-    <SafeArea style={styles.container}>
+    <SafeArea edges={["left", "right"]} style={styles.container}>
       <WeekProgressCard
         title={title}
         subtitle={named ? range : weekYear(weekStart)}
@@ -61,50 +62,55 @@ export default function WorkoutsView() {
         total={total}
       />
 
-      <View style={styles.list}>
-        {state.status === "loading" && <LoadingState />}
+      <View style={styles.body}>
+        <View style={styles.list}>
+          {state.status === "loading" && <LoadingState />}
 
-        {state.status === "error" && (
-          <ErrorState
-            message={t(`errors:${state.errorCode}`)}
-            retryLabel={t("retry")}
-            onRetry={retry}
-          />
-        )}
+          {state.status === "error" && (
+            <ErrorState
+              message={t(`errors:${state.errorCode}`)}
+              retryLabel={t("retry")}
+              onRetry={retry}
+            />
+          )}
 
-        {state.status === "ready" && (
-          <FlatList
-            data={workouts}
-            keyExtractor={(workout) => workout.id}
-            testID="workouts-list"
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-            contentContainerStyle={styles.items}
-            ListEmptyComponent={<Text variant="bodyLarge">{t("empty")}</Text>}
-            renderItem={({ item }) => (
-              <WorkoutCard
-                name={item.name}
-                author={authorOf(item)}
-                // The day the athlete finished it, not the planned one; a done workout without it shows "--".
-                day={
-                  isDone(item) && item.completedAt
-                    ? formatShortWeekday(item.completedAt, i18n.language)
-                    : t("day.pending")
-                }
-                progress={progressOf(item.status)}
-                progressLabel={t(`status.${progressOf(item.status)}`)}
-              />
-            )}
-          />
-        )}
+          {state.status === "ready" && (
+            <FlatList
+              data={workouts}
+              keyExtractor={(workout) => workout.id}
+              testID="workouts-list"
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+              contentContainerStyle={styles.items}
+              ListEmptyComponent={<Text variant="bodyLarge">{t("empty")}</Text>}
+              renderItem={({ item }) => (
+                <WorkoutCard
+                  name={item.name}
+                  author={authorOf(item)}
+                  // The day the athlete finished it, not the planned one; a done workout without it shows "--".
+                  day={
+                    isDone(item) && item.completedAt
+                      ? formatShortWeekday(item.completedAt, i18n.language)
+                      : t("day.pending")
+                  }
+                  progress={progressOf(item.status)}
+                  progressLabel={t(`status.${progressOf(item.status)}`)}
+                  onPress={() =>
+                    router.push({ pathname: "/workouts/[id]", params: { id: item.id } })
+                  }
+                />
+              )}
+            />
+          )}
+        </View>
+
+        <WeekNavigator
+          range={range}
+          previousLabel={t("week.previous")}
+          nextLabel={t("week.following")}
+          onPrevious={previousWeek}
+          onNext={nextWeek}
+        />
       </View>
-
-      <WeekNavigator
-        range={range}
-        previousLabel={t("week.previous")}
-        nextLabel={t("week.following")}
-        onPrevious={previousWeek}
-        onNext={nextWeek}
-      />
     </SafeArea>
   );
 }
@@ -112,8 +118,11 @@ export default function WorkoutsView() {
 const styles = StyleSheet.create({
   container: {
     gap: 16,
+  },
+  body: {
+    flex: 1,
+    gap: 16,
     paddingHorizontal: 24,
-    paddingTop: 24,
   },
   list: {
     flex: 1,

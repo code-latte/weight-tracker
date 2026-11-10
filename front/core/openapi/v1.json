@@ -10006,6 +10006,91 @@
           }
         }
       },
+      "WorkoutByIdExerciseResponse": {
+        "required": [
+          "id",
+          "exerciseId",
+          "translations",
+          "videoUrl",
+          "muscle",
+          "bodyPart",
+          "type",
+          "effort",
+          "perSide",
+          "restMinutes",
+          "sets",
+          "superSeriesId",
+          "setRecords"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "exerciseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExerciseTranslationResponse"
+            }
+          },
+          "videoUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "muscle": {
+            "type": "string"
+          },
+          "bodyPart": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "effort": {
+            "type": "string"
+          },
+          "perSide": {
+            "type": "boolean"
+          },
+          "restMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "sets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetResponse"
+            }
+          },
+          "superSeriesId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "setRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetRecordResponse"
+            }
+          }
+        }
+      },
       "WorkoutByIdResponse": {
         "required": [
           "id",
@@ -10023,7 +10108,8 @@
           "reviewedBy",
           "resultsUpdatedAt",
           "athlete",
-          "trainer"
+          "trainer",
+          "mesocycle"
         ],
         "type": "object",
         "properties": {
@@ -10061,7 +10147,7 @@
           "exercises": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/WorkoutExerciseDetailResponse"
+              "$ref": "#/components/schemas/WorkoutByIdExerciseResponse"
             }
           },
           "mesocycleId": {
@@ -10118,6 +10204,16 @@
               },
               {
                 "$ref": "#/components/schemas/UserProfileResponse"
+              }
+            ]
+          },
+          "mesocycle": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkoutMesocycleResponse"
               }
             ]
           }
@@ -10469,6 +10565,47 @@
               "string"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "WorkoutMesocycleResponse": {
+        "required": [
+          "id",
+          "name",
+          "objective",
+          "startDate",
+          "durationInWeeks",
+          "weeks"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "durationInWeeks": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "weeks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MesocycleWeekResponse"
+            }
           }
         }
       },

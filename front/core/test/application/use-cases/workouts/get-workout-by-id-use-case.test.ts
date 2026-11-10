@@ -22,8 +22,8 @@ const workoutDetail: WorkoutById = {
   userId: "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c",
   trainerId: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
   status: "DRAFT",
-  mesocycleId: null,
-  mesocycleWeekNumber: null,
+  mesocycleId: "8c3e4f2a-1b7d-4c75-8e9f-2f8b9e3c4d5e",
+  mesocycleWeekNumber: 2,
   completedAt: null,
   reviewedAt: null,
   reviewedBy: null,
@@ -32,6 +32,11 @@ const workoutDetail: WorkoutById = {
     {
       id: "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
       exerciseId: "1f2e3d4c-5b6a-4978-8695-a4b3c2d1e0f9",
+      translations: [{ languageCode: "es", name: "Sentadilla" }],
+      videoUrl: "https://videos.example/sentadilla",
+      muscle: "QUADRICEPS",
+      bodyPart: "LEGS",
+      type: "STRENGTH",
       effort: "HIGH",
       perSide: false,
       restMinutes: null,
@@ -53,6 +58,14 @@ const workoutDetail: WorkoutById = {
     name: "Luis",
     surname: "Pérez",
     role: "TRAINER",
+  },
+  mesocycle: {
+    id: "8c3e4f2a-1b7d-4c75-8e9f-2f8b9e3c4d5e",
+    name: "Fuerza base",
+    objective: "Fuerza",
+    startDate: "2026-10-26",
+    durationInWeeks: 4,
+    weeks: [],
   },
 };
 

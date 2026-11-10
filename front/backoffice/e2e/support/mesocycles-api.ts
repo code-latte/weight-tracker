@@ -150,8 +150,8 @@ export async function mockMesocyclesApi(
 
 /**
  * Intercepts what creating and opening a week workout needs: `POST /workouts` stores the workout in `workouts` with
- * `newId`, the `people` it names and the date of its week; `GET /workouts/{id}` answers it; the catalog and the
- * favorites are empty. Every creation body is recorded, in order.
+ * `newId`, the `people` it names and the date of its week; `GET /workouts/{id}` answers it, with its mesocycle from
+ * `mesocycles` embedded as the API does; the catalog and the favorites are empty. Every creation body is recorded, in order.
  */
 export async function mockWeekWorkoutsApi(
   page: Page,
@@ -160,7 +160,14 @@ export async function mockWeekWorkoutsApi(
     people,
     newId = "8c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
     workoutDate,
-  }: { workouts: StoredWorkout[]; people: Person[]; newId?: string; workoutDate: string },
+    mesocycles = [],
+  }: {
+    workouts: StoredWorkout[];
+    people: Person[];
+    newId?: string;
+    workoutDate: string;
+    mesocycles?: StoredMesocycle[];
+  },
 ): Promise<SentRequest[]> {
   const sent: SentRequest[] = [];
   const personOf = (id: string) => people.find((person) => person.id === id)!;
@@ -204,7 +211,22 @@ export async function mockWeekWorkoutsApi(
     }
     const id = new URL(route.request().url()).pathname.split("/").pop() ?? "";
     const workout = workouts.find((item) => item.id === id);
-    return workout ? route.fulfill(json(workout)) : route.fulfill(json({ status: 404 }, 404));
+    if (!workout) {
+      return route.fulfill(json({ status: 404 }, 404));
+    }
+    // The API embeds the mesocycle, without its people: the workout already carries them.
+    const placedIn = mesocycles.find((mesocycle) => mesocycle.id === workout.mesocycleId);
+    const mesocycle = placedIn
+      ? {
+          id: placedIn.id,
+          name: placedIn.name,
+          objective: placedIn.objective,
+          startDate: placedIn.startDate,
+          durationInWeeks: placedIn.durationInWeeks,
+          weeks: placedIn.weeks,
+        }
+      : null;
+    return route.fulfill(json({ ...workout, mesocycle }));
   });
   for (const path of ["exercises", "exercise-favorites"]) {
     await page.route(`${api}/${path}`, (route) =>

@@ -450,6 +450,28 @@ public class OpenApiDocumentTests : IntegrationTest
     }
 
     [Fact]
+    public async Task GetWorkoutById_ShouldDocumentTheCatalogDataOfEachEntryAndANullableMesocycle()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var schemas = document.GetProperty("components").GetProperty("schemas");
+        var properties = schemas.GetProperty("WorkoutByIdResponse").GetProperty("properties");
+        properties.GetProperty("exercises").GetRawText()
+            .Should().Contain("#/components/schemas/WorkoutByIdExerciseResponse");
+        schemas.GetProperty("WorkoutByIdExerciseResponse").GetProperty("properties").EnumerateObject()
+            .Select(property => property.Name)
+            .Should().Contain(["translations", "videoUrl", "muscle", "bodyPart", "type"]);
+
+        var mesocycle = properties.GetProperty("mesocycle").GetRawText();
+        mesocycle.Should().Contain("#/components/schemas/WorkoutMesocycleResponse");
+        mesocycle.Should().Match(text => text.Contains("\"null\"") || text.Contains("\"nullable\": true") || text.Contains("\"nullable\":true"));
+        schemas.GetProperty("WorkoutMesocycleResponse").GetProperty("properties").GetProperty("weeks").GetRawText()
+            .Should().Contain("#/components/schemas/MesocycleWeekResponse");
+    }
+
+    [Fact]
     public async Task ListWorkouts_ShouldDocumentANullablePlacementOnEachItem()
     {
         // Arrange & Act

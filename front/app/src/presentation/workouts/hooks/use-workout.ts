@@ -1,0 +1,110 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { ContainerInterface, Dependencies } from "@weight-tracker/core/application";
+import type {
+  DomainErrorCode,
+  WorkoutById,
+  WorkoutByIdExercise,
+} from "@weight-tracker/core/domain";
+import useContainer from "@/presentation/common/hooks/use-container";
+import type { ExerciseProgress } from "@/presentation/workouts/components/molecules/exercise-progress-icon";
+
+/** One exercise of the workout as the screen shows it. An exercise without names leaves the name empty. */
+export interface WorkoutExerciseRowData {
+  id: string;
+  name: string | null;
+  type: string;
+  videoUrl: string | null;
+  progress: ExerciseProgress;
+}
+
+type WorkoutState =
+  | { status: "loading" }
+  | { status: "ready"; workout: WorkoutById }
+  | { status: "error"; errorCode: DomainErrorCode };
+
+/** The workout carries its exercises' catalog data and its mesocycle, so one read is enough. */
+async function readWorkout(
+  container: ContainerInterface<Dependencies>,
+  id: string,
+): Promise<WorkoutState> {
+  const result = await container.resolve("getWorkoutByIdUseCase").execute({ id });
+  if (!result.ok) {
+    return { status: "error", errorCode: result.error.code };
+  }
+
+  return { status: "ready", workout: result.value };
+}
+
+/**
+ * Whether an exercise is done, under way or not started, from the set records against the prescribed sets. Each
+ * prescription is `count × target`, so the sets are the sum of the counts.
+ */
+export function exerciseProgressOf(exercise: WorkoutByIdExercise): ExerciseProgress {
+  const records = exercise.setRecords.length;
+  if (records === 0) {
+    return "notStarted";
+  }
+  const sets = exercise.sets.reduce((total, set) => total + Number(set.count), 0);
+
+  return records >= sets ? "done" : "inProgress";
+}
+
+/** One workout with its exercises and mesocycle, read when the screen mounts and on retry. */
+export default function useWorkout(id: string) {
+  const container = useContainer();
+  const { i18n } = useTranslation();
+  const [state, setState] = useState<WorkoutState>({ status: "loading" });
+
+  useEffect(() => {
+    let active = true;
+
+    void readWorkout(container, id).then((next) => {
+      if (active) {
+        setState(next);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [container, id]);
+
+  const retry = useCallback(() => {
+    setState({ status: "loading" });
+    void readWorkout(container, id).then(setState);
+  }, [container, id]);
+
+  const rows = useMemo<WorkoutExerciseRowData[]>(() => {
+    if (state.status !== "ready") {
+      return [];
+    }
+
+    return state.workout.exercises.map((exercise) => {
+      const translation =
+        exercise.translations.find((candidate) => candidate.languageCode === i18n.language) ??
+        exercise.translations[0];
+
+      return {
+        id: exercise.id,
+        name: translation?.name ?? null,
+        type: exercise.type,
+        videoUrl: exercise.videoUrl,
+        progress: exerciseProgressOf(exercise),
+      };
+    });
+  }, [state, i18n.language]);
+
+  const workout = state.status === "ready" ? state.workout : null;
+
+  return {
+    state,
+    retry,
+    rows,
+    done: rows.filter((row) => row.progress === "done").length,
+    total: rows.length,
+    mesocycleName: workout?.mesocycle?.name ?? null,
+    mesocycleWeekNumber:
+      workout?.mesocycleWeekNumber != null ? Number(workout.mesocycleWeekNumber) : null,
+  };
+}

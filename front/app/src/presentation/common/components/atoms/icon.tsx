@@ -1,7 +1,8 @@
 import { View } from "react-native";
-import { Icon as PaperIcon, useTheme } from "react-native-paper";
+import { Icon as PaperIcon } from "react-native-paper";
+import { useAppTheme } from "@/presentation/common/theme";
 
-type IconTone = "primary" | "secondary" | "default";
+type IconTone = "primary" | "secondary" | "success" | "onPrimary" | "default";
 
 interface IconProps {
   /** A Material Community Icons name. */
@@ -19,10 +20,12 @@ export default function Icon({
   tone = "default",
   accessibilityLabel,
 }: IconProps) {
-  const theme = useTheme();
+  const theme = useAppTheme();
   const colors: Record<IconTone, string> = {
     primary: theme.colors.primary,
     secondary: theme.colors.secondary,
+    success: theme.custom.semantic.success,
+    onPrimary: theme.colors.onPrimary,
     default: theme.colors.onSurfaceVariant,
   };
 

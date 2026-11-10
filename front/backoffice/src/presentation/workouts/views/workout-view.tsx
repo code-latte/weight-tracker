@@ -45,9 +45,6 @@ import useExercisesEditor from "@/presentation/workouts/hooks/use-exercises-edit
 import useSaveWorkoutAsTemplate from "@/presentation/workouts/hooks/use-save-workout-as-template";
 import useUpdateWorkout from "@/presentation/workouts/hooks/use-update-workout";
 import useWorkout from "@/presentation/workouts/hooks/use-workout";
-import useWorkoutMesocycle, {
-  type WorkoutMesocycleState,
-} from "@/presentation/workouts/hooks/use-workout-mesocycle";
 import { weekMiddleOf, weekStartOf } from "@/presentation/workouts/week";
 
 function WorkoutNotFound() {
@@ -102,20 +99,16 @@ function personCardOf(person: WorkoutById["athlete"], role: string): PersonCardP
   return { name: displayNameOf(person), initials: initialsOf(person), role };
 }
 
-/** The mesocycle entry of the strip: left out for a standalone workout or when its mesocycle cannot be read. */
+/** The mesocycle entry of the strip, from the mesocycle the workout carries: left out for a standalone workout. */
 function mesocycleEntryOf(
   workout: WorkoutById,
-  state: WorkoutMesocycleState,
   weekLabel: (number: number) => string,
 ): WorkoutContextMesocycle | null {
-  if (state.status === "loading") {
-    return "loading";
-  }
-  if (state.status !== "loaded" || !workout.mesocycleId) {
+  if (!workout.mesocycle) {
     return null;
   }
   return {
-    name: state.mesocycle.name,
+    name: workout.mesocycle.name,
     week: weekLabel(Number(workout.mesocycleWeekNumber)),
   };
 }
@@ -175,7 +168,6 @@ function LoadedWorkout({
   const propertiesTitleId = useId();
   const exercisesTitleId = useId();
   const { saving, errorCode, saved, save, clearSaved } = useUpdateWorkout();
-  const mesocycle = useWorkoutMesocycle(workout.mesocycleId);
   const [values, setValues] = useState<WorkoutDetailsFormValues>({
     name: workout.name,
     description: workout.description ?? "",
@@ -266,9 +258,7 @@ function LoadedWorkout({
             ? personCardOf(workout.trainer, tc("person.role.trainer"))
             : null
         }
-        mesocycle={mesocycleEntryOf(workout, mesocycle, (number) =>
-          t("workout.context.week", { number }),
-        )}
+        mesocycle={mesocycleEntryOf(workout, (number) => t("workout.context.week", { number }))}
       />
       {errorCode && (
         <Alert severity="error" sx={{ mb: 3 }}>

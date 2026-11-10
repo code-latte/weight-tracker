@@ -5520,6 +5520,25 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        WorkoutByIdExerciseResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            exerciseId: string;
+            translations: components["schemas"]["ExerciseTranslationResponse"][];
+            videoUrl: null | string;
+            muscle: string;
+            bodyPart: string;
+            type: string;
+            effort: string;
+            perSide: boolean;
+            /** Format: double */
+            restMinutes: null | number | string;
+            sets: components["schemas"]["SetResponse"][];
+            /** Format: int32 */
+            superSeriesId: null | number | string;
+            setRecords: components["schemas"]["SetRecordResponse"][];
+        };
         WorkoutByIdResponse: {
             /** Format: uuid */
             id: string;
@@ -5532,7 +5551,7 @@ export interface components {
             /** Format: uuid */
             trainerId: null | string;
             status: string;
-            exercises: components["schemas"]["WorkoutExerciseDetailResponse"][];
+            exercises: components["schemas"]["WorkoutByIdExerciseResponse"][];
             /** Format: uuid */
             mesocycleId: null | string;
             /** Format: int32 */
@@ -5547,6 +5566,7 @@ export interface components {
             resultsUpdatedAt: null | string;
             athlete: components["schemas"]["UserProfileResponse"];
             trainer: null | components["schemas"]["UserProfileResponse"];
+            mesocycle: null | components["schemas"]["WorkoutMesocycleResponse"];
         };
         WorkoutDetailResponse: {
             /** Format: uuid */
@@ -5632,6 +5652,17 @@ export interface components {
             reviewedBy: null | string;
             /** Format: date-time */
             resultsUpdatedAt: null | string;
+        };
+        WorkoutMesocycleResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            objective: string;
+            /** Format: date */
+            startDate: string;
+            /** Format: int32 */
+            durationInWeeks: number | string;
+            weeks: components["schemas"]["MesocycleWeekResponse"][];
         };
         WorkoutResponse: {
             /** Format: uuid */

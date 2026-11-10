@@ -50,9 +50,11 @@ export type {
   UpdateWorkoutRequest,
   Workout,
   WorkoutById,
+  WorkoutByIdExercise,
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
+  WorkoutMesocycle,
   WorkoutStatus,
 } from "./workouts/workout";
 export type {

@@ -47,33 +47,22 @@ initials, their full name or email, and the role caption "Entrenador", when the 
 
 ### Requirement: A placed workout shows its mesocycle and week
 
-When the loaded workout is placed in a mesocycle, the strip SHALL read that mesocycle once and SHALL show, after the
-person cards, a card of the same size with the caption "Mesociclo" and a breadcrumb of the mesocycle's name and
-"Semana <n>". The card SHALL NOT link anywhere. A standalone workout SHALL show no mesocycle card and SHALL NOT read
-any mesocycle.
+When the loaded workout is placed in a mesocycle, the strip SHALL show, after the person cards, a card of the same
+size with the caption "Mesociclo" and a breadcrumb of the name of the mesocycle the workout carries and "Semana <n>".
+The card SHALL NOT link anywhere. The screen SHALL NOT read the mesocycle separately. A standalone workout SHALL show
+no mesocycle card.
 
 #### Scenario: Placed workout
 
 - **WHEN** a trainer loads a workout placed in week 2 of mesocycle `m-1` "Hipertrofia"
-- **THEN** exactly one read of mesocycle `m-1` is sent
-- **AND** the mesocycle card shows the breadcrumb "Hipertrofia" / "Semana 2"
+- **THEN** the mesocycle card shows the breadcrumb "Hipertrofia" / "Semana 2"
+- **AND** no mesocycle read is sent
 - **AND** the card holds no link
 
 #### Scenario: Standalone workout
 
 - **WHEN** a trainer loads a workout with no mesocycle
 - **THEN** no mesocycle card is shown and no mesocycle read is sent
-
-### Requirement: The mesocycle entry never blocks the workout
-
-While the mesocycle is read, its card SHALL show a loading placeholder. When the read fails, the mesocycle card SHALL
-be left out and the rest of the screen SHALL work as usual.
-
-#### Scenario: Mesocycle read fails
-
-- **WHEN** a placed workout loads and its mesocycle read fails with no response
-- **THEN** no mesocycle card is shown
-- **AND** the athlete's person card, the properties card and the exercises card are shown
 
 ### Requirement: The strip is translated
 

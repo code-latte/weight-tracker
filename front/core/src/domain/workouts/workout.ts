@@ -4,8 +4,15 @@ export type Workout = components["schemas"]["WorkoutResponse"];
 /** A workout as listed: the workout plus its athlete and, when it has one, its trainer. */
 export type WorkoutListItem = components["schemas"]["WorkoutListItemResponse"];
 export type WorkoutDetail = components["schemas"]["WorkoutDetailResponse"];
-/** A workout as read by id: the detail plus its athlete and, when it has one, its trainer. */
+/**
+ * A workout as read by id: the detail plus its athlete, its trainer when it has one, the catalog data of each entry's
+ * exercise and the mesocycle it is placed in, so it can be shown without further reads.
+ */
 export type WorkoutById = components["schemas"]["WorkoutByIdResponse"];
+/** An entry of a workout read by id: the entry plus its exercise's names, video, muscle, body part and type. */
+export type WorkoutByIdExercise = components["schemas"]["WorkoutByIdExerciseResponse"];
+/** The mesocycle a workout read by id is placed in, with its weeks. */
+export type WorkoutMesocycle = components["schemas"]["WorkoutMesocycleResponse"];
 export type WorkoutExerciseDetail = components["schemas"]["WorkoutExerciseDetailResponse"];
 export type CreateWorkoutRequest = components["schemas"]["CreateWorkoutRequest"];
 export type UpdateWorkoutRequest = components["schemas"]["UpdateWorkoutRequest"];

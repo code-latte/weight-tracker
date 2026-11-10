@@ -1,6 +1,7 @@
 import { StyleSheet, View } from "react-native";
-import Card from "@/presentation/common/components/atoms/card";
+import { useTheme } from "react-native-paper";
 import ProgressBar from "@/presentation/common/components/atoms/progress-bar";
+import SafeArea from "@/presentation/common/components/atoms/safe-area";
 import Text from "@/presentation/common/components/atoms/text";
 
 interface WeekProgressCardProps {
@@ -11,7 +12,7 @@ interface WeekProgressCardProps {
   total: number;
 }
 
-/** The viewed week: its title and subtitle, and how many of its workouts are done. */
+/** The viewed week, as the screen's jumbo panel: its title and subtitle, and how many of its workouts are done. */
 export default function WeekProgressCard({
   title,
   subtitle,
@@ -19,32 +20,46 @@ export default function WeekProgressCard({
   completed,
   total,
 }: WeekProgressCardProps) {
+  const theme = useTheme();
+  const onPrimary = { color: theme.colors.onPrimary };
+
   return (
-    <Card mode="contained">
+    <SafeArea edges={["top"]} style={[styles.panel, { backgroundColor: theme.colors.primary }]}>
       <View style={styles.row}>
         <View style={styles.week}>
-          <Text variant="titleLarge" role="heading" aria-level={1}>
+          <Text variant="titleLarge" role="heading" aria-level={1} style={onPrimary}>
             {title}
           </Text>
-          <Text variant="bodyMedium">{subtitle}</Text>
+          <Text variant="bodyMedium" style={onPrimary}>
+            {subtitle}
+          </Text>
         </View>
         <View style={styles.progress}>
-          <Text variant="titleMedium" style={styles.progressLabel}>
+          <Text variant="titleMedium" style={[styles.progressLabel, onPrimary]}>
             {progressLabel}
           </Text>
-          <ProgressBar progress={total === 0 ? 0 : completed / total} />
+          <ProgressBar
+            progress={total === 0 ? 0 : completed / total}
+            color={theme.colors.onPrimary}
+            style={{ backgroundColor: theme.colors.primaryContainer }}
+          />
         </View>
       </View>
-    </Card>
+    </SafeArea>
   );
 }
 
 const styles = StyleSheet.create({
+  panel: {
+    flex: 0,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
-    padding: 16,
   },
   week: {
     maxWidth: "70%",

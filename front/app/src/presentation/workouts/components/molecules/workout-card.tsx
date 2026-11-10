@@ -12,6 +12,7 @@ interface WorkoutCardProps {
   day: string;
   progress: WorkoutProgress;
   progressLabel: string;
+  onPress?: () => void;
 }
 
 /** One workout of the week: its status, its name and author, and the day it was done. */
@@ -21,9 +22,10 @@ export default function WorkoutCard({
   day,
   progress,
   progressLabel,
+  onPress,
 }: WorkoutCardProps) {
   return (
-    <Card mode="outlined">
+    <Card mode="outlined" onPress={onPress}>
       <View style={styles.row}>
         <WorkoutStatusIcon progress={progress} label={progressLabel} />
         <View style={styles.body}>

@@ -5,6 +5,12 @@ import { MIN_REFRESH_MS } from "@/presentation/workouts/hooks/use-week-workouts"
 import WorkoutsView from "@/presentation/workouts/views/workouts-view";
 import renderWithProviders from "../../../support/render-with-providers";
 
+const mockPush = jest.fn();
+
+jest.mock("expo-router", () => ({
+  router: { push: (href: unknown) => mockPush(href) },
+}));
+
 // Paper's icons load their font through expo-font, which has no assets under Jest.
 jest.mock("expo-font", () => ({
   ...jest.requireActual("expo-font"),
@@ -196,6 +202,20 @@ describe("WorkoutsView", () => {
     expect(screen.getAllByText("Carlos Ruiz")).toHaveLength(4);
     expect(screen.getByText("Creado por mí")).toBeOnTheScreen();
     expect(screen.queryByText("Ana López")).not.toBeOnTheScreen();
+  });
+
+  it("opens a workout when its card is tapped", async () => {
+    // Arrange
+    mockPush.mockClear();
+    const { dependencies } = setup();
+    await renderWithProviders(<WorkoutsView />, dependencies);
+    await screen.findByText("Empuje");
+
+    // Act
+    await fireEvent.press(screen.getByText("Tirón"));
+
+    // Assert
+    expect(mockPush).toHaveBeenCalledWith({ pathname: "/workouts/[id]", params: { id: "w3" } });
   });
 
   it("shows the weekday a done workout was completed on, and -- for the others", async () => {

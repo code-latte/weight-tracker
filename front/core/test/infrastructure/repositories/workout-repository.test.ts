@@ -76,9 +76,20 @@ const workoutDetail: WorkoutDetail = {
 
 const workoutById: WorkoutById = {
   ...workoutDetail,
+  exercises: [
+    {
+      ...workoutExercise,
+      translations: [{ languageCode: "es", name: "Sentadilla" }],
+      videoUrl: null,
+      muscle: "QUADRICEPS",
+      bodyPart: "LEGS",
+      type: "STRENGTH",
+    },
+  ],
   trainerId: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
   athlete: listedPerson,
   trainer: { ...listedPerson, id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d", role: "TRAINER" },
+  mesocycle: null,
 };
 
 const createRequest: CreateWorkoutRequest = {

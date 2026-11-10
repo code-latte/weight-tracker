@@ -138,6 +138,7 @@ test("creates a workout in a mesocycle week, opens it and goes back to the week"
     people: [bea, trainer],
     newId: workoutId,
     workoutDate: "2026-11-11",
+    mesocycles: [hypertrophy],
   });
   await page.addInitScript(() => {
     window.localStorage.setItem("auth.accessToken", "access");

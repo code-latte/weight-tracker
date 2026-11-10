@@ -9,7 +9,6 @@ import type {
   CreateSuperSeriesInput,
   Exercise,
   ExerciseFavorite,
-  Mesocycle,
   RemoveExerciseFromWorkoutInput,
   ReorderWorkoutExercisesInput,
   Result,
@@ -20,6 +19,7 @@ import type {
   UserProfile,
   Workout,
   WorkoutById,
+  WorkoutByIdExercise,
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutTemplate,
@@ -139,16 +139,30 @@ const treePose = catalogExercise(
 );
 const typeCatalog = async () => ok([...catalog, bike, hamstringStretch, treePose]);
 
+/** Every catalog exercise of these tests, so a workout entry can carry its exercise's data as the API sends it. */
+const knownExercises = new Map(
+  [...catalog, curl, pushdown, hammerCurl, legCurl, bike, hamstringStretch, treePose].map(
+    (exercise) => [exercise.id, exercise],
+  ),
+);
+
 function workoutExercise(
   id: string,
   exerciseId: string,
   effort: string,
   sets: WorkoutExerciseDetail["sets"],
   { perSide = false, restMinutes = null }: Partial<WorkoutExerciseDetail> = {},
-): WorkoutExerciseDetail {
+): WorkoutByIdExercise {
+  const exercise = knownExercises.get(exerciseId);
+
   return {
     id,
     exerciseId,
+    translations: exercise?.translations ?? [],
+    videoUrl: exercise?.videoUrl ?? null,
+    muscle: exercise?.muscle ?? "",
+    bodyPart: exercise?.bodyPart ?? "",
+    type: exercise?.type ?? "",
     effort,
     perSide,
     restMinutes,
@@ -191,6 +205,7 @@ const workout: WorkoutById = {
   exercises: [squatInWorkout, benchInWorkout, pressInWorkout],
   athlete: ana,
   trainer: null,
+  mesocycle: null,
 };
 
 /** What the API answers to an update: the saved data, with the list response's shape. */
@@ -290,7 +305,6 @@ function renderWorkout({
   getFavorites = async () => ok([]),
   markFavorite = async (exerciseId) => ok(favoriteOf(exerciseId)),
   unmarkFavorite = async () => ok(undefined),
-  getMesocycle = async () => fail(new DomainError("UNEXPECTED", "Not used")),
   profile = completeProfile,
   saveAsTemplate = async () => ok(savedTemplate),
   changeStatus = async ({ status }) => ok({ ...workout, status: status ?? workout.status }),
@@ -302,7 +316,6 @@ function renderWorkout({
   getFavorites?: () => Promise<Result<ExerciseFavorite[], DomainError>>;
   markFavorite?: (exerciseId: string) => Promise<Result<ExerciseFavorite, DomainError>>;
   unmarkFavorite?: (exerciseId: string) => Promise<Result<void, DomainError>>;
-  getMesocycle?: () => Promise<Result<Mesocycle, DomainError>>;
   profile?: UserProfile;
   session?: () => Promise<Result<Session | null, DomainError>>;
   updateWorkout?: (input: UpdateWorkoutInput) => Promise<Result<Workout, DomainError>>;
@@ -321,7 +334,8 @@ function renderWorkout({
 } = {}) {
   const readWorkout = vi.fn(getWorkout);
   const readCatalog = vi.fn(getExercises);
-  const readMesocycle = vi.fn(getMesocycle);
+  // The workout carries its mesocycle: registered only to prove the screen never reads it.
+  const readMesocycle = vi.fn(async () => fail(new DomainError("UNEXPECTED", "Not used")));
   const favorites = {
     read: vi.fn(getFavorites),
     mark: vi.fn(markFavorite),
@@ -3815,18 +3829,14 @@ describe("WorkoutView", () => {
       workoutDate: "2026-11-04",
       mesocycleId: "m-1",
       mesocycleWeekNumber: 2,
-    };
-    const hypertrophy: Mesocycle = {
-      id: "m-1",
-      trainerId: luis.id,
-      athleteId: ana.id,
-      name: "Hipertrofia",
-      objective: "Ganar masa",
-      startDate: "2026-10-26",
-      durationInWeeks: 4,
-      weeks: [],
-      trainer: luis,
-      athlete: ana,
+      mesocycle: {
+        id: "m-1",
+        name: "Hipertrofia",
+        objective: "Ganar masa",
+        startDate: "2026-10-26",
+        durationInWeeks: 4,
+        weeks: [],
+      },
     };
     const strip = () => screen.getByRole("region", { name: "Datos del entrenamiento" });
 
@@ -3887,11 +3897,10 @@ describe("WorkoutView", () => {
       expect(within(strip()).queryByText("Entrenador")).not.toBeInTheDocument();
     });
 
-    it("reads a placed workout's mesocycle once and shows its week as a breadcrumb", async () => {
+    it("shows a placed workout's mesocycle week as a breadcrumb from the workout itself", async () => {
       // Arrange
       const { readMesocycle, rendered } = renderWorkout({
         getWorkout: async () => ok(placed),
-        getMesocycle: async () => ok(hypertrophy),
       });
 
       // Act
@@ -3904,11 +3913,10 @@ describe("WorkoutView", () => {
       });
       expect(breadcrumb).toHaveTextContent("Hipertrofia/Semana 2");
       expect(within(strip()).queryByRole("link")).not.toBeInTheDocument();
-      expect(readMesocycle).toHaveBeenCalledTimes(1);
-      expect(readMesocycle).toHaveBeenCalledWith({ id: "m-1" });
+      expect(readMesocycle).not.toHaveBeenCalled();
     });
 
-    it("reads no mesocycle for a standalone workout", async () => {
+    it("shows no mesocycle for a standalone workout", async () => {
       // Arrange
       const { readMesocycle, rendered } = renderWorkout();
 
@@ -3921,31 +3929,10 @@ describe("WorkoutView", () => {
       expect(readMesocycle).not.toHaveBeenCalled();
     });
 
-    it("leaves the mesocycle out and keeps the editor when it cannot be read", async () => {
-      // Arrange
-      const { readMesocycle, rendered } = renderWorkout({
-        getWorkout: async () => ok(placed),
-        getMesocycle: async () => fail(new DomainError("NETWORK", "")),
-      });
-
-      // Act
-      await rendered;
-      await loaded();
-
-      // Assert
-      await waitFor(() => expect(readMesocycle).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(within(strip()).queryByText("Mesociclo")).not.toBeInTheDocument());
-      expect(within(strip()).getByText("Ana García")).toBeInTheDocument();
-      expect(within(propertiesSection()).getByRole("textbox", { name: "Nombre" })).toHaveValue(
-        "Pierna",
-      );
-    });
-
     it("leads Volver back to the mesocycle of a placed workout", async () => {
       // Arrange & Act
       await renderWorkout({
         getWorkout: async () => ok(placed),
-        getMesocycle: async () => ok(hypertrophy),
       }).rendered;
 
       // Assert
@@ -3960,7 +3947,6 @@ describe("WorkoutView", () => {
       // Arrange & Act
       await renderWorkout({
         getWorkout: async () => ok(placed),
-        getMesocycle: async () => ok(hypertrophy),
       }).rendered;
 
       // Assert
@@ -3975,7 +3961,6 @@ describe("WorkoutView", () => {
       // Arrange
       const { mutations, rendered } = renderWorkout({
         getWorkout: async () => ok(placed),
-        getMesocycle: async () => ok(hypertrophy),
       });
       await rendered;
       await loaded();
@@ -4038,7 +4023,6 @@ describe("WorkoutView", () => {
       // Arrange
       await renderWorkout({
         getWorkout: async () => ok(placed),
-        getMesocycle: async () => ok(hypertrophy),
         profile: admin,
       }).rendered;
       await loaded();

@@ -19,5 +19,22 @@
     "started": "En curso",
     "pending": "Pendiente"
   },
-  "retry": "Reintentar"
+  "retry": "Reintentar",
+  "workout": {
+    "subtitle": "{{mesocycle}} · Semana {{week}}",
+    "progress": "{{done}} / {{total}} ejercicios",
+    "video": "Ver vídeo",
+    "details": "Ver detalle",
+    "unknownExercise": "Ejercicio",
+    "exerciseStatus": {
+      "done": "Completado",
+      "inProgress": "En curso",
+      "notStarted": "Sin empezar"
+    },
+    "exerciseType": {
+      "strength": "Fuerza",
+      "cardio": "Cardio",
+      "stretching": "Estiramiento"
+    }
+  }
 }

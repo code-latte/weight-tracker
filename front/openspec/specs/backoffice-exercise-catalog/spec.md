@@ -10,7 +10,7 @@ trainer, adds exercises of their own, outside any workout.
 ### Requirement: The exercise catalog screen lists the catalog
 
 The screen at `/exercises` SHALL be reachable by a signed-in `ADMIN` or `TRAINER`, SHALL show the heading "Catálogo de
-ejercicios" and SHALL read the catalog and the user's favorites once when it opens. It SHALL show the same content as
+ejercicios", SHALL use the session's exercise catalog and SHALL read the user's favorites once when it opens. It SHALL show the same content as
 the workout screen's catalog dialog: the section sidebar ("Todos", "Mis ejercicios", "Favoritos"), the text filter, the
 type, body-part and muscle pills, and every catalog exercise as a card with its name and labels. Because no workout is
 being built, no exercise SHALL be hidden for being in one. The sections and filters SHALL narrow the list exactly as in
@@ -21,7 +21,8 @@ the dialog, without sending any request.
 - **WHEN** a trainer opens `/exercises` and the catalog holds three exercises
 - **THEN** the heading "Catálogo de ejercicios" and the sections "Todos", "Mis ejercicios" and "Favoritos" are shown
 - **AND** "Todos" is selected and the three exercises are listed
-- **AND** exactly one read of the catalog and one read of the favorites are sent
+- **AND** exactly one read of the favorites and no read of the catalog are sent, the catalog having been read after
+  sign-in
 
 #### Scenario: Sections and filters apply
 
@@ -205,7 +206,7 @@ the active language. A header SHALL NOT be selectable, and choosing a muscle SHA
 With a valid form, "Crear" SHALL send exactly one creation with the trimmed name, the chosen muscle and type, the
 trimmed link only when one was typed, and the language the screen is shown in. While it is in progress the fields and
 both buttons SHALL be disabled. When the API accepts it, the dialog SHALL close and the created exercise SHALL be in the
-catalog list and under "Mis ejercicios", without reading the catalog again. The selected section and the filters SHALL
+catalog list and under "Mis ejercicios" at once, and the session's catalog SHALL then be read again in the background. The selected section and the filters SHALL
 be kept.
 
 #### Scenario: Exercise created
@@ -215,7 +216,7 @@ be kept.
 - **THEN** exactly one creation is sent with `languageCode` `es`, that name, `MIDDLE_BACK` and `STRENGTH`, and no link
 - **AND** the dialog closes
 - **AND** "Remo con banda" is listed under "Todos" and under "Mis ejercicios"
-- **AND** no new read of the catalog is sent
+- **AND** exactly one new read of the catalog is sent, and the list stays visible while it runs
 
 #### Scenario: Created in the screen's language
 
@@ -273,3 +274,30 @@ first translation.
 
 - **WHEN** the language is English and a trainer opens `/exercises`
 - **THEN** the heading reads "Exercise catalog", the button "Add exercise" and the dialog "New exercise"
+
+### Requirement: Each section shows how many exercises it holds
+
+The section sidebar of the exercise catalog, on the catalog screen and in the catalog dialog of the workout and template
+editors, SHALL show each section's name followed by the number of exercises it holds, as "Todos (4)", "Mis ejercicios
+(1)", "Favoritos (2)". The count SHALL cover the section before the text and the pills narrow it, so it does not change
+while the user filters. "Favoritos" SHALL show no count until the favorites are read, nor when they fail to load.
+
+#### Scenario: Counts per section
+
+- **WHEN** the catalog holds four exercises, one owned by the user, and two of them are favorites
+- **THEN** the sections read "Todos (4)", "Mis ejercicios (1)" and "Favoritos (2)"
+
+#### Scenario: Filters do not change the counts
+
+- **WHEN** the user types a name that matches one exercise
+- **THEN** the sections still read "Todos (4)", "Mis ejercicios (1)" and "Favoritos (2)"
+
+#### Scenario: Favorites not available
+
+- **WHEN** the favorites fail to load
+- **THEN** the sections read "Todos (4)", "Mis ejercicios (1)" and "Favoritos"
+
+#### Scenario: English
+
+- **WHEN** the screen is shown in English
+- **THEN** the sections read "All (n)", "My exercises (n)" and "Favorites (n)"

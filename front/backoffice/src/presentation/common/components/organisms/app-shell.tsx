@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import { usePathname, useRouter } from "next/navigation";
 import RequireSession from "@/presentation/auth/components/require-session";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
+import useExerciseCatalog from "@/presentation/common/hooks/use-exercise-catalog";
 import AppHeader from "@/presentation/common/components/organisms/app-header";
 import NavigationDrawer from "@/presentation/common/components/organisms/navigation-drawer";
 
@@ -12,16 +13,21 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-/** Reads the profile once the session is confirmed, and keeps a user in onboarding on the home screen. */
+/**
+ * Reads the profile and, in the background, the exercise catalog once the session is confirmed, and keeps a user in
+ * onboarding on the home screen.
+ */
 function SignedInContent({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { load, onboardingPending } = useCurrentUser();
+  const { load: loadExercises } = useExerciseCatalog();
   const redirecting = onboardingPending && pathname !== "/";
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadExercises();
+  }, [load, loadExercises]);
 
   useEffect(() => {
     if (redirecting) {

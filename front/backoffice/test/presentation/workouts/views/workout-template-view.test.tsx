@@ -12,6 +12,7 @@ import type {
 } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
 import WorkoutTemplateView from "@/presentation/workouts/views/workout-template-view";
+import LoadExerciseCatalog from "../../../support/load-exercise-catalog";
 import renderWithProviders, { completeProfile } from "../../../support/render-with-providers";
 
 const replace = vi.fn();
@@ -72,12 +73,15 @@ function renderTemplate({
   updateTemplate = async (input: UpdateWorkoutTemplateInput) =>
     ok({ ...template, name: input.name ?? template.name }),
   deleteTemplate = async () => ok(undefined),
+  catalogLoadedFirst = false,
 }: {
   getTemplate?: () => Promise<Result<WorkoutTemplate, DomainError>>;
   updateTemplate?: (
     input: UpdateWorkoutTemplateInput,
   ) => Promise<Result<WorkoutTemplate, DomainError>>;
   deleteTemplate?: () => Promise<Result<void, DomainError>>;
+  /** Opens the screen after the session's catalog was read, as after sign-in. */
+  catalogLoadedFirst?: boolean;
 } = {}) {
   const readTemplate = vi.fn(getTemplate);
   const readCatalog = vi.fn(async () => ok(catalog));
@@ -111,30 +115,39 @@ function renderTemplate({
     readFavorites,
     mutations,
     workoutMutations,
-    rendered: renderWithProviders(<WorkoutTemplateView />, {
-      getSessionUseCase: () => ({
-        execute: async () => ok({ accessToken: "a", refreshToken: "r" }),
-      }),
-      getMyProfileUseCase: () => ({ execute: async () => ok(completeProfile) }),
-      getWorkoutTemplateByIdUseCase: () => ({ execute: readTemplate }),
-      getExercisesUseCase: () => ({ execute: readCatalog }),
-      getExerciseFavoritesUseCase: () => ({ execute: readFavorites }),
-      updateWorkoutTemplateUseCase: () => ({ execute: mutations.update }),
-      deleteWorkoutTemplateUseCase: () => ({ execute: mutations.delete }),
-      addExerciseToWorkoutTemplateUseCase: () => ({ execute: mutations.addExercise }),
-      updateWorkoutTemplateExerciseUseCase: () => ({ execute: mutations.updateExercise }),
-      removeExerciseFromWorkoutTemplateUseCase: () => ({ execute: mutations.removeExercise }),
-      reorderWorkoutTemplateExercisesUseCase: () => ({ execute: mutations.reorderExercises }),
-      createWorkoutTemplateSuperSeriesUseCase: () => ({ execute: mutations.createSuperSeries }),
-      breakWorkoutTemplateSuperSeriesUseCase: () => ({ execute: mutations.breakSuperSeries }),
-      updateWorkoutUseCase: () => ({ execute: workoutMutations.update }),
-      addExerciseToWorkoutUseCase: () => ({ execute: workoutMutations.addExercise }),
-      updateWorkoutExerciseUseCase: () => ({ execute: workoutMutations.updateExercise }),
-      removeExerciseFromWorkoutUseCase: () => ({ execute: workoutMutations.removeExercise }),
-      reorderWorkoutExercisesUseCase: () => ({ execute: workoutMutations.reorderExercises }),
-      createSuperSeriesUseCase: () => ({ execute: workoutMutations.createSuperSeries }),
-      breakSuperSeriesUseCase: () => ({ execute: workoutMutations.breakSuperSeries }),
-    }),
+    rendered: renderWithProviders(
+      catalogLoadedFirst ? (
+        <LoadExerciseCatalog>
+          <WorkoutTemplateView />
+        </LoadExerciseCatalog>
+      ) : (
+        <WorkoutTemplateView />
+      ),
+      {
+        getSessionUseCase: () => ({
+          execute: async () => ok({ accessToken: "a", refreshToken: "r" }),
+        }),
+        getMyProfileUseCase: () => ({ execute: async () => ok(completeProfile) }),
+        getWorkoutTemplateByIdUseCase: () => ({ execute: readTemplate }),
+        getExercisesUseCase: () => ({ execute: readCatalog }),
+        getExerciseFavoritesUseCase: () => ({ execute: readFavorites }),
+        updateWorkoutTemplateUseCase: () => ({ execute: mutations.update }),
+        deleteWorkoutTemplateUseCase: () => ({ execute: mutations.delete }),
+        addExerciseToWorkoutTemplateUseCase: () => ({ execute: mutations.addExercise }),
+        updateWorkoutTemplateExerciseUseCase: () => ({ execute: mutations.updateExercise }),
+        removeExerciseFromWorkoutTemplateUseCase: () => ({ execute: mutations.removeExercise }),
+        reorderWorkoutTemplateExercisesUseCase: () => ({ execute: mutations.reorderExercises }),
+        createWorkoutTemplateSuperSeriesUseCase: () => ({ execute: mutations.createSuperSeries }),
+        breakWorkoutTemplateSuperSeriesUseCase: () => ({ execute: mutations.breakSuperSeries }),
+        updateWorkoutUseCase: () => ({ execute: workoutMutations.update }),
+        addExerciseToWorkoutUseCase: () => ({ execute: workoutMutations.addExercise }),
+        updateWorkoutExerciseUseCase: () => ({ execute: workoutMutations.updateExercise }),
+        removeExerciseFromWorkoutUseCase: () => ({ execute: workoutMutations.removeExercise }),
+        reorderWorkoutExercisesUseCase: () => ({ execute: workoutMutations.reorderExercises }),
+        createSuperSeriesUseCase: () => ({ execute: workoutMutations.createSuperSeries }),
+        breakSuperSeriesUseCase: () => ({ execute: workoutMutations.breakSuperSeries }),
+      },
+    ),
   };
 }
 
@@ -208,6 +221,22 @@ describe("WorkoutTemplateView", () => {
     // Assert
     expect(readTemplate).toHaveBeenCalledTimes(1);
     expect(readTemplate).toHaveBeenCalledWith({ id: "wt-1" });
+    expect(readCatalog).toHaveBeenCalledTimes(1);
+    expect(readFavorites).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the session's catalog and does not read it on opening once it was read", async () => {
+    // Arrange
+    const { readTemplate, readCatalog, readFavorites, rendered } = renderTemplate({
+      catalogLoadedFirst: true,
+    });
+
+    // Act
+    await rendered;
+    await loaded();
+
+    // Assert
+    expect(readTemplate).toHaveBeenCalledTimes(1);
     expect(readCatalog).toHaveBeenCalledTimes(1);
     expect(readFavorites).toHaveBeenCalledTimes(1);
   });

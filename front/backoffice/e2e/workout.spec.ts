@@ -1006,7 +1006,7 @@ test("marks an exercise as a favorite, finds it under Favoritos and adds it to t
   const card = catalogDialog.getByRole("listitem").filter({ hasText: "Press de banca" });
   await card.getByRole("button", { name: "Añadir a favoritos" }).click();
   await expect(card.getByRole("button", { name: "Quitar de favoritos" })).toBeVisible();
-  await catalogDialog.getByRole("button", { name: "Favoritos", exact: true }).click();
+  await catalogDialog.getByRole("button", { name: /^Favoritos( \(\d+\))?$/ }).click();
   await expect(
     catalogDialog.getByRole("list", { name: "Catálogo de ejercicios" }).getByRole("listitem"),
   ).toHaveCount(1);
@@ -1055,7 +1055,7 @@ test("keeps a favorite after a reload and lists it under Favoritos", async ({ pa
 
   // Assert
   const catalogDialog = await openCatalog(page);
-  await catalogDialog.getByRole("button", { name: "Favoritos", exact: true }).click();
+  await catalogDialog.getByRole("button", { name: /^Favoritos( \(\d+\))?$/ }).click();
   const cards = catalogDialog
     .getByRole("list", { name: "Catálogo de ejercicios" })
     .getByRole("listitem");
@@ -1072,7 +1072,7 @@ test("unmarks a favorite and leaves it out of Favoritos", async ({ page }) => {
   });
   await page.goto(`/workout?id=${existing.id}`);
   const catalogDialog = await openCatalog(page);
-  await catalogDialog.getByRole("button", { name: "Favoritos", exact: true }).click();
+  await catalogDialog.getByRole("button", { name: /^Favoritos( \(\d+\))?$/ }).click();
   const card = catalogDialog.getByRole("listitem").filter({ hasText: "Press de banca" });
 
   // Act
@@ -1114,7 +1114,7 @@ test("keeps the catalog dialog the same height whatever the filters leave", asyn
   const initial = (await catalogDialog.boundingBox())!.height;
 
   // Act
-  await catalogDialog.getByRole("button", { name: "Mis ejercicios", exact: true }).click();
+  await catalogDialog.getByRole("button", { name: /^Mis ejercicios( \(\d+\))?$/ }).click();
   await expect(catalogDialog.getByText("Ningún ejercicio coincide con el filtro.")).toBeVisible();
 
   // Assert
@@ -1149,7 +1149,7 @@ test("opens the catalog page from the menu, creates an exercise and finds it und
   // Assert
   await expect(dialog).toBeHidden();
   await expect(cards).toHaveCount(3);
-  await page.getByRole("button", { name: "Mis ejercicios", exact: true }).click();
+  await page.getByRole("button", { name: /^Mis ejercicios( \(\d+\))?$/ }).click();
   await expect(cards).toHaveCount(1);
   await expect(cards.first()).toContainText("Remo con banda");
   expect(sent.creations).toEqual([
@@ -1171,7 +1171,7 @@ test("marks a favorite from the catalog page and finds it under Favoritos", asyn
   // Assert
   await expect(card.getByRole("button", { name: "Quitar de favoritos" })).toBeVisible();
   expect(sent.marks).toEqual([benchPress.id]);
-  await page.getByRole("button", { name: "Favoritos", exact: true }).click();
+  await page.getByRole("button", { name: /^Favoritos( \(\d+\))?$/ }).click();
   await expect(cards).toHaveCount(1);
   await expect(cards.first()).toContainText("Press de banca");
 });

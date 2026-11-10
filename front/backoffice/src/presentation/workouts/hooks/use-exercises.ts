@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import type { DomainErrorCode, Exercise } from "@weight-tracker/core/domain";
-import useSession from "@/presentation/auth/hooks/use-session";
-import useContainer from "@/presentation/common/hooks/use-container";
+import useExerciseCatalog from "@/presentation/common/hooks/use-exercise-catalog";
 
 type ExercisesStatus = "loading" | "loaded" | "failed";
 
@@ -10,54 +9,30 @@ interface ExercisesState {
   exercises: Exercise[];
   errorCode: DomainErrorCode | null;
   reload: () => void;
-  /** Appends an exercise created on this screen, so it is listed without reading the catalog again. */
+  /** Appends an exercise created on this screen, so it is listed without waiting for the catalog to be read again. */
   add: (exercise: Exercise) => void;
+  /** Reads the catalog again in the background, after the user created or updated an exercise of their own. */
+  refresh: () => void;
 }
 
-/** Reads the exercise catalog when the screen opens. Held by the screen only, so it resets on exit. */
+/**
+ * The session's exercise catalog, as a screen that needs it sees it. The catalog is read once per session (in the
+ * background after sign-in); a screen opened before that read starts it, and never reads it again on its own.
+ */
 export default function useExercises(): ExercisesState {
-  const container = useContainer();
-  const { runWithSession } = useSession();
-  const [status, setStatus] = useState<ExercisesStatus>("loading");
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [errorCode, setErrorCode] = useState<DomainErrorCode | null>(null);
-  // Bumped by every read and on unmount, so an answer that arrives after either is ignored.
-  const generation = useRef(0);
+  const { status, exercises, errorCode, load, reload, add, refresh } = useExerciseCatalog();
 
-  // State changes only when the answer arrives; `reload` sets "loading" beforehand.
-  const request = useCallback(() => {
-    const current = ++generation.current;
-
-    void runWithSession(() => container.resolve("getExercisesUseCase").execute()).then((result) => {
-      if (current !== generation.current) {
-        return;
-      }
-      if (result.ok) {
-        setExercises(result.value);
-        setStatus("loaded");
-      } else {
-        setErrorCode(result.error.code);
-        setStatus("failed");
-      }
-    });
-  }, [container, runWithSession]);
-
-  const reload = useCallback(() => {
-    setStatus("loading");
-    setErrorCode(null);
-    request();
-  }, [request]);
-
-  const add = useCallback((exercise: Exercise) => {
-    setExercises((current) => [...current, exercise]);
-  }, []);
-
+  // React runs a screen's effects before the shell's, so the screen asks too; only the first ask reads.
   useEffect(() => {
-    request();
-    return () => {
-      generation.current += 1;
-    };
-  }, [request]);
+    load();
+  }, [load]);
 
-  return { status, exercises, errorCode, reload, add };
+  return {
+    status: status === "idle" ? "loading" : status,
+    exercises,
+    errorCode,
+    reload,
+    add,
+    refresh,
+  };
 }

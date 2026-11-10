@@ -77,7 +77,8 @@
         "label": "Sections",
         "ALL": "All",
         "MINE": "My exercises",
-        "FAVORITES": "Favorites"
+        "FAVORITES": "Favorites",
+        "withCount": "{{label}} ({{count}})"
       },
       "favorite": {
         "add": "Add to favorites",

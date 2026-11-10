@@ -5,6 +5,7 @@ import type { Dependencies } from "@weight-tracker/core/application";
 import { type Exercise, ok } from "@weight-tracker/core/domain";
 import { Container } from "@weight-tracker/core/infrastructure";
 import SessionProvider from "@/presentation/auth/components/session-provider";
+import ExerciseCatalogProvider from "@/presentation/common/components/exercise-catalog-provider";
 import ContainerProvider from "@/presentation/common/context/container-provider";
 import useExercises from "@/presentation/workouts/hooks/use-exercises";
 
@@ -22,7 +23,7 @@ function exercise(id: string): Exercise {
   };
 }
 
-/** The hook with only the registrations it reads: the session and the catalog. */
+/** The hook under the session's catalog provider, with only the registrations it reads: the session and the catalog. */
 function renderExercises(read: () => Promise<ReturnType<typeof ok<Exercise[]>>>) {
   const container = new Container({
     getSessionUseCase: () => ({
@@ -34,7 +35,9 @@ function renderExercises(read: () => Promise<ReturnType<typeof ok<Exercise[]>>>)
   return renderHook(() => useExercises(), {
     wrapper: ({ children }: { children: ReactNode }) => (
       <ContainerProvider container={container}>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <ExerciseCatalogProvider>{children}</ExerciseCatalogProvider>
+        </SessionProvider>
       </ContainerProvider>
     ),
   });

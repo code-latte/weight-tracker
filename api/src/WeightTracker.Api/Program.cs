@@ -110,6 +110,7 @@ builder.Services.AddScoped<GetAllWorkoutsUseCase>();
 builder.Services.AddScoped<GetWorkoutByIdUseCase>();
 builder.Services.AddScoped<CreateWorkoutUseCase>();
 builder.Services.AddScoped<UpdateWorkoutUseCase>();
+builder.Services.AddScoped<DeleteWorkoutUseCase>();
 builder.Services.AddScoped<AddWorkoutExerciseUseCase>();
 builder.Services.AddScoped<UpdateWorkoutExerciseUseCase>();
 builder.Services.AddScoped<RemoveWorkoutExerciseUseCase>();

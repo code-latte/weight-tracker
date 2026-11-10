@@ -81,6 +81,19 @@ export default class WorkoutRepository implements WorkoutRepositoryInterface {
     }
   }
 
+  async delete(id: string): Promise<Result<void, DomainError>> {
+    try {
+      await this.httpClient.request<void>({
+        method: "DELETE",
+        path: `/workouts/${id}`,
+      });
+
+      return ok(undefined);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
   async addExercise(
     workoutId: string,
     request: AddExerciseRequest,

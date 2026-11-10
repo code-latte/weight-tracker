@@ -11,6 +11,7 @@
     },
     "empty": "Todavía no hay entrenamientos.",
     "edit": "Editar {{name}}",
+    "delete": "Eliminar {{name}}",
     "noTrainer": "Sin entrenador"
   },
   "createWorkout": {
@@ -87,6 +88,24 @@
     "details": {
       "save": "Guardar",
       "saved": "Entrenamiento guardado."
+    },
+    "status": {
+      "publish": "Publicar",
+      "backToDraft": "Volver a borrador",
+      "published": "Entrenamiento publicado.",
+      "movedToDraft": "El entrenamiento ha vuelto a borrador.",
+      "locked": "El atleta ha empezado este entrenamiento y no puedes editarlo",
+      "cancel": "Cancelar",
+      "publishConfirm": {
+        "title": "¿Publicar el entrenamiento?",
+        "body": "El atleta podrá verlo y empezarlo.",
+        "confirm": "Publicar"
+      },
+      "backToDraftConfirm": {
+        "title": "¿Volver a borrador?",
+        "body": "El atleta dejará de verlo hasta que lo vuelvas a publicar.",
+        "confirm": "Volver a borrador"
+      }
     },
     "exercises": {
       "empty": "Este entrenamiento aún no tiene ejercicios.",
@@ -271,6 +290,7 @@
       "trainer": "Entrenador"
     },
     "edit": "Editar {{name}}",
+    "delete": "Eliminar {{name}}",
     "empty": "Todavía no hay plantillas.",
     "unknownTrainer": "—"
   },

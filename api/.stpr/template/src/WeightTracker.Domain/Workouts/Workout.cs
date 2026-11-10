@@ -45,6 +45,12 @@ public sealed class Workout : AggregateRoot
     public bool IsExecuted => Status is WorkoutStatus.STARTED or WorkoutStatus.COMPLETED or WorkoutStatus.REVIEWED;
 
     /// <summary>
+    /// Last time the workout reached completed, in UTC, <c>null</c> until it is first completed.
+    /// Leaving completed keeps it, so the status tells whether the workout is completed now.
+    /// </summary>
+    public DateTime? CompletedAt { get; private set; }
+
+    /// <summary>
     /// When the workout was reviewed, in UTC, <c>null</c> until it is reviewed.
     /// </summary>
     public DateTime? ReviewedAt { get; private set; }
@@ -156,7 +162,8 @@ public sealed class Workout : AggregateRoot
         WeekNumber? mesocycleWeekNumber = null,
         DateTime? reviewedAt = null,
         Id? reviewedBy = null,
-        DateTime? resultsUpdatedAt = null
+        DateTime? resultsUpdatedAt = null,
+        DateTime? completedAt = null
     )
     {
         EnsureDefined(status);
@@ -193,6 +200,7 @@ public sealed class Workout : AggregateRoot
             ReviewedAt = reviewedAt,
             ReviewedBy = reviewedBy,
             ResultsUpdatedAt = resultsUpdatedAt,
+            CompletedAt = completedAt,
         };
     }
 
@@ -219,6 +227,17 @@ public sealed class Workout : AggregateRoot
 
         UserId = userId;
         TrainerId = trainerId;
+    }
+
+    /// <summary>
+    /// Confirms the workout may be deleted. Only a draft can be, whoever asks, an admin included,
+    /// so nothing published, executed or reviewed is ever lost.
+    /// </summary>
+    /// <exception cref="WorkoutDeletionLockedException">When the workout is no longer a draft.</exception>
+    public void EnsureCanBeDeleted()
+    {
+        if (Status != WorkoutStatus.DRAFT)
+            throw new WorkoutDeletionLockedException(this.Id, Status);
     }
 
     /// <summary>
@@ -251,16 +270,18 @@ public sealed class Workout : AggregateRoot
     /// and started to completed. Anything else, including staying in the same status, is refused.
     /// A completed workout becomes reviewed only through <see cref="MarkReviewed"/>.
     /// </summary>
+    /// <param name="target">Status to move to</param>
+    /// <param name="changedAtUtc">When the change happens, in UTC. Recorded as <see cref="CompletedAt"/> when completing.</param>
     /// <exception cref="InvalidWorkoutStatusException">When the target is not a defined value.</exception>
     /// <exception cref="InvalidWorkoutStatusTransitionException">When the move is not part of the lifecycle.</exception>
-    public void ChangeStatus(WorkoutStatus target)
+    public void ChangeStatus(WorkoutStatus target, DateTime changedAtUtc)
     {
         EnsureDefined(target);
 
         if (CanTransitionTo(target) == false)
             throw new InvalidWorkoutStatusTransitionException(Status, target);
 
-        Status = target;
+        SetStatus(target, changedAtUtc);
     }
 
     /// <summary>
@@ -282,16 +303,27 @@ public sealed class Workout : AggregateRoot
     /// A review is never set or undone this way: reviewing goes through <see cref="MarkReviewed"/>, and
     /// unlocking a reviewed workout needs its own audited operation.
     /// </summary>
+    /// <param name="target">Status to set</param>
+    /// <param name="changedAtUtc">When the change happens, in UTC. Recorded as <see cref="CompletedAt"/> when completing.</param>
     /// <exception cref="InvalidWorkoutStatusException">When the target is not a defined value.</exception>
     /// <exception cref="InvalidWorkoutStatusTransitionException">When the target or the current status is reviewed.</exception>
-    public void OverrideStatus(WorkoutStatus target)
+    public void OverrideStatus(WorkoutStatus target, DateTime changedAtUtc)
     {
         EnsureDefined(target);
 
         if (target == WorkoutStatus.REVIEWED || Status == WorkoutStatus.REVIEWED)
             throw new InvalidWorkoutStatusTransitionException(Status, target);
 
+        SetStatus(target, changedAtUtc);
+    }
+
+    private void SetStatus(WorkoutStatus target, DateTime changedAtUtc)
+    {
         Status = target;
+
+        // Every completion overwrites the date; any other status keeps the last one
+        if (target == WorkoutStatus.COMPLETED)
+            CompletedAt = ToStoredPrecision(changedAtUtc);
     }
 
     /// <summary>

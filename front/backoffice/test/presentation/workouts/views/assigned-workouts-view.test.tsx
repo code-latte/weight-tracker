@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DomainError, fail, ok } from "@weight-tracker/core/domain";
@@ -63,6 +63,7 @@ const legs: WorkoutListItem = {
   trainer: luis,
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  completedAt: null,
   reviewedAt: null,
   reviewedBy: null,
   resultsUpdatedAt: null,
@@ -93,20 +94,25 @@ function dateCellOf(name: string) {
 function renderAssignedPlans({
   profile = completeProfile,
   getWorkouts = async () => ok([legs, pushDay]),
+  deleteWorkout = async () => ok(undefined),
 }: {
   profile?: UserProfile;
   getWorkouts?: () => Promise<Result<WorkoutListItem[], DomainError>>;
+  deleteWorkout?: () => Promise<Result<void, DomainError>>;
 } = {}) {
   const execute = vi.fn(getWorkouts);
+  const deletion = vi.fn(deleteWorkout);
 
   return {
     execute,
+    deletion,
     rendered: renderWithProviders(<AssignedWorkoutsView />, {
       getSessionUseCase: () => ({
         execute: async () => ok({ accessToken: "a", refreshToken: "r" }),
       }),
       getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
       getWorkoutsUseCase: () => ({ execute }),
+      deleteWorkoutUseCase: () => ({ execute: deletion }),
       getMyAthletesUseCase: () => ({ execute: async () => ok([]) }),
     }),
   };
@@ -180,8 +186,28 @@ describe("AssignedWorkoutsView", () => {
       within(legsRow)
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
-    ).toEqual(["Pierna", "Semana del 26 oct – 1 nov", "Ana García", "3", ""]);
+    ).toEqual(["PiernaBorrador", "Semana del 26 oct – 1 nov", "Ana García", "3", ""]);
     expect(within(pushRow).getAllByRole("cell")[3]).toHaveTextContent("0");
+  });
+
+  it.each([
+    ["DRAFT", "Borrador", "MuiChip-colorDefault"],
+    ["PUBLISHED", "Publicado", "MuiChip-colorInfo"],
+    ["STARTED", "En curso", "MuiChip-colorWarning"],
+    ["COMPLETED", "Completado", "MuiChip-colorSuccess"],
+    ["REVIEWED", "Revisado", "MuiChip-colorSecondary"],
+  ])("labels a %s workout as %s next to its name, in its colour", async (status, label, color) => {
+    // Arrange
+    const workout: WorkoutListItem = { ...legs, status };
+
+    // Act
+    await renderAssignedPlans({ getWorkouts: async () => ok([workout]) }).rendered;
+
+    // Assert
+    await screen.findByText("Pierna");
+    const nameCell = within(bodyRows()[0]!).getAllByRole("cell")[0]!;
+    const chip = within(nameCell).getByText(label).closest(".MuiChip-root");
+    expect(chip).toHaveClass(color);
   });
 
   it("shows the email of an athlete without a name and no athlete id", async () => {
@@ -208,7 +234,7 @@ describe("AssignedWorkoutsView", () => {
       within(legsRow)
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
-    ).toEqual(["Pierna", "Semana del 26 oct – 1 nov", "Ana García", "Luis Pérez", "3", ""]);
+    ).toEqual(["PiernaBorrador", "Semana del 26 oct – 1 nov", "Ana García", "Luis Pérez", "3", ""]);
     expect(within(pushRow).getAllByRole("cell")[3]).toHaveTextContent("Sin entrenador");
     expect(screen.queryByText("t-1")).not.toBeInTheDocument();
   });
@@ -333,6 +359,141 @@ describe("AssignedWorkoutsView", () => {
     expect(dateCellOf("W 2025-10-29")).toBe("Semana del 27 oct 2025 – 2 nov 2025");
   });
 
+  describe("deleting a workout", () => {
+    it("asks for confirmation and sends nothing when the trash button is pressed", async () => {
+      // Arrange
+      const { deletion, rendered } = renderAssignedPlans();
+      await rendered;
+      const user = userEvent.setup();
+      await screen.findByText("Pierna");
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Eliminar Pierna" }));
+
+      // Assert
+      const dialog = await screen.findByRole("dialog", { name: "¿Eliminar entrenamiento?" });
+      expect(
+        within(dialog).getByText(
+          "Se eliminará el entrenamiento con sus ejercicios. Esta acción no se puede deshacer.",
+        ),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
+      expect(deletion).not.toHaveBeenCalled();
+    });
+
+    it("shows the delete action to an admin on a published workout too", async () => {
+      // Arrange
+      const published: WorkoutListItem = { ...legs, status: "PUBLISHED" };
+
+      // Act
+      await renderAssignedPlans({ profile: adminProfile, getWorkouts: async () => ok([published]) })
+        .rendered;
+
+      // Assert
+      expect(await screen.findByRole("link", { name: "Editar Pierna" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Eliminar Pierna" })).toBeInTheDocument();
+    });
+
+    it("closes the dialog without deleting when Cancelar is pressed", async () => {
+      // Arrange
+      const { deletion, rendered } = renderAssignedPlans();
+      await rendered;
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: "Eliminar Pierna" }));
+      const dialog = await screen.findByRole("dialog", { name: "¿Eliminar entrenamiento?" });
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+      // Assert
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "¿Eliminar entrenamiento?" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(deletion).not.toHaveBeenCalled();
+    });
+
+    it("deletes the row's workout once and reads the workouts again on confirm", async () => {
+      // Arrange
+      const getWorkouts = vi
+        .fn<() => Promise<Result<WorkoutListItem[], DomainError>>>()
+        .mockResolvedValueOnce(ok([legs, pushDay]))
+        .mockResolvedValueOnce(ok([pushDay]));
+      const { execute, deletion, rendered } = renderAssignedPlans({ getWorkouts });
+      await rendered;
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: "Eliminar Pierna" }));
+      const dialog = await screen.findByRole("dialog", { name: "¿Eliminar entrenamiento?" });
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+      // Assert
+      await waitFor(() => expect(screen.queryByText("Pierna")).not.toBeInTheDocument());
+      expect(deletion).toHaveBeenCalledTimes(1);
+      expect(deletion).toHaveBeenCalledWith({ id: legs.id });
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Empuje")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "¿Eliminar entrenamiento?" }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it("explains that only drafts can be deleted when the API answers CONFLICT", async () => {
+      // Arrange
+      const { execute, rendered } = renderAssignedPlans({
+        deleteWorkout: async () => fail(new DomainError("CONFLICT", "")),
+      });
+      await rendered;
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: "Eliminar Pierna" }));
+      const dialog = await screen.findByRole("dialog", { name: "¿Eliminar entrenamiento?" });
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+      // Assert
+      expect(
+        await screen.findByText("Solo se pueden eliminar entrenamientos en borrador."),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("La operación entra en conflicto con el estado actual."),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("Pierna")).toBeInTheDocument();
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the error for its code when the deletion fails for another reason", async () => {
+      // Arrange
+      const { execute, rendered } = renderAssignedPlans({
+        deleteWorkout: async () => fail(new DomainError("FORBIDDEN", "")),
+      });
+      await rendered;
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: "Eliminar Pierna" }));
+      const dialog = await screen.findByRole("dialog", { name: "¿Eliminar entrenamiento?" });
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+      // Assert
+      expect(
+        await screen.findByText("No tienes permiso para realizar esta acción."),
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "¿Eliminar entrenamiento?" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(bodyRows()).toHaveLength(2);
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("follows the active language", async () => {
     // Arrange
     await renderAssignedPlans({ profile: adminProfile }).rendered;
@@ -349,6 +510,8 @@ describe("AssignedWorkoutsView", () => {
     }
     expect(screen.getByText("Week of Oct 26 – Nov 1")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Edit Pierna" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Pierna" })).toBeInTheDocument();
+    expect(screen.getAllByText("Draft")).toHaveLength(2);
     expect(screen.getByText("No trainer")).toBeInTheDocument();
   });
 });

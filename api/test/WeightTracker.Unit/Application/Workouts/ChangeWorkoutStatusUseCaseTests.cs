@@ -25,6 +25,11 @@ public class ChangeWorkoutStatusUseCaseTests
     private readonly Mock<IWorkoutRepository> _workouts = new(MockBehavior.Strict);
     private readonly Mock<IUnitOfWork> _unitOfWork = new(MockBehavior.Strict);
 
+    private static readonly DateTime Now = new(2026, 11, 10, 7, 45, 0, DateTimeKind.Utc);
+    private readonly Mock<IClock> _clock = new();
+
+    public ChangeWorkoutStatusUseCaseTests() => _clock.Setup(clock => clock.UtcNow).Returns(Now);
+
     /// <summary>A stored workout prescribed by the trainer.</summary>
     private static Workout AStoredWorkoutIn(WorkoutStatus status)
         => Workout.Rehydrate(Id.New(), AthleteId, TrainerId, Name, null, WorkoutDate, status, []);
@@ -44,7 +49,7 @@ public class ChangeWorkoutStatusUseCaseTests
         _unitOfWork.VerifyNoOtherCalls();
     }
 
-    private ChangeWorkoutStatusUseCase AUseCase() => new(_workouts.Object, new WorkoutStatusAuthorizer(), _unitOfWork.Object);
+    private ChangeWorkoutStatusUseCase AUseCase() => new(_workouts.Object, new WorkoutStatusAuthorizer(), _unitOfWork.Object, _clock.Object);
 
     [Fact]
     public async Task Execute_ShouldChangeTheStatusSaveAndCommitOnce()
@@ -77,6 +82,38 @@ public class ChangeWorkoutStatusUseCaseTests
         // Assert
         updated.Status.Should().Be(WorkoutStatus.DRAFT);
         _unitOfWork.Verify(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldCompleteAtTheClockTime()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.STARTED);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await AUseCase().Execute(AthleteId, Role.USER, workout.Id, WorkoutStatus.COMPLETED, CancellationToken.None);
+
+        // Assert
+        updated.Status.Should().Be(WorkoutStatus.COMPLETED);
+        updated.CompletedAt.Should().Be(Now);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldLetAnAdminCompleteAtTheClockTime()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.DRAFT);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, WorkoutStatus.COMPLETED, CancellationToken.None);
+
+        // Assert
+        updated.Status.Should().Be(WorkoutStatus.COMPLETED);
+        updated.CompletedAt.Should().Be(Now);
     }
 
     [Fact]

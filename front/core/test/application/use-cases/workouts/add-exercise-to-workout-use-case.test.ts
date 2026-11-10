@@ -69,6 +69,11 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
+  async delete(): Promise<Result<void, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
   async addExercise(
     id: string,
     request: AddExerciseRequest,

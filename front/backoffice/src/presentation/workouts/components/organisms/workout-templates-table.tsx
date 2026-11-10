@@ -1,5 +1,6 @@
 "use client";
 
+import DeleteOutlined from "@mui/icons-material/DeleteOutlined";
 import EditOutlined from "@mui/icons-material/EditOutlined";
 import type { WorkoutTemplate } from "@weight-tracker/core/domain";
 import NextLink from "next/link";
@@ -17,6 +18,8 @@ interface WorkoutTemplatesTableProps {
   templates: WorkoutTemplate[];
   /** Whether the trainer column is rendered at all. */
   showTrainer: boolean;
+  /** Asks to delete this template; the table sends nothing itself. */
+  onDelete: (template: WorkoutTemplate) => void;
   /** The trainer's display name by id; a template only carries the id. */
   trainerNameOf: (trainerId: string) => string | null;
 }
@@ -26,6 +29,7 @@ export default function WorkoutTemplatesTable({
   templates,
   showTrainer,
   trainerNameOf,
+  onDelete,
 }: WorkoutTemplatesTableProps) {
   const { t } = useTranslation("workouts");
 
@@ -56,13 +60,19 @@ export default function WorkoutTemplatesTable({
                 </TableCell>
               )}
               <TableCell align="right">{template.exercises.length}</TableCell>
-              <TableCell align="right" padding="checkbox">
+              <TableCell align="right" padding="checkbox" sx={{ whiteSpace: "nowrap" }}>
                 <IconButton
                   component={NextLink}
                   href={`/workout-template?id=${encodeURIComponent(template.id)}`}
                   aria-label={t("workoutTemplates.edit", { name: template.name })}
                 >
                   <EditOutlined />
+                </IconButton>
+                <IconButton
+                  aria-label={t("workoutTemplates.delete", { name: template.name })}
+                  onClick={() => onDelete(template)}
+                >
+                  <DeleteOutlined />
                 </IconButton>
               </TableCell>
             </TableRow>

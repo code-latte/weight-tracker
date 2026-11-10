@@ -510,6 +510,7 @@ public class ExceptionMapperTests
         { new DuplicateMesocycleWeekException(WeekNumber.From(2), Id.New()), StatusCodes.Status409Conflict },
         { new MesocycleDurationTooShortException(3, WeekNumber.From(4), Id.New()), StatusCodes.Status409Conflict },
         { new WorkoutPlacementLockedException(Id.New(), WorkoutStatus.STARTED), StatusCodes.Status409Conflict },
+        { new WorkoutDeletionLockedException(Id.New(), WorkoutStatus.PUBLISHED), StatusCodes.Status409Conflict },
         { new IncompleteWorkoutPlacementException(Id.New()), StatusCodes.Status409Conflict },
     };
 

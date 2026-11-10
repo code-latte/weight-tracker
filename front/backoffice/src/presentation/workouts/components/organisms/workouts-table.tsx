@@ -1,8 +1,10 @@
 "use client";
 
+import DeleteOutlined from "@mui/icons-material/DeleteOutlined";
 import EditOutlined from "@mui/icons-material/EditOutlined";
 import type { WorkoutListItem } from "@weight-tracker/core/domain";
 import NextLink from "next/link";
+import Chip from "@/presentation/common/components/atoms/chip";
 import IconButton from "@/presentation/common/components/atoms/icon-button";
 import Table from "@/presentation/common/components/atoms/table";
 import TableBody from "@/presentation/common/components/atoms/table-body";
@@ -12,6 +14,7 @@ import TableHead from "@/presentation/common/components/atoms/table-head";
 import TableRow from "@/presentation/common/components/atoms/table-row";
 import Typography from "@/presentation/common/components/atoms/typography";
 import { fullNameOf } from "@/presentation/common/full-name";
+import { workoutStatusColorOf } from "@/presentation/common/workout-status";
 import useWeekLabel from "@/presentation/workouts/hooks/use-week-label";
 import { useTranslation } from "react-i18next";
 
@@ -19,6 +22,8 @@ interface WorkoutsTableProps {
   workouts: WorkoutListItem[];
   /** Whether the trainer column is rendered at all. */
   showTrainer: boolean;
+  /** Asks to delete this workout; the table sends nothing itself. */
+  onDelete: (workout: WorkoutListItem) => void;
 }
 
 /** The person's full name, or their email when they have no name. */
@@ -27,8 +32,9 @@ function displayNameOf(person: WorkoutListItem["athlete"]): string {
 }
 
 /** The workouts in the order the API returns them, one row each. */
-export default function WorkoutsTable({ workouts, showTrainer }: WorkoutsTableProps) {
+export default function WorkoutsTable({ workouts, showTrainer, onDelete }: WorkoutsTableProps) {
   const { t } = useTranslation("workouts");
+  const { t: tc } = useTranslation();
   const weekLabelOf = useWeekLabel();
 
   if (workouts.length === 0) {
@@ -51,7 +57,16 @@ export default function WorkoutsTable({ workouts, showTrainer }: WorkoutsTablePr
         <TableBody>
           {workouts.map((workout) => (
             <TableRow key={workout.id}>
-              <TableCell>{workout.name}</TableCell>
+              <TableCell>
+                {workout.name}
+                <Chip
+                  label={tc(`workoutStatus.${workout.status}`, { defaultValue: workout.status })}
+                  color={workoutStatusColorOf(workout.status)}
+                  size="small"
+                  variant="outlined"
+                  sx={{ ml: 1 }}
+                />
+              </TableCell>
               <TableCell>{weekLabelOf(workout.workoutDate)}</TableCell>
               <TableCell>{displayNameOf(workout.athlete)}</TableCell>
               {showTrainer && (
@@ -62,13 +77,19 @@ export default function WorkoutsTable({ workouts, showTrainer }: WorkoutsTablePr
                 </TableCell>
               )}
               <TableCell align="right">{workout.exercises.length}</TableCell>
-              <TableCell align="right" padding="checkbox">
+              <TableCell align="right" padding="checkbox" sx={{ whiteSpace: "nowrap" }}>
                 <IconButton
                   component={NextLink}
                   href={`/workout?id=${encodeURIComponent(workout.id)}`}
                   aria-label={t("assignedWorkouts.edit", { name: workout.name })}
                 >
                   <EditOutlined />
+                </IconButton>
+                <IconButton
+                  aria-label={t("assignedWorkouts.delete", { name: workout.name })}
+                  onClick={() => onDelete(workout)}
+                >
+                  <DeleteOutlined />
                 </IconButton>
               </TableCell>
             </TableRow>

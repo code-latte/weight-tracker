@@ -50,13 +50,14 @@ for an athlete whose profile is known to be complete, and when onboarding ends. 
 
 ### Requirement: Tapping a tab shows its screen
 
-Tapping a tab SHALL select it and show its screen: home for Inicio (`/`), and a screen headed "Entrenamientos"
-(`/workouts`), "Progreso" (`/progress`) or "Perfil" (`/profile`) for the other tabs.
+Tapping a tab SHALL select it and show its screen: home for Inicio (`/`), the workouts week view for Entrenamientos
+(`/workouts`, see `app-workouts-list`), and a screen headed "Progreso" (`/progress`) or "Perfil" (`/profile`) for the
+other tabs.
 
 #### Scenario: Open Entrenamientos
 
 - **WHEN** the athlete taps "Entrenamientos"
-- **THEN** the Entrenamientos tab is selected and the screen shows the heading "Entrenamientos"
+- **THEN** the Entrenamientos tab is selected and the screen shows the week-progress card of the current week
 
 #### Scenario: Open Progreso
 

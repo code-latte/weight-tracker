@@ -199,6 +199,13 @@ These rules decide who may perform an operation. They are permissions, so they l
   - The rule lives in a single Application service shared by every workout-editing use case; use cases must not
     restate it inline.
   - Recording sets is not an edit, so neither this rule nor the lock applies to it. It follows the recording rule below.
+- **Deleting a workout.** Deleting removes the workout permanently, with its exercises, sets and superseries.
+  - Who may delete is the editing permission above, checked through `WorkoutEditAuthorizer.EnsureCanModify`; anyone
+    else is rejected with `UnauthorizedOperationException` (403). `EnsureCanModify` checks permission only, so content
+    edits keep going through `EnsureCanEdit`.
+  - Only a `DRAFT` workout can be deleted, for every caller, an `ADMIN` included: the edit rule's admin bypass does
+    not apply. The aggregate enforces it with `WorkoutDeletionLockedException` (409). The permission check runs first,
+    so a caller who may not delete gets 403 and never learns the workout's status.
 - **Recording sets.** Adding, editing, removing and reordering the set records of a workout (the reps and weight
   actually performed) is allowed only to:
   - an `ADMIN`, always;
@@ -225,6 +232,9 @@ These rules decide who may perform an operation. They are permissions, so they l
   - the athlete of a workout without trainer may make every lifecycle move;
   - anyone else is rejected with `UnauthorizedOperationException` (403). A valid move the caller's role cannot make
     is 403; a move outside the lifecycle is 409.
+  - Every move to `COMPLETED`, through the lifecycle or an admin override, records the server time as `CompletedAt`,
+    overwriting any earlier completion. Other moves keep it, so leaving `COMPLETED` does not clear it. The caller
+    passes the time in; the aggregate never reads the clock.
 - **Reviewing a workout.** Marking a `COMPLETED` workout as `REVIEWED` is allowed only to:
   - an `ADMIN`;
   - the workout's prescribing trainer (`TrainerId`).

@@ -1233,6 +1233,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workouts/{workoutId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    workoutId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workouts/{workoutId}/superseries": {
         parameters: {
             query?: never;
@@ -5459,6 +5538,8 @@ export interface components {
             /** Format: int32 */
             mesocycleWeekNumber: null | number | string;
             /** Format: date-time */
+            completedAt: null | string;
+            /** Format: date-time */
             reviewedAt: null | string;
             /** Format: uuid */
             reviewedBy: null | string;
@@ -5484,6 +5565,8 @@ export interface components {
             mesocycleId: null | string;
             /** Format: int32 */
             mesocycleWeekNumber: null | number | string;
+            /** Format: date-time */
+            completedAt: null | string;
             /** Format: date-time */
             reviewedAt: null | string;
             /** Format: uuid */
@@ -5542,6 +5625,8 @@ export interface components {
             /** Format: int32 */
             mesocycleWeekNumber: null | number | string;
             /** Format: date-time */
+            completedAt: null | string;
+            /** Format: date-time */
             reviewedAt: null | string;
             /** Format: uuid */
             reviewedBy: null | string;
@@ -5565,6 +5650,8 @@ export interface components {
             mesocycleId: null | string;
             /** Format: int32 */
             mesocycleWeekNumber: null | number | string;
+            /** Format: date-time */
+            completedAt: null | string;
             /** Format: date-time */
             reviewedAt: null | string;
             /** Format: uuid */

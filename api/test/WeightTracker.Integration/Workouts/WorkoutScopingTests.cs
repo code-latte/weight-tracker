@@ -54,6 +54,23 @@ public class WorkoutScopingTests : WorkoutEndpointTest
         workout.GetProperty("status").GetString().Should().Be("REVIEWED");
         workout.GetProperty("reviewedBy").GetGuid().Should().Be(SeedData.AdminId);
         workout.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.String);
+        workout.GetProperty("completedAt").ValueKind.Should().Be(JsonValueKind.String);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldCarryTheCompletionDateOfACompletedWorkout()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "COMPLETED");
+        var completedAt = await CompletedAtOf(SeedData.TrainedWorkoutId);
+
+        // Act
+        var workout = await WorkoutVisibleTo(SeedCredentials.User, SeedData.TrainedWorkoutId);
+
+        // Assert
+        workout.GetProperty("status").GetString().Should().Be("COMPLETED");
+        completedAt.Should().NotBeNull();
+        workout.GetProperty("completedAt").GetDateTime().Should().Be(completedAt!.Value);
     }
 
     [Fact]
@@ -66,6 +83,7 @@ public class WorkoutScopingTests : WorkoutEndpointTest
         workout.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.Null);
         workout.GetProperty("reviewedBy").ValueKind.Should().Be(JsonValueKind.Null);
         workout.GetProperty("resultsUpdatedAt").ValueKind.Should().Be(JsonValueKind.Null);
+        workout.GetProperty("completedAt").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]

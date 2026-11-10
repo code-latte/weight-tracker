@@ -9,6 +9,7 @@ import {
   type WorkoutDetailsFormViolations,
 } from "@weight-tracker/core/application";
 import { useTranslation } from "react-i18next";
+import Alert from "@/presentation/common/components/atoms/alert";
 import Button from "@/presentation/common/components/atoms/button";
 import Card from "@/presentation/common/components/atoms/card";
 import CardContent from "@/presentation/common/components/atoms/card-content";
@@ -33,6 +34,10 @@ interface WorkoutDetailsCardProps {
   showWeek?: boolean;
   /** An action shown right before the save button, such as saving the workout as a template. */
   secondaryAction?: ReactNode;
+  /** An action shown right after the save button, such as publishing the workout. */
+  statusAction?: ReactNode;
+  /** The athlete started the workout: the fields are disabled and a notice replaces the save and status actions. */
+  locked?: boolean;
 }
 
 const maxLengthOf: Partial<Record<keyof WorkoutDetailsFormValues, number>> = {
@@ -56,6 +61,8 @@ export default function WorkoutDetailsCard({
   title,
   showWeek = true,
   secondaryAction,
+  statusAction,
+  locked = false,
 }: WorkoutDetailsCardProps) {
   const { t } = useTranslation("workouts");
 
@@ -65,7 +72,7 @@ export default function WorkoutDetailsCard({
     return {
       label: t(`createWorkout.fields.${name === "workoutDate" ? "date" : name}`),
       value: values[name],
-      disabled,
+      disabled: disabled || locked,
       onChange: (event: { target: { value: string } }) => onChange(name, event.target.value),
       error: Boolean(violation),
       helperText: violation
@@ -93,7 +100,7 @@ export default function WorkoutDetailsCard({
               <WeekField
                 value={values.workoutDate}
                 onChange={(monday) => onChange("workoutDate", monday)}
-                disabled={disabled || weekLocked}
+                disabled={disabled || weekLocked || locked}
                 error={
                   errors.workoutDate
                     ? t(`createWorkout.validation.${errors.workoutDate}`)
@@ -103,11 +110,20 @@ export default function WorkoutDetailsCard({
             )}
           </Box>
           <TextField {...field("description")} multiline minRows={2} />
-          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
             {secondaryAction}
-            <Button variant="contained" disabled={saving} onClick={onSave}>
-              {t("workout.details.save")}
-            </Button>
+            {locked ? (
+              <Alert severity="info" sx={{ py: 0 }}>
+                {t("workout.status.locked")}
+              </Alert>
+            ) : (
+              <>
+                <Button variant="contained" disabled={saving} onClick={onSave}>
+                  {t("workout.details.save")}
+                </Button>
+                {statusAction}
+              </>
+            )}
           </Box>
         </Box>
       </CardContent>

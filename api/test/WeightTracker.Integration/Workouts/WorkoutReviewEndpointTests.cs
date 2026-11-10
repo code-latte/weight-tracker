@@ -52,6 +52,7 @@ public class WorkoutReviewEndpointTests : WorkoutEndpointTest
         await GivenCompletedByTheAthlete();
         var trainer = await AuthenticatedClientFor(SeedCredentials.Trainer);
         var resultsUpdatedAt = await ResultsUpdatedAtOf(PrescribedWorkoutId);
+        var completedAt = await CompletedAtOf(PrescribedWorkoutId);
 
         // Act
         var response = await PutReview(trainer, PrescribedWorkoutId, resultsUpdatedAt);
@@ -65,6 +66,8 @@ public class WorkoutReviewEndpointTests : WorkoutEndpointTest
         stored.GetProperty("status").GetString().Should().Be("REVIEWED");
         stored.GetProperty("reviewedBy").GetGuid().Should().Be(SeedData.TrainerId);
         stored.GetProperty("reviewedAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        completedAt.Should().NotBeNull();
+        stored.GetProperty("completedAt").GetDateTime().Should().Be(completedAt!.Value);
     }
 
     [Fact]

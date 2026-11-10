@@ -31,6 +31,7 @@ const workoutDetail: WorkoutDetail = {
   status: "STARTED",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  completedAt: null,
   reviewedAt: null,
   reviewedBy: null,
   resultsUpdatedAt: "2026-11-02T10:15:00Z",
@@ -78,6 +79,11 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
   }
 
   async update(): Promise<Result<Workout, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async delete(): Promise<Result<void, DomainError>> {
     this.otherCalls += 1;
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }

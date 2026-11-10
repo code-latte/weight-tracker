@@ -83,12 +83,28 @@ public class WorkoutRepository : IWorkoutRepository
         tracked.ReviewedAtUtc = entity.ReviewedAtUtc;
         tracked.ReviewedBy = entity.ReviewedBy;
         tracked.ResultsUpdatedAtUtc = entity.ResultsUpdatedAtUtc;
+        tracked.CompletedAtUtc = entity.CompletedAtUtc;
 
         // Compare against the version the caller decided on, not the one just re-read
         if (_loadedVersions.TryGetValue(tracked.Id, out var loadedVersion))
             _context.Entry(tracked).Property(stored => stored.Version).OriginalValue = loadedVersion;
 
         Reconcile(tracked, entity);
+    }
+
+    public async Task Delete(Workout workout, CancellationToken cancellationToken)
+    {
+        var tracked = await WithAggregateTables(_context.Workouts)
+            .FirstOrDefaultAsync(stored => stored.Id == workout.Id.Value, cancellationToken);
+
+        if (tracked is null)
+            return;
+
+        // Compare against the version the caller decided on, not the one just re-read
+        if (_loadedVersions.TryGetValue(tracked.Id, out var loadedVersion))
+            _context.Entry(tracked).Property(stored => stored.Version).OriginalValue = loadedVersion;
+
+        _context.Workouts.Remove(tracked);
     }
 
     /// <summary>

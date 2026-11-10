@@ -9,7 +9,12 @@ import {
   type WorkoutDetailsFormValues,
   type WorkoutDetailsFormViolations,
 } from "@weight-tracker/core/application";
-import type { Exercise, UpdateWorkoutInput, WorkoutById } from "@weight-tracker/core/domain";
+import type {
+  Exercise,
+  UpdateWorkoutInput,
+  WorkoutById,
+  WorkoutStatus,
+} from "@weight-tracker/core/domain";
 import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -25,11 +30,13 @@ import HomeSkeleton from "@/presentation/common/components/molecules/home-skelet
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import AppShell from "@/presentation/common/components/organisms/app-shell";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
+import ChangeWorkoutStatusDialog from "@/presentation/workouts/components/organisms/change-workout-status-dialog";
 import WorkoutDetailsCard from "@/presentation/workouts/components/organisms/workout-details-card";
 import WorkoutContextStrip, {
   type WorkoutContextMesocycle,
 } from "@/presentation/workouts/components/organisms/workout-context-strip";
 import WorkoutExercisesEditor from "@/presentation/workouts/components/organisms/workout-exercises-editor";
+import useChangeWorkoutStatus from "@/presentation/workouts/hooks/use-change-workout-status";
 import useExerciseFavorites, {
   type ExerciseFavoritesState,
 } from "@/presentation/workouts/hooks/use-exercise-favorites";
@@ -141,6 +148,17 @@ function toUpdate(workout: WorkoutById, values: WorkoutDetailsFormValues): Updat
   return input;
 }
 
+/** The status a workout can move to from the backoffice, or `null` once the athlete started it and it is locked. */
+function statusTargetOf(status: WorkoutById["status"]): "PUBLISHED" | "DRAFT" | null {
+  if (status === "DRAFT") {
+    return "PUBLISHED";
+  }
+  if (status === "PUBLISHED") {
+    return "DRAFT";
+  }
+  return null;
+}
+
 /** The editor once both reads are in: it owns the workout's form, its save, the exercises and the open dialog. */
 function LoadedWorkout({
   workout,
@@ -172,11 +190,27 @@ function LoadedWorkout({
     values.workoutDate !== storedValues.workoutDate;
   const [errors, setErrors] = useState<WorkoutDetailsFormViolations>({});
   const editor = useExercisesEditor("workout", workout.id, workout.exercises, exercises);
+  const statusChange = useChangeWorkoutStatus();
+  const [status, setStatus] = useState(workout.status);
+  const [confirming, setConfirming] = useState(false);
+  // The change the dialog asks about: kept while it closes, so its copy does not follow the new status.
+  const [dialogTarget, setDialogTarget] = useState<"PUBLISHED" | "DRAFT" | null>(null);
+  const statusTarget = statusTargetOf(status);
 
   function handleChange(field: keyof WorkoutDetailsFormValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
     clearSaved();
     asTemplate.clear();
+    statusChange.clear();
+  }
+
+  async function handleStatusChange(target: WorkoutStatus) {
+    clearSaved();
+    const changed = await statusChange.change(workout.id, target);
+    setConfirming(false);
+    if (changed) {
+      setStatus(changed);
+    }
   }
 
   async function handleSave() {
@@ -186,6 +220,7 @@ function LoadedWorkout({
       return;
     }
 
+    statusChange.clear();
     if (await save(toUpdate(workout, values))) {
       setStoredValues(values);
     }
@@ -204,6 +239,20 @@ function LoadedWorkout({
         </Button>
       </span>
     </Tooltip>
+  );
+
+  const statusAction = statusTarget && (
+    <Button
+      variant={statusTarget === "PUBLISHED" ? "contained" : "outlined"}
+      color="secondary"
+      disabled={saving || statusChange.changing}
+      onClick={() => {
+        setDialogTarget(statusTarget);
+        setConfirming(true);
+      }}
+    >
+      {t(statusTarget === "PUBLISHED" ? "workout.status.publish" : "workout.status.backToDraft")}
+    </Button>
   );
 
   return (
@@ -229,6 +278,20 @@ function LoadedWorkout({
       {saved && (
         <Alert severity="success" sx={{ mb: 3 }}>
           {t("workout.details.saved")}
+        </Alert>
+      )}
+      {statusChange.errorCode && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {tc(`errors:${statusChange.errorCode}`)}
+        </Alert>
+      )}
+      {statusChange.changed && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {t(
+            statusChange.changed === "PUBLISHED"
+              ? "workout.status.published"
+              : "workout.status.movedToDraft",
+          )}
         </Alert>
       )}
       {asTemplate.errorCode && (
@@ -259,12 +322,14 @@ function LoadedWorkout({
           <WorkoutDetailsCard
             values={values}
             errors={errors}
-            saving={saving}
+            saving={saving || statusChange.changing}
             onSave={() => void handleSave()}
             disabled={saving}
             weekLocked={Boolean(workout.mesocycleId)}
             onChange={handleChange}
             secondaryAction={saveAsTemplate}
+            statusAction={statusAction}
+            locked={statusTarget === null}
             titleId={propertiesTitleId}
           />
         </Box>
@@ -275,6 +340,15 @@ function LoadedWorkout({
           titleId={exercisesTitleId}
         />
       </Box>
+      {dialogTarget && (
+        <ChangeWorkoutStatusDialog
+          open={confirming}
+          target={dialogTarget}
+          pending={statusChange.changing}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => void handleStatusChange(dialogTarget)}
+        />
+      )}
     </>
   );
 }

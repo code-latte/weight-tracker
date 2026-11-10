@@ -1,0 +1,23 @@
+{
+  "week": {
+    "current": "Esta semana",
+    "next": "Próxima semana",
+    "previous": "Semana anterior",
+    "following": "Semana siguiente"
+  },
+  "progress": "{{completed}} / {{total}}",
+  "author": {
+    "me": "Creado por mí"
+  },
+  "day": {
+    "pending": "--"
+  },
+  "empty": "No tienes entrenamientos esta semana",
+  "status": {
+    "completed": "Completado",
+    "reviewed": "Revisado",
+    "started": "En curso",
+    "pending": "Pendiente"
+  },
+  "retry": "Reintentar"
+}

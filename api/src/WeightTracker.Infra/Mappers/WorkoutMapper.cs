@@ -28,6 +28,7 @@ public static class WorkoutMapper
             ReviewedAtUtc = workout.ReviewedAt,
             ReviewedBy = workout.ReviewedBy?.Value,
             ResultsUpdatedAtUtc = workout.ResultsUpdatedAt,
+            CompletedAtUtc = workout.CompletedAt,
         };
 
         var exercisePosition = 0;
@@ -129,7 +130,8 @@ public static class WorkoutMapper
                 entity.MesocycleWeekNumber is null ? null : WeekNumber.From(entity.MesocycleWeekNumber.Value),
                 entity.ReviewedAtUtc,
                 entity.ReviewedBy is null ? null : Id.From(entity.ReviewedBy.Value),
-                entity.ResultsUpdatedAtUtc);
+                entity.ResultsUpdatedAtUtc,
+                entity.CompletedAtUtc);
         }
         catch (DomainException exception)
         {

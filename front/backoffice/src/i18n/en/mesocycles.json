@@ -76,7 +76,8 @@
       "name": "Name",
       "exercises": "Exercises"
     },
-    "editWorkout": "Edit {{name}}"
+    "editWorkout": "Edit {{name}}",
+    "deleteWorkout": "Delete {{name}}"
   },
   "trainingWeekType": {
     "ADAPTATION": "Adaptation",

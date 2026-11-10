@@ -29,6 +29,7 @@ export type {
   CreateSuperSeriesInput,
   CreateSuperSeriesRequest,
   CreateWorkoutRequest,
+  DeleteWorkoutInput,
   GetWorkoutByIdInput,
   GetWorkoutsInput,
   RemoveExerciseFromWorkoutInput,

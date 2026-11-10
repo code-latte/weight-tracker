@@ -193,7 +193,7 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var stored = await Read(Id.From(SeedData.OwnedWorkoutId));
-        stored!.ChangeStatus(WorkoutStatus.PUBLISHED);
+        stored!.ChangeStatus(WorkoutStatus.PUBLISHED, RecordedAt);
 
         await Write(repository => repository.Save(stored, CancellationToken.None));
 
@@ -651,8 +651,8 @@ public class WorkoutRepositoryTests : IntegrationTest
         foreach (var exerciseId in exerciseIds)
             workout.AddExercise(exerciseId, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))]);
 
-        workout.ChangeStatus(WorkoutStatus.PUBLISHED);
-        workout.ChangeStatus(WorkoutStatus.STARTED);
+        workout.ChangeStatus(WorkoutStatus.PUBLISHED, RecordedAt);
+        workout.ChangeStatus(WorkoutStatus.STARTED, RecordedAt);
 
         return workout;
     }
@@ -846,17 +846,38 @@ public class WorkoutRepositoryTests : IntegrationTest
 
     private static readonly DateTime ReviewedAt = new(2026, 11, 8, 9, 0, 0, DateTimeKind.Utc);
 
-    /// <summary>A workout prescribed by the seeded trainer, completed with one set record registered at <see cref="RecordedAt"/>.</summary>
+    private static readonly DateTime CompletedAt = new(2026, 11, 7, 11, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>A workout prescribed by the seeded trainer, completed at <see cref="CompletedAt"/> with one set record registered at <see cref="RecordedAt"/>.</summary>
     private static Workout ACompletedPrescribedWorkout()
     {
         var workout = Workout.Create(Id.From(SeedData.UserId), Id.From(SeedData.TrainerId), Name, null, new DateTime(2026, 11, 7));
         workout.AddExercise(PressBanca, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))]);
-        workout.ChangeStatus(WorkoutStatus.PUBLISHED);
-        workout.ChangeStatus(WorkoutStatus.STARTED);
+        workout.ChangeStatus(WorkoutStatus.PUBLISHED, RecordedAt);
+        workout.ChangeStatus(WorkoutStatus.STARTED, RecordedAt);
         workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
-        workout.ChangeStatus(WorkoutStatus.COMPLETED);
+        workout.ChangeStatus(WorkoutStatus.COMPLETED, CompletedAt);
 
         return workout;
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistTheCompletionTimeOfAStoredAggregate()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.ChangeStatus(WorkoutStatus.COMPLETED, CompletedAt);
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        stored!.Status.Should().Be(WorkoutStatus.COMPLETED);
+        stored.CompletedAt.Should().Be(CompletedAt);
     }
 
     [Fact]
@@ -878,6 +899,7 @@ public class WorkoutRepositoryTests : IntegrationTest
         stored.ReviewedAt.Should().Be(ReviewedAt);
         stored.ReviewedBy.Should().Be(Id.From(SeedData.TrainerId));
         stored.ResultsUpdatedAt.Should().Be(RecordedAt);
+        stored.CompletedAt.Should().Be(CompletedAt);
     }
 
     [Fact]
@@ -950,5 +972,81 @@ public class WorkoutRepositoryTests : IntegrationTest
         var stored = await Read(workout.Id);
         stored!.Status.Should().Be(WorkoutStatus.COMPLETED);
         EntryFor(stored, PressBanca).SetRecords.Single().Reps.Value.Should().Be(10);
+    }
+
+    private static Workout ADraftWorkoutWith(params Id[] exerciseIds)
+    {
+        var workout = Workout.Create(
+            Id.From(SeedData.UserId), Id.From(SeedData.TrainerId), Name, null, new DateTime(2026, 11, 12));
+        foreach (var exerciseId in exerciseIds)
+            workout.AddExercise(exerciseId, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))]);
+
+        return workout;
+    }
+
+    [Fact]
+    public async Task Delete_ShouldRemoveTheWorkoutAcrossItsTables()
+    {
+        // Arrange
+        var workout = ADraftWorkoutWith(PressBanca, Sentadilla, Plancha);
+        workout.CreateSuperSeries([EntryFor(workout, PressBanca).Id, EntryFor(workout, Sentadilla).Id]);
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+        var entryIds = workout.Exercises.Select(entry => entry.Id.Value).ToList();
+        var stored = await Read(workout.Id);
+
+        // Act
+        await Write(repository => repository.Delete(stored!, CancellationToken.None));
+
+        // Assert
+        (await Read(workout.Id)).Should().BeNull();
+        (await Factory.CountRows<WorkoutExerciseEntity>(row => row.WorkoutId == workout.Id.Value)).Should().Be(0);
+        (await Factory.CountRows<WorkoutExerciseSetEntity>(row => entryIds.Contains(row.WorkoutExerciseId)))
+            .Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Delete_ShouldLeaveOtherWorkoutsUntouched()
+    {
+        // Arrange
+        var deleted = ADraftWorkoutWith(PressBanca);
+        var kept = ADraftWorkoutWith(PressBanca);
+        await Write(repository => repository.Save(deleted, CancellationToken.None));
+        await Write(repository => repository.Save(kept, CancellationToken.None));
+        var stored = await Read(deleted.Id);
+
+        // Act
+        await Write(repository => repository.Delete(stored!, CancellationToken.None));
+
+        // Assert
+        var survivor = await Read(kept.Id);
+        survivor.Should().NotBeNull();
+        EntryFor(survivor!, PressBanca).Sets.Should().Equal(new SetPrescription(3, new SetTarget.Reps(10)));
+    }
+
+    [Fact]
+    public async Task SaveChanges_ShouldRefuseDeletingAWorkoutThatChangedAfterItWasRead()
+    {
+        // Arrange
+        var workout = ADraftWorkoutWith(PressBanca);
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        using var deleteScope = Factory.Services.CreateScope();
+        var deleteRepository = deleteScope.ServiceProvider.GetRequiredService<IWorkoutRepository>();
+        var toDelete = await deleteRepository.GetById(workout.Id, CancellationToken.None);
+
+        var published = await Read(workout.Id);
+        published!.ChangeStatus(WorkoutStatus.PUBLISHED, new DateTime(2026, 11, 10, 9, 0, 0, DateTimeKind.Utc));
+        await Write(repository => repository.Save(published, CancellationToken.None));
+
+        await deleteRepository.Delete(toDelete!, CancellationToken.None);
+
+        // Act
+        var act = () => deleteScope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<WorkoutConcurrencyConflictException>();
+        var stored = await Read(workout.Id);
+        stored.Should().NotBeNull();
+        stored!.Status.Should().Be(WorkoutStatus.PUBLISHED);
     }
 }

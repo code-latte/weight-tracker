@@ -701,9 +701,39 @@ public class WorkoutTests
         act.Should().Throw<SuperSeriesSetCountMismatchException>();
     }
 
-    private static Workout AWorkoutIn(WorkoutStatus status, Id? trainerId = null)
+    [Fact]
+    public void EnsureCanBeDeleted_ShouldAcceptADraft()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.DRAFT);
+
+        // Act
+        var act = () => workout.EnsureCanBeDeleted();
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void EnsureCanBeDeleted_ShouldRejectAWorkoutThatIsNoLongerADraft(WorkoutStatus status)
+    {
+        // Arrange
+        var workout = AWorkoutIn(status);
+
+        // Act
+        var act = () => workout.EnsureCanBeDeleted();
+
+        // Assert
+        act.Should().Throw<WorkoutDeletionLockedException>();
+    }
+
+    private static Workout AWorkoutIn(WorkoutStatus status, Id? trainerId = null, DateTime? completedAt = null)
         => Workout.Rehydrate(Id.New(), Id.New(), trainerId, Name, null, WorkoutDate, status, [],
-            reviewedAt: ReviewedAtFor(status), reviewedBy: ReviewerFor(status));
+            reviewedAt: ReviewedAtFor(status), reviewedBy: ReviewerFor(status), completedAt: completedAt);
 
     // A reviewed workout always carries its review metadata, so the factories add it for that status only
     private static DateTime? ReviewedAtFor(WorkoutStatus status) => status == WorkoutStatus.REVIEWED ? WorkoutDate : null;
@@ -751,7 +781,7 @@ public class WorkoutTests
         var workout = AWorkoutIn(from);
 
         // Act
-        workout.ChangeStatus(to);
+        workout.ChangeStatus(to, ChangedAt);
 
         // Assert
         workout.Status.Should().Be(to);
@@ -780,7 +810,7 @@ public class WorkoutTests
         var workout = AWorkoutIn(from);
 
         // Act
-        var act = () => workout.ChangeStatus(to);
+        var act = () => workout.ChangeStatus(to, ChangedAt);
 
         // Assert
         act.Should().Throw<InvalidWorkoutStatusTransitionException>();
@@ -794,7 +824,7 @@ public class WorkoutTests
         var workout = AWorkoutIn(WorkoutStatus.DRAFT);
 
         // Act
-        var act = () => workout.ChangeStatus((WorkoutStatus)99);
+        var act = () => workout.ChangeStatus((WorkoutStatus)99, ChangedAt);
 
         // Assert
         act.Should().Throw<InvalidWorkoutStatusException>();
@@ -811,7 +841,7 @@ public class WorkoutTests
         var workout = AWorkoutIn(from);
 
         // Act
-        workout.OverrideStatus(to);
+        workout.OverrideStatus(to, ChangedAt);
 
         // Assert
         workout.Status.Should().Be(to);
@@ -829,7 +859,7 @@ public class WorkoutTests
         var workout = AWorkoutIn(from, Id.New());
 
         // Act
-        var act = () => workout.OverrideStatus(to);
+        var act = () => workout.OverrideStatus(to, ChangedAt);
 
         // Assert
         act.Should().Throw<InvalidWorkoutStatusTransitionException>();
@@ -843,11 +873,123 @@ public class WorkoutTests
         var workout = AWorkoutIn(WorkoutStatus.PUBLISHED);
 
         // Act
-        var act = () => workout.OverrideStatus((WorkoutStatus)99);
+        var act = () => workout.OverrideStatus((WorkoutStatus)99, ChangedAt);
 
         // Assert
         act.Should().Throw<InvalidWorkoutStatusException>();
         workout.Status.Should().Be(WorkoutStatus.PUBLISHED);
+    }
+
+    private static readonly DateTime ChangedAt = new(2026, 11, 10, 7, 45, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void ChangeStatus_ShouldRecordWhenTheWorkoutIsCompleted()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.STARTED);
+
+        // Act
+        workout.ChangeStatus(WorkoutStatus.COMPLETED, ChangedAt);
+
+        // Assert
+        workout.CompletedAt.Should().Be(ChangedAt);
+    }
+
+    [Fact]
+    public void ChangeStatus_ShouldTruncateTheCompletionTimeToTheStoredPrecision()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.STARTED);
+
+        // Act
+        workout.ChangeStatus(WorkoutStatus.COMPLETED, ChangedAt.AddTicks(7));
+
+        // Assert
+        workout.CompletedAt.Should().Be(ChangedAt);
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.STARTED)]
+    public void ChangeStatus_ShouldKeepTheCompletionDateWhenNotCompleting(WorkoutStatus from, WorkoutStatus to)
+    {
+        // Arrange
+        var workout = AWorkoutIn(from, completedAt: WorkoutDate);
+
+        // Act
+        workout.ChangeStatus(to, ChangedAt);
+
+        // Assert
+        workout.CompletedAt.Should().Be(WorkoutDate);
+    }
+
+    [Fact]
+    public void ChangeStatus_ShouldKeepTheCompletionDateWhenTheMoveIsRefused()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.COMPLETED, completedAt: WorkoutDate);
+
+        // Act
+        var act = () => workout.ChangeStatus(WorkoutStatus.STARTED, ChangedAt);
+
+        // Assert
+        act.Should().Throw<InvalidWorkoutStatusTransitionException>();
+        workout.CompletedAt.Should().Be(WorkoutDate);
+    }
+
+    [Fact]
+    public void OverrideStatus_ShouldRecordWhenTheWorkoutIsCompleted()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.DRAFT);
+
+        // Act
+        workout.OverrideStatus(WorkoutStatus.COMPLETED, ChangedAt);
+
+        // Assert
+        workout.CompletedAt.Should().Be(ChangedAt);
+    }
+
+    [Fact]
+    public void OverrideStatus_ShouldKeepTheCompletionDateWhenLeavingCompleted()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.COMPLETED, completedAt: WorkoutDate);
+
+        // Act
+        workout.OverrideStatus(WorkoutStatus.DRAFT, ChangedAt);
+
+        // Assert
+        workout.Status.Should().Be(WorkoutStatus.DRAFT);
+        workout.CompletedAt.Should().Be(WorkoutDate);
+    }
+
+    [Fact]
+    public void OverrideStatus_ShouldOverwriteTheCompletionDateWhenCompletingAgain()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.COMPLETED, completedAt: WorkoutDate);
+
+        // Act
+        workout.OverrideStatus(WorkoutStatus.COMPLETED, ChangedAt);
+
+        // Assert
+        workout.CompletedAt.Should().Be(ChangedAt);
+    }
+
+    [Fact]
+    public void OverrideStatus_ShouldKeepTheCompletionDateWhenRefused()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.REVIEWED, Id.New(), completedAt: WorkoutDate);
+
+        // Act
+        var act = () => workout.OverrideStatus(WorkoutStatus.COMPLETED, ChangedAt);
+
+        // Assert
+        act.Should().Throw<InvalidWorkoutStatusTransitionException>();
+        workout.CompletedAt.Should().Be(WorkoutDate);
     }
 
     [Theory]
@@ -2168,9 +2310,9 @@ public class WorkoutTests
     private static readonly DateTime ReviewedAt = new(2026, 11, 8, 9, 0, 0, DateTimeKind.Utc);
 
     /// <summary>A completed workout prescribed by <paramref name="trainerId"/>, whose results last changed at <paramref name="resultsUpdatedAt"/>.</summary>
-    private static Workout ACompletedWorkout(Id? trainerId, DateTime? resultsUpdatedAt = null)
+    private static Workout ACompletedWorkout(Id? trainerId, DateTime? resultsUpdatedAt = null, DateTime? completedAt = null)
         => Workout.Rehydrate(Id.New(), Id.New(), trainerId, Name, null, WorkoutDate, WorkoutStatus.COMPLETED, [],
-            resultsUpdatedAt: resultsUpdatedAt);
+            resultsUpdatedAt: resultsUpdatedAt, completedAt: completedAt);
 
     [Fact]
     public void MarkReviewed_ShouldReviewACompletedPrescribedWorkoutAndRecordWhoAndWhen()
@@ -2457,6 +2599,52 @@ public class WorkoutTests
         workout.ReviewedAt.Should().BeNull();
         workout.ReviewedBy.Should().BeNull();
         workout.ResultsUpdatedAt.Should().BeNull();
+        workout.CompletedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void CreateFromTemplate_ShouldStartWithoutCompletionDate()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var template = ATemplateWithASuperSeries(trainerId);
+
+        // Act
+        var workout = Workout.CreateFromTemplate(template, Id.New(), WorkoutDate);
+
+        // Assert
+        workout.CompletedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void MarkReviewed_ShouldKeepTheCompletionDate()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var workout = ACompletedWorkout(trainerId, completedAt: WorkoutDate);
+
+        // Act
+        workout.MarkReviewed(trainerId, ReviewedAt, null);
+
+        // Assert
+        workout.CompletedAt.Should().Be(WorkoutDate);
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.COMPLETED, false)]
+    [InlineData(WorkoutStatus.COMPLETED, true)]
+    [InlineData(WorkoutStatus.DRAFT, true)]
+    public void Rehydrate_ShouldRestoreTheCompletionDateWhateverTheStatus(WorkoutStatus status, bool withCompletedAt)
+    {
+        // Arrange
+        DateTime? completedAt = withCompletedAt ? WorkoutDate : null;
+
+        // Act
+        var workout = AWorkoutIn(status, completedAt: completedAt);
+
+        // Assert
+        workout.Status.Should().Be(status);
+        workout.CompletedAt.Should().Be(completedAt);
     }
 
     [Theory]

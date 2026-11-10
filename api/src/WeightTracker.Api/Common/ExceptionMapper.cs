@@ -106,6 +106,7 @@ public class ExceptionMapper
                 or ExerciseNotUsableInWorkoutException or MesocycleTrainerIsAthleteException
                 or MesocycleWeekOutOfRangeException or DuplicateMesocycleWeekException
                 or MesocycleDurationTooShortException or WorkoutPlacementLockedException
+                or WorkoutDeletionLockedException
                 or IncompleteWorkoutPlacementException or MesocycleAthleteMismatchException
                 or MesocycleTrainerMismatchException or MesocycleWeekHasWorkoutsException
                 or WorkoutResultsLockedException or SetRecordNotAllowedForTargetException

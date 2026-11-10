@@ -11,6 +11,7 @@
     },
     "empty": "No workouts yet.",
     "edit": "Edit {{name}}",
+    "delete": "Delete {{name}}",
     "noTrainer": "No trainer"
   },
   "createWorkout": {
@@ -87,6 +88,24 @@
     "details": {
       "save": "Save",
       "saved": "Workout saved."
+    },
+    "status": {
+      "publish": "Publish",
+      "backToDraft": "Back to draft",
+      "published": "Workout published.",
+      "movedToDraft": "Workout moved back to draft.",
+      "locked": "The athlete started this workout and you cannot edit it",
+      "cancel": "Cancel",
+      "publishConfirm": {
+        "title": "Publish the workout?",
+        "body": "The athlete will be able to see it and start it.",
+        "confirm": "Publish"
+      },
+      "backToDraftConfirm": {
+        "title": "Move back to draft?",
+        "body": "The athlete will no longer see it until you publish it again.",
+        "confirm": "Back to draft"
+      }
     },
     "exercises": {
       "empty": "This workout has no exercises yet.",
@@ -271,6 +290,7 @@
       "trainer": "Trainer"
     },
     "edit": "Edit {{name}}",
+    "delete": "Delete {{name}}",
     "empty": "No workout templates yet.",
     "unknownTrainer": "—"
   },

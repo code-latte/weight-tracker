@@ -248,4 +248,93 @@ public class WorkoutEditAuthorizerTests
         // Assert
         act.Should().NotThrow();
     }
+
+    [Theory]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void EnsureCanModify_ShouldAllowAnAdminWhateverTheStatus(WorkoutStatus status)
+    {
+        // Arrange
+        var workout = AWorkoutIn(status, TrainerId);
+
+        // Act
+        var act = () => _authorizer.EnsureCanModify(workout, Id.New(), Role.ADMIN, Operation);
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.REVIEWED)]
+    public void EnsureCanModify_ShouldAllowThePrescribingTrainerWhateverTheStatus(WorkoutStatus status)
+    {
+        // Arrange
+        var workout = AWorkoutIn(status, TrainerId);
+
+        // Act
+        var act = () => _authorizer.EnsureCanModify(workout, TrainerId, Role.TRAINER, Operation);
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.STARTED)]
+    [InlineData(WorkoutStatus.COMPLETED)]
+    public void EnsureCanModify_ShouldAllowTheOwnerOfASelfCreatedWorkoutWhateverTheStatus(WorkoutStatus status)
+    {
+        // Arrange
+        var workout = AWorkoutIn(status, null);
+
+        // Act
+        var act = () => _authorizer.EnsureCanModify(workout, OwnerId, Role.USER, Operation);
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureCanModify_ShouldRejectTheOwnerOfAPrescribedWorkout()
+    {
+        // Arrange
+        var workout = APrescribedWorkout();
+
+        // Act
+        var act = () => _authorizer.EnsureCanModify(workout, OwnerId, Role.USER, Operation);
+
+        // Assert
+        act.Should().Throw<UnauthorizedOperationException>();
+    }
+
+    [Fact]
+    public void EnsureCanModify_ShouldRejectAnotherTrainerOnAPrescribedWorkout()
+    {
+        // Arrange
+        var workout = APrescribedWorkout();
+
+        // Act
+        var act = () => _authorizer.EnsureCanModify(workout, Id.New(), Role.TRAINER, Operation);
+
+        // Assert
+        act.Should().Throw<UnauthorizedOperationException>();
+    }
+
+    [Fact]
+    public void EnsureCanModify_ShouldRejectAUserWhoDoesNotOwnASelfCreatedWorkout()
+    {
+        // Arrange
+        var workout = ASelfCreatedWorkout();
+
+        // Act
+        var act = () => _authorizer.EnsureCanModify(workout, Id.New(), Role.USER, Operation);
+
+        // Assert
+        act.Should().Throw<UnauthorizedOperationException>();
+    }
 }

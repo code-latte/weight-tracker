@@ -30,6 +30,7 @@ const workout: Workout = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  completedAt: null,
   reviewedAt: null,
   reviewedBy: null,
   resultsUpdatedAt: null,
@@ -528,6 +529,59 @@ describe("WorkoutRepository", () => {
 
       // Act
       const result = await repository.update(workout.id, updateRequest);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("delete", () => {
+    it("deletes /workouts/{id} without a body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => undefined);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.delete(workout.id);
+
+      // Assert
+      expect(httpClient.requests).toEqual([{ method: "DELETE", path: `/workouts/${workout.id}` }]);
+    });
+
+    it("returns an empty success when the API answers 204", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => undefined));
+
+      // Act
+      const result = await repository.delete(workout.id);
+
+      // Assert
+      expect(result).toEqual(ok(undefined));
+    });
+
+    it.each([
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [409, "CONFLICT"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.delete(workout.id);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.delete(workout.id);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

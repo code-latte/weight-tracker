@@ -146,6 +146,8 @@ interface SentRequests {
   groupings: unknown[];
   /** The paths of the `DELETE /workouts/{id}/superseries/{superSeriesId}` requests. */
   breaks: string[];
+  /** The bodies of the `PUT /workouts/{id}/status` requests. */
+  statusChanges: unknown[];
 }
 
 interface SentNewExercise {
@@ -199,7 +201,8 @@ function entryOf(
  * Intercepts the workout and catalog endpoints. A `POST /workouts` stores what it receives as a new workout, a
  * `PUT /workouts/{id}` replaces that workout's data, a `POST` or `PUT` under `/workouts/{id}/exercises` adds or
  * replaces an exercise, a `PUT /workouts/{id}/exercises/order` reorders them, and `POST` and `DELETE` under
- * `/workouts/{id}/superseries` group and ungroup them. Resolves to the bodies of the exercise requests.
+ * `/workouts/{id}/superseries` group and ungroup them, and a `PUT /workouts/{id}/status` stores the status it receives.
+ * Resolves to the bodies of the exercise requests.
  */
 async function mockWorkoutsApi(
   page: Page,
@@ -219,6 +222,7 @@ async function mockWorkoutsApi(
     creations: [],
     groupings: [],
     breaks: [],
+    statusChanges: [],
   };
   // The catalog the API holds: creating an exercise adds one, owned by the signed-in user.
   const stored = [...exercises];
@@ -281,6 +285,22 @@ async function mockWorkoutsApi(
     }
     // The read by id carries the athlete and the trainer, as the list does.
     return route.fulfill(json({ ...workout, athlete, trainer: null }));
+  });
+  await page.route(`${api}/workouts/*/status`, (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    const workoutId = new URL(request.url()).pathname.split("/")[2] ?? "";
+    const workout = workouts.get(workoutId);
+    if (!workout) {
+      return route.fulfill(json({ status: 404 }, 404));
+    }
+    const body = request.postDataJSON() as { status: string };
+    sent.statusChanges.push(body);
+    const changed = { ...workout, status: body.status };
+    workouts.set(workoutId, changed);
+    return route.fulfill(json(changed));
   });
   await page.route(`${api}/workouts/*/exercises`, (route) => {
     const request = route.request();
@@ -578,6 +598,34 @@ test("saves a workout's data and shows it after a reload", async ({ page }) => {
   await expect(page.getByText("Entrenamiento guardado.")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Nombre" })).toHaveValue("Empuje B");
+});
+
+test("publishes a draft workout and moves it back to draft, confirming each change", async ({
+  page,
+}) => {
+  // Arrange
+  const sent = await signIn(page);
+  await page.goto(`/workout?id=${existing.id}`);
+  const properties = page.getByRole("region", { name: "Propiedades del entrenamiento" });
+  await properties.getByRole("button", { name: "Publicar" }).click();
+  await page
+    .getByRole("dialog", { name: "¿Publicar el entrenamiento?" })
+    .getByRole("button", { name: "Publicar" })
+    .click();
+  await expect(page.getByText("Entrenamiento publicado.")).toBeVisible();
+  await page.reload();
+  await properties.getByRole("button", { name: "Volver a borrador" }).click();
+
+  // Act
+  await page
+    .getByRole("dialog", { name: "¿Volver a borrador?" })
+    .getByRole("button", { name: "Volver a borrador" })
+    .click();
+
+  // Assert
+  await expect(page.getByText("El entrenamiento ha vuelto a borrador.")).toBeVisible();
+  await expect(properties.getByRole("button", { name: "Publicar" })).toBeVisible();
+  expect(sent.statusChanges).toEqual([{ status: "PUBLISHED" }, { status: "DRAFT" }]);
 });
 
 test("adds an exercise through the catalog and configuration dialogs and keeps it after a reload", async ({

@@ -92,6 +92,20 @@
       "trainer": "Entrenador"
     }
   },
+  "workoutStatus": {
+    "DRAFT": "Borrador",
+    "PUBLISHED": "Publicado",
+    "STARTED": "En curso",
+    "COMPLETED": "Completado",
+    "REVIEWED": "Revisado"
+  },
+  "deleteWorkout": {
+    "title": "¿Eliminar entrenamiento?",
+    "body": "Se eliminará el entrenamiento con sus ejercicios. Esta acción no se puede deshacer.",
+    "cancel": "Cancelar",
+    "confirm": "Eliminar",
+    "conflict": "Solo se pueden eliminar entrenamientos en borrador."
+  },
   "workoutTemplatePicker": {
     "sectionsLabel": "Origen del entrenamiento",
     "sections": {

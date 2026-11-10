@@ -33,6 +33,7 @@ const firstWeek: WorkoutListItem = {
   trainer: null,
   mesocycleId,
   mesocycleWeekNumber: 1,
+  completedAt: null,
   reviewedAt: null,
   reviewedBy: null,
   resultsUpdatedAt: null,

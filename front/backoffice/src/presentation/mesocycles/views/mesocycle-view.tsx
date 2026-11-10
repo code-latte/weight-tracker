@@ -19,6 +19,7 @@ import type {
   MesocycleWeek,
   TrainingWeekType,
   UpdateMesocycleInput,
+  WorkoutListItem,
 } from "@weight-tracker/core/domain";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -31,6 +32,7 @@ import type { PersonCardProps } from "@/presentation/common/components/molecules
 import HomeSkeleton from "@/presentation/common/components/molecules/home-skeleton";
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import AppShell from "@/presentation/common/components/organisms/app-shell";
+import DeleteWorkoutDialog from "@/presentation/common/components/organisms/delete-workout-dialog";
 import useAssignees from "@/presentation/common/hooks/use-assignees";
 import useCurrentUser from "@/presentation/common/hooks/use-current-user";
 import CreateWeekWorkoutDialog from "@/presentation/mesocycles/components/organisms/create-week-workout-dialog";
@@ -40,6 +42,7 @@ import MesocycleWeekDialog from "@/presentation/mesocycles/components/organisms/
 import MesocycleWeeksCard from "@/presentation/mesocycles/components/organisms/mesocycle-weeks-card";
 import useCreateMesocycle from "@/presentation/mesocycles/hooks/use-create-mesocycle";
 import useCreateWorkoutFromTemplate from "@/presentation/common/hooks/use-create-workout-from-template";
+import useDeleteWorkout from "@/presentation/common/hooks/use-delete-workout";
 import useCreateWeekWorkout from "@/presentation/mesocycles/hooks/use-create-week-workout";
 import useMesocycle from "@/presentation/mesocycles/hooks/use-mesocycle";
 import useMesocycleWorkouts from "@/presentation/mesocycles/hooks/use-mesocycle-workouts";
@@ -290,6 +293,9 @@ function LoadedMesocycle({
   const workouts = useMesocycleWorkouts(mesocycle.id);
   const weekWorkout = useCreateWeekWorkout();
   const fromTemplate = useCreateWorkoutFromTemplate();
+  const deletion = useDeleteWorkout();
+  // The workout whose deletion is waiting for confirmation.
+  const [pendingDelete, setPendingDelete] = useState<WorkoutListItem | null>(null);
   const [values, setValues] = useState<CreateMesocycleFormValues>(() => valuesOf(mesocycle));
   const [errors, setErrors] = useState<CreateMesocycleFormViolations>({});
   const [dialog, setDialog] = useState<OpenDialog>({ kind: "none" });
@@ -342,6 +348,16 @@ function LoadedMesocycle({
     });
     if (workout) {
       router.push(`/workout?id=${encodeURIComponent(workout.id)}`);
+    }
+  }
+
+  async function handleWorkoutDelete(workoutId: string) {
+    const deleted = await deletion.remove(workoutId);
+    setPendingDelete(null);
+
+    // Only the workouts change: the mesocycle itself is not read again.
+    if (deleted) {
+      workouts.reload();
     }
   }
 
@@ -399,8 +415,23 @@ function LoadedMesocycle({
             onEdit={(stored) => setDialog({ kind: "redefine", week: stored })}
             workouts={workouts}
             onCreateWorkout={(weekNumber) => setDialog({ kind: "workout", weekNumber })}
+            onDeleteWorkout={setPendingDelete}
+            deleteError={
+              deletion.errorCode === null
+                ? null
+                : // Only a draft can be deleted: the API answers CONFLICT for any other status.
+                  deletion.errorCode === "CONFLICT"
+                  ? tc("deleteWorkout.conflict")
+                  : tc(`errors:${deletion.errorCode}`)
+            }
           />
         )}
+      />
+      <DeleteWorkoutDialog
+        open={pendingDelete !== null}
+        pending={deletion.deleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => pendingDelete && void handleWorkoutDelete(pendingDelete.id)}
       />
       {dialog.kind === "workout" && (
         // Mounted per opening, so each one starts empty.

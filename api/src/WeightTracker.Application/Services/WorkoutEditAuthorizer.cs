@@ -21,12 +21,24 @@ public class WorkoutEditAuthorizer
     /// <exception cref="WorkoutLockedException">When the caller may edit the workout but it is no longer a draft, or it is reviewed.</exception>
     public void EnsureCanEdit(Workout workout, Id callerId, Role callerRole, string operation)
     {
-        if (CanEdit(workout, callerId, callerRole) == false)
-            throw new UnauthorizedOperationException(operation);
+        EnsureCanModify(workout, callerId, callerRole, operation);
 
         // Checked after the permission so a caller who may not edit never learns the status
         if (IsLockedFor(workout, callerRole))
             throw new WorkoutLockedException(workout.Id, workout.Status);
+    }
+
+    /// <summary>
+    /// Checks only who may change the workout, not whether its status still allows it.
+    /// Content edits must go through <see cref="EnsureCanEdit"/>; this is for operations that apply their own
+    /// status rule, such as deleting a workout.
+    /// </summary>
+    /// <param name="operation">Operation being attempted, used in the error message.</param>
+    /// <exception cref="UnauthorizedOperationException">When the caller may not change the workout.</exception>
+    public void EnsureCanModify(Workout workout, Id callerId, Role callerRole, string operation)
+    {
+        if (CanEdit(workout, callerId, callerRole) == false)
+            throw new UnauthorizedOperationException(operation);
     }
 
     // A reviewed workout keeps the prescription that was reviewed, so the admin bypass does not reach it

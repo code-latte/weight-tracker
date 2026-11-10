@@ -25,6 +25,7 @@ export default interface WorkoutRepositoryInterface {
   getById(id: string): Promise<Result<WorkoutById, DomainError>>;
   create(request: CreateWorkoutRequest): Promise<Result<Workout, DomainError>>;
   update(id: string, request: UpdateWorkoutRequest): Promise<Result<Workout, DomainError>>;
+  delete(id: string): Promise<Result<void, DomainError>>;
   addExercise(
     workoutId: string,
     request: AddExerciseRequest,

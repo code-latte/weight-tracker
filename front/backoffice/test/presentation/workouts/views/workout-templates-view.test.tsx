@@ -71,21 +71,25 @@ function renderTemplates({
   profile = completeProfile,
   getTemplates = async () => ok([legs, upper]),
   createTemplate = async () => ok({ ...legs, id: "wt-9" }),
+  deleteTemplate = async () => ok(undefined),
 }: {
   profile?: UserProfile;
   getTemplates?: () => Promise<Result<WorkoutTemplate[], DomainError>>;
   createTemplate?: (
     request: CreateWorkoutTemplateRequest,
   ) => Promise<Result<WorkoutTemplate, DomainError>>;
+  deleteTemplate?: () => Promise<Result<void, DomainError>>;
 } = {}) {
   const execute = vi.fn(getTemplates);
   const create = vi.fn(createTemplate);
   const getUsers = vi.fn(async () => ok(users));
+  const deletion = vi.fn(deleteTemplate);
 
   return {
     execute,
     create,
     getUsers,
+    deletion,
     rendered: renderWithProviders(<WorkoutTemplatesView />, {
       getSessionUseCase: () => ({
         execute: async () => ok({ accessToken: "a", refreshToken: "r" }),
@@ -94,6 +98,7 @@ function renderTemplates({
       getWorkoutTemplatesUseCase: () => ({ execute }),
       createWorkoutTemplateUseCase: () => ({ execute: create }),
       getUsersUseCase: () => ({ execute: getUsers }),
+      deleteWorkoutTemplateUseCase: () => ({ execute: deletion }),
     }),
   };
 }
@@ -344,6 +349,114 @@ describe("WorkoutTemplatesView", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  describe("deleting a template", () => {
+    async function confirmDialogFor(user: ReturnType<typeof userEvent.setup>, name: string) {
+      await user.click(await screen.findByRole("button", { name: `Eliminar ${name}` }));
+      return screen.findByRole("dialog", { name: "¿Eliminar esta plantilla?" });
+    }
+
+    it("asks for confirmation and sends nothing when the trash button is pressed", async () => {
+      // Arrange
+      const { deletion, rendered } = renderTemplates();
+      await rendered;
+      const user = userEvent.setup();
+      await screen.findByText("Pierna A");
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Eliminar Pierna A" }));
+
+      // Assert
+      const dialog = await screen.findByRole("dialog", { name: "¿Eliminar esta plantilla?" });
+      expect(
+        within(dialog).getByText("Los entrenamientos creados desde ella no cambian."),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
+      expect(deletion).not.toHaveBeenCalled();
+    });
+
+    it("shows the delete action to an admin as well", async () => {
+      // Arrange & Act
+      await renderTemplates({ profile: adminProfile }).rendered;
+
+      // Assert
+      expect(await screen.findByRole("link", { name: "Editar Pierna A" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Eliminar Pierna A" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Eliminar Torso" })).toBeInTheDocument();
+    });
+
+    it("closes the dialog without deleting when Cancelar is pressed", async () => {
+      // Arrange
+      const { deletion, rendered } = renderTemplates();
+      await rendered;
+      const user = userEvent.setup();
+      const dialog = await confirmDialogFor(user, "Pierna A");
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+      // Assert
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "¿Eliminar esta plantilla?" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(deletion).not.toHaveBeenCalled();
+    });
+
+    it("deletes the row's template once and reads the templates again on confirm", async () => {
+      // Arrange
+      const getTemplates = vi
+        .fn<() => Promise<Result<WorkoutTemplate[], DomainError>>>()
+        .mockResolvedValueOnce(ok([legs, upper]))
+        .mockResolvedValueOnce(ok([upper]));
+      const { execute, deletion, rendered } = renderTemplates({ getTemplates });
+      await rendered;
+      const user = userEvent.setup();
+      const dialog = await confirmDialogFor(user, "Pierna A");
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+      // Assert
+      await waitFor(() => expect(screen.queryByText("Pierna A")).not.toBeInTheDocument());
+      expect(deletion).toHaveBeenCalledTimes(1);
+      expect(deletion).toHaveBeenCalledWith({ id: legs.id });
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Torso")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "¿Eliminar esta plantilla?" }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it("shows the error for its code and keeps the rows when the deletion fails", async () => {
+      // Arrange
+      const { execute, rendered } = renderTemplates({
+        deleteTemplate: async () => fail(new DomainError("FORBIDDEN", "")),
+      });
+      await rendered;
+      const user = userEvent.setup();
+      const dialog = await confirmDialogFor(user, "Pierna A");
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+      // Assert
+      expect(
+        await screen.findByText("No tienes permiso para realizar esta acción."),
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "¿Eliminar esta plantilla?" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(bodyRows()).toHaveLength(2);
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("follows the active language", async () => {
     // Arrange
     await renderTemplates().rendered;
@@ -355,5 +468,6 @@ describe("WorkoutTemplatesView", () => {
     // Assert
     expect(screen.getByRole("heading", { name: "Workout templates" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New template" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Pierna A" })).toBeInTheDocument();
   });
 });

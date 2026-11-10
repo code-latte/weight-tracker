@@ -143,6 +143,19 @@ public class OpenApiDocumentTests : IntegrationTest
     }
 
     [Fact]
+    public async Task DeleteWorkout_ShouldDocumentItsResponses()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var responses = Operation(document, "/workouts/{workoutId}", "delete").GetProperty("responses");
+
+        responses.EnumerateObject().Select(property => property.Name)
+            .Should().Contain(["204", "401", "403", "404", "409"]);
+    }
+
+    [Fact]
     public async Task RemoveMesocycleWeek_ShouldDocumentItsResponses()
     {
         // Arrange & Act

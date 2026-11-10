@@ -1,0 +1,23 @@
+{
+  "week": {
+    "current": "This week",
+    "next": "Next week",
+    "previous": "Previous week",
+    "following": "Next week"
+  },
+  "progress": "{{completed}} / {{total}}",
+  "author": {
+    "me": "Created by me"
+  },
+  "day": {
+    "pending": "--"
+  },
+  "empty": "No workouts this week",
+  "status": {
+    "completed": "Completed",
+    "reviewed": "Reviewed",
+    "started": "In progress",
+    "pending": "Pending"
+  },
+  "retry": "Retry"
+}

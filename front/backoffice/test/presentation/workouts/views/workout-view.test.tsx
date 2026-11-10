@@ -5,6 +5,7 @@ import { DomainError, fail, ok } from "@weight-tracker/core/domain";
 import type {
   AddExerciseToWorkoutInput,
   BreakSuperSeriesInput,
+  ChangeWorkoutStatusInput,
   CreateSuperSeriesInput,
   Exercise,
   ExerciseFavorite,
@@ -183,6 +184,7 @@ const workout: WorkoutById = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  completedAt: null,
   reviewedAt: null,
   reviewedBy: null,
   resultsUpdatedAt: null,
@@ -291,7 +293,9 @@ function renderWorkout({
   getMesocycle = async () => fail(new DomainError("UNEXPECTED", "Not used")),
   profile = completeProfile,
   saveAsTemplate = async () => ok(savedTemplate),
+  changeStatus = async ({ status }) => ok({ ...workout, status: status ?? workout.status }),
 }: {
+  changeStatus?: (input: ChangeWorkoutStatusInput) => Promise<Result<WorkoutDetail, DomainError>>;
   saveAsTemplate?: () => Promise<Result<WorkoutTemplate, DomainError>>;
   getWorkout?: () => Promise<Result<WorkoutById, DomainError>>;
   getExercises?: () => Promise<Result<Exercise[], DomainError>>;
@@ -333,6 +337,7 @@ function renderWorkout({
     createSuperSeries: vi.fn(createSuperSeries),
     breakSuperSeries: vi.fn(breakSuperSeries),
     saveAsTemplate: vi.fn(saveAsTemplate),
+    changeStatus: vi.fn(changeStatus),
   };
 
   return {
@@ -359,6 +364,7 @@ function renderWorkout({
       createSuperSeriesUseCase: () => ({ execute: mutations.createSuperSeries }),
       breakSuperSeriesUseCase: () => ({ execute: mutations.breakSuperSeries }),
       createWorkoutTemplateFromWorkoutUseCase: () => ({ execute: mutations.saveAsTemplate }),
+      changeWorkoutStatusUseCase: () => ({ execute: mutations.changeStatus }),
     }),
   };
 }
@@ -4158,6 +4164,305 @@ describe("WorkoutView", () => {
         within(screen.getByRole("region", { name: "Workout properties" })).getByRole("button", {
           name: "Save as template",
         }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("status change", () => {
+    const withStatus = (status: string) => async () => ok({ ...workout, status });
+    const statusButton = (name: string) =>
+      within(propertiesSection()).queryByRole("button", { name });
+    const publishDialog = () =>
+      screen.queryByRole("dialog", { name: "¿Publicar el entrenamiento?" });
+    const backToDraftDialog = () => screen.queryByRole("dialog", { name: "¿Volver a borrador?" });
+    const lockNotice = "El atleta ha empezado este entrenamiento y no puedes editarlo";
+    /** The page behind a closing dialog stays hidden from assistive technology until its transition ends. */
+    const propertiesShown = () =>
+      screen.findByRole("region", { name: "Propiedades del entrenamiento" });
+
+    it("offers Publicar right after Guardar on a draft workout, and no Volver a borrador", async () => {
+      // Arrange & Act
+      await renderWorkout().rendered;
+      await loaded();
+
+      // Assert
+      const buttons = within(propertiesSection())
+        .getAllByRole("button")
+        .map((button) => button.textContent);
+      expect(buttons[buttons.indexOf("Guardar") + 1]).toBe("Publicar");
+      expect(statusButton("Publicar")).toHaveClass(
+        "MuiButton-contained",
+        "MuiButton-colorSecondary",
+      );
+      expect(statusButton("Volver a borrador")).not.toBeInTheDocument();
+      expect(screen.queryByText(lockNotice)).not.toBeInTheDocument();
+    });
+
+    it("offers Volver a borrador right after Guardar on a published workout, and no Publicar", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withStatus("PUBLISHED") }).rendered;
+      await loaded();
+
+      // Assert
+      const buttons = within(propertiesSection())
+        .getAllByRole("button")
+        .map((button) => button.textContent);
+      expect(buttons[buttons.indexOf("Guardar") + 1]).toBe("Volver a borrador");
+      expect(statusButton("Volver a borrador")).toHaveClass(
+        "MuiButton-outlined",
+        "MuiButton-colorSecondary",
+      );
+      expect(statusButton("Publicar")).not.toBeInTheDocument();
+      expect(screen.queryByText(lockNotice)).not.toBeInTheDocument();
+    });
+
+    it("offers Publicar to an admin too", async () => {
+      // Arrange & Act
+      await renderWorkout({ profile: { ...completeProfile, id: "admin-1", role: "ADMIN" } })
+        .rendered;
+      await loaded();
+
+      // Assert
+      expect(statusButton("Publicar")).toBeInTheDocument();
+      expect(statusButton("Volver a borrador")).not.toBeInTheDocument();
+    });
+
+    it("asks before publishing and sends nothing", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(statusButton("Publicar")!);
+
+      // Assert
+      const dialog = await screen.findByRole("dialog", { name: "¿Publicar el entrenamiento?" });
+      expect(within(dialog).getByText("El atleta podrá verlo y empezarlo.")).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Cancelar" })).toBeEnabled();
+      expect(within(dialog).getByRole("button", { name: "Publicar" })).toBeEnabled();
+      expect(mutations.changeStatus).not.toHaveBeenCalled();
+    });
+
+    it("asks before moving back to draft and sends nothing", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({ getWorkout: withStatus("PUBLISHED") });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(statusButton("Volver a borrador")!);
+
+      // Assert
+      const dialog = await screen.findByRole("dialog", { name: "¿Volver a borrador?" });
+      expect(
+        within(dialog).getByText("El atleta dejará de verlo hasta que lo vuelvas a publicar."),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Volver a borrador" })).toBeEnabled();
+      expect(mutations.changeStatus).not.toHaveBeenCalled();
+    });
+
+    it("closes the dialog on Cancelar without a request, keeping the status", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(statusButton("Publicar")!);
+      const dialog = await screen.findByRole("dialog", { name: "¿Publicar el entrenamiento?" });
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+      // Assert
+      await waitFor(() => expect(publishDialog()).not.toBeInTheDocument());
+      expect(mutations.changeStatus).not.toHaveBeenCalled();
+      expect(statusButton("Publicar")).toBeInTheDocument();
+    });
+
+    it("publishes once on confirm and then offers Volver a borrador", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout();
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(statusButton("Publicar")!);
+      const dialog = await screen.findByRole("dialog", { name: "¿Publicar el entrenamiento?" });
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Publicar" }));
+
+      // Assert
+      expect(await screen.findByText("Entrenamiento publicado.")).toBeInTheDocument();
+      expect(mutations.changeStatus).toHaveBeenCalledTimes(1);
+      expect(mutations.changeStatus).toHaveBeenCalledWith({
+        workoutId: "w-1",
+        status: "PUBLISHED",
+      });
+      await propertiesShown();
+      expect(publishDialog()).not.toBeInTheDocument();
+      expect(statusButton("Volver a borrador")).toBeInTheDocument();
+      expect(statusButton("Publicar")).not.toBeInTheDocument();
+    });
+
+    it("moves a published workout back to draft once on confirm and then offers Publicar", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({ getWorkout: withStatus("PUBLISHED") });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(statusButton("Volver a borrador")!);
+      const dialog = await screen.findByRole("dialog", { name: "¿Volver a borrador?" });
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Volver a borrador" }));
+
+      // Assert
+      expect(await screen.findByText("El entrenamiento ha vuelto a borrador.")).toBeInTheDocument();
+      await propertiesShown();
+      expect(mutations.changeStatus).toHaveBeenCalledTimes(1);
+      expect(mutations.changeStatus).toHaveBeenCalledWith({ workoutId: "w-1", status: "DRAFT" });
+      expect(statusButton("Publicar")).toBeInTheDocument();
+      expect(statusButton("Volver a borrador")).not.toBeInTheDocument();
+    });
+
+    it("disables the dialog and Guardar while the change is in progress, and ignores Escape", async () => {
+      // Arrange
+      const { rendered } = renderWorkout({ changeStatus: () => new Promise(() => {}) });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(statusButton("Publicar")!);
+      const dialog = await screen.findByRole("dialog", { name: "¿Publicar el entrenamiento?" });
+      await user.click(within(dialog).getByRole("button", { name: "Publicar" }));
+
+      // Act
+      await user.keyboard("{Escape}");
+
+      // Assert
+      expect(publishDialog()).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Cancelar" })).toBeDisabled();
+      expect(within(dialog).getByRole("button", { name: "Publicar" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Guardar", hidden: true })).toBeDisabled();
+    });
+
+    it("disables Publicar while the workout is being saved", async () => {
+      // Arrange
+      const { rendered } = renderWorkout({ updateWorkout: () => new Promise(() => {}) });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+      // Assert
+      await waitFor(() => expect(statusButton("Publicar")).toBeDisabled());
+    });
+
+    it("shows the error and keeps Volver a borrador when the API refuses the change", async () => {
+      // Arrange
+      const { rendered } = renderWorkout({
+        getWorkout: withStatus("PUBLISHED"),
+        changeStatus: async () => fail(new DomainError("VALIDATION", "")),
+      });
+      await rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(statusButton("Volver a borrador")!);
+      const dialog = await screen.findByRole("dialog", { name: "¿Volver a borrador?" });
+
+      // Act
+      await user.click(within(dialog).getByRole("button", { name: "Volver a borrador" }));
+
+      // Assert
+      expect(await screen.findByText("Revisa los datos introducidos.")).toBeInTheDocument();
+      await propertiesShown();
+      expect(backToDraftDialog()).not.toBeInTheDocument();
+      expect(statusButton("Volver a borrador")).toBeInTheDocument();
+      expect(screen.queryByText("El entrenamiento ha vuelto a borrador.")).not.toBeInTheDocument();
+    });
+
+    it("hides the confirmation when a field changes again", async () => {
+      // Arrange
+      await renderWorkout().rendered;
+      await loaded();
+      const user = userEvent.setup();
+      await user.click(statusButton("Publicar")!);
+      const dialog = await screen.findByRole("dialog", { name: "¿Publicar el entrenamiento?" });
+      await user.click(within(dialog).getByRole("button", { name: "Publicar" }));
+      await screen.findByText("Entrenamiento publicado.");
+      await propertiesShown();
+
+      // Act
+      await user.type(within(propertiesSection()).getByRole("textbox", { name: "Nombre" }), " B");
+
+      // Assert
+      expect(screen.queryByText("Entrenamiento publicado.")).not.toBeInTheDocument();
+    });
+
+    it.each(["STARTED", "COMPLETED", "REVIEWED"])(
+      "locks the details of a %s workout but keeps Guardar como plantilla",
+      async (status) => {
+        // Arrange & Act
+        await renderWorkout({ getWorkout: withStatus(status) }).rendered;
+        await loaded();
+
+        // Assert
+        const properties = propertiesSection();
+        expect(within(properties).getByText(lockNotice)).toBeInTheDocument();
+        expect(
+          within(properties).queryByRole("button", { name: "Guardar" }),
+        ).not.toBeInTheDocument();
+        expect(statusButton("Publicar")).not.toBeInTheDocument();
+        expect(statusButton("Volver a borrador")).not.toBeInTheDocument();
+        expect(within(properties).getByRole("textbox", { name: "Nombre" })).toBeDisabled();
+        expect(within(properties).getByRole("textbox", { name: "Descripción" })).toBeDisabled();
+        expect(
+          within(properties).getByRole("button", { name: "Guardar como plantilla" }),
+        ).toBeInTheDocument();
+      },
+    );
+
+    it("locks a reviewed workout for an admin too", async () => {
+      // Arrange & Act
+      await renderWorkout({
+        getWorkout: withStatus("REVIEWED"),
+        profile: { ...completeProfile, id: "admin-1", role: "ADMIN" },
+      }).rendered;
+      await loaded();
+
+      // Assert
+      expect(within(propertiesSection()).getByText(lockNotice)).toBeInTheDocument();
+      expect(
+        within(propertiesSection()).queryByRole("button", { name: "Guardar" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the exercises editor of a started workout as it is", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withStatus("STARTED") }).rendered;
+      await loaded();
+
+      // Assert
+      expect(
+        within(exercisesSection()).getByRole("button", { name: "Añadir ejercicio" }),
+      ).toBeEnabled();
+    });
+
+    it("reads in English", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withStatus("STARTED") }).rendered;
+      await loaded();
+
+      // Act
+      await act(() => i18n.changeLanguage("en"));
+
+      // Assert
+      expect(
+        screen.getByText("The athlete started this workout and you cannot edit it"),
       ).toBeInTheDocument();
     });
   });

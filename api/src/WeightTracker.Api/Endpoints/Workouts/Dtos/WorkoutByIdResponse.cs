@@ -10,6 +10,7 @@ namespace WeightTracker.Api.Endpoints.Workouts.Dtos;
 /// </summary>
 /// <param name="MesocycleId">Mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
 /// <param name="MesocycleWeekNumber">Week of the mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
+/// <param name="CompletedAt">Last time the workout reached <c>COMPLETED</c>, in UTC, <c>null</c> until it is first completed. Kept when it leaves completed.</param>
 /// <param name="ReviewedAt">When the workout was reviewed, in UTC, <c>null</c> until it is reviewed.</param>
 /// <param name="ReviewedBy">User who reviewed the workout, <c>null</c> until it is reviewed.</param>
 /// <param name="ResultsUpdatedAt">Last time its set records changed, in UTC, <c>null</c> while they never changed. Send it back when reviewing.</param>
@@ -26,6 +27,7 @@ public sealed record WorkoutByIdResponse(
     IReadOnlyList<WorkoutExerciseDetailResponse> Exercises,
     Guid? MesocycleId,
     int? MesocycleWeekNumber,
+    DateTime? CompletedAt,
     DateTime? ReviewedAt,
     Guid? ReviewedBy,
     DateTime? ResultsUpdatedAt,
@@ -47,6 +49,7 @@ public sealed record WorkoutByIdResponse(
             workout.Exercises.Select(WorkoutExerciseDetailResponse.From).ToList(),
             workout.MesocycleId?.Value,
             workout.MesocycleWeekNumber?.Value,
+            workout.CompletedAt,
             workout.ReviewedAt,
             workout.ReviewedBy?.Value,
             workout.ResultsUpdatedAt,

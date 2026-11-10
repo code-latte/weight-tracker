@@ -244,6 +244,7 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         body.GetProperty("status").GetString().Should().Be("REVIEWED");
         body.GetProperty("reviewedBy").GetGuid().Should().Be(SeedData.AdminId);
         body.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.String);
+        body.GetProperty("completedAt").ValueKind.Should().Be(JsonValueKind.String);
     }
 
     [Fact]
@@ -258,6 +259,7 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         body.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.Null);
         body.GetProperty("reviewedBy").ValueKind.Should().Be(JsonValueKind.Null);
         body.GetProperty("resultsUpdatedAt").ValueKind.Should().Be(JsonValueKind.Null);
+        body.GetProperty("completedAt").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]

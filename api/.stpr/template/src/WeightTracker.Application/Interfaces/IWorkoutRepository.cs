@@ -32,4 +32,10 @@ public interface IWorkoutRepository
 
     public Task Save(Workout workout, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Removes the workout with its exercises, sets and set records. The removal is committed by the unit of work,
+    /// which refuses it when the workout changed since it was read.
+    /// </summary>
+    public Task Delete(Workout workout, CancellationToken cancellationToken);
+
 }

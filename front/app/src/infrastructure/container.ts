@@ -29,6 +29,7 @@ import {
   CreateWorkoutUseCase,
   DeactivateUserUseCase,
   DefineMesocycleWeekUseCase,
+  DeleteWorkoutUseCase,
   type Dependencies,
   EndTrainerAthleteUseCase,
   GetAthleteInvitationsUseCase,
@@ -127,6 +128,7 @@ const container = new Container<Dependencies>({
   getWorkoutByIdUseCase: (c) => new GetWorkoutByIdUseCase(c.resolve("workoutRepository")),
   createWorkoutUseCase: (c) => new CreateWorkoutUseCase(c.resolve("workoutRepository")),
   updateWorkoutUseCase: (c) => new UpdateWorkoutUseCase(c.resolve("workoutRepository")),
+  deleteWorkoutUseCase: (c) => new DeleteWorkoutUseCase(c.resolve("workoutRepository")),
   addExerciseToWorkoutUseCase: (c) =>
     new AddExerciseToWorkoutUseCase(c.resolve("workoutRepository")),
   updateWorkoutExerciseUseCase: (c) =>

@@ -762,4 +762,32 @@ public class WorkoutMapperTests
         // Assert
         act.Should().Throw<PersistenceMappingException>();
     }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveTheCompletionTime()
+    {
+        // Arrange
+        var original = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.COMPLETED, [],
+            completedAt: RecordedAt);
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.CompletedAt.Should().Be(RecordedAt);
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveACompletedWorkoutWithoutCompletionTime()
+    {
+        // Arrange
+        var original = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.COMPLETED, []);
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.Status.Should().Be(WorkoutStatus.COMPLETED);
+        restored.CompletedAt.Should().BeNull();
+    }
 }

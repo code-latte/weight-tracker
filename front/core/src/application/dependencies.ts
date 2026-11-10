@@ -11,6 +11,7 @@ import type {
   CreateSuperSeriesInput,
   CreateWorkoutRequest,
   DefineMesocycleWeekInput,
+  DeleteWorkoutInput,
   Exercise,
   ExerciseFavorite,
   GetAthleteMesocyclesInput,
@@ -114,6 +115,7 @@ export default interface Dependencies {
   getWorkoutByIdUseCase: UseCaseInterface<GetWorkoutByIdInput, WorkoutById>;
   createWorkoutUseCase: UseCaseInterface<CreateWorkoutRequest, Workout>;
   updateWorkoutUseCase: UseCaseInterface<UpdateWorkoutInput, Workout>;
+  deleteWorkoutUseCase: UseCaseInterface<DeleteWorkoutInput, void>;
   addExerciseToWorkoutUseCase: UseCaseInterface<AddExerciseToWorkoutInput, WorkoutExerciseDetail>;
   updateWorkoutExerciseUseCase: UseCaseInterface<UpdateWorkoutExerciseInput, WorkoutExerciseDetail>;
   removeExerciseFromWorkoutUseCase: UseCaseInterface<RemoveExerciseFromWorkoutInput, void>;

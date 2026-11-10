@@ -21,6 +21,7 @@ public class WorkoutsController : AuthorizedController
     private readonly GetWorkoutByIdUseCase _getWorkoutById;
     private readonly CreateWorkoutUseCase _createWorkout;
     private readonly UpdateWorkoutUseCase _updateWorkout;
+    private readonly DeleteWorkoutUseCase _deleteWorkout;
     private readonly CreateSuperSeriesUseCase _createSuperSeries;
     private readonly BreakSuperSeriesUseCase _breakSuperSeries;
     private readonly AddWorkoutExerciseUseCase _addExercise;
@@ -40,6 +41,7 @@ public class WorkoutsController : AuthorizedController
         GetWorkoutByIdUseCase getWorkoutById,
         CreateWorkoutUseCase createWorkout,
         UpdateWorkoutUseCase updateWorkout,
+        DeleteWorkoutUseCase deleteWorkout,
         CreateSuperSeriesUseCase createSuperSeries,
         BreakSuperSeriesUseCase breakSuperSeries,
         AddWorkoutExerciseUseCase addExercise,
@@ -60,6 +62,7 @@ public class WorkoutsController : AuthorizedController
         _getWorkoutById = getWorkoutById;
         _createWorkout = createWorkout;
         _updateWorkout = updateWorkout;
+        _deleteWorkout = deleteWorkout;
         _createSuperSeries = createSuperSeries;
         _breakSuperSeries = breakSuperSeries;
         _addExercise = addExercise;
@@ -193,6 +196,30 @@ public class WorkoutsController : AuthorizedController
                 cancellationToken);
 
             return Ok(WorkoutDetailResponse.From(workout));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Permanently deletes a draft workout, with its exercises, sets and superseries. Only a draft can be
+    /// deleted, by an admin too; move a published workout back to draft first.
+    /// </summary>
+    [HttpDelete("{workoutId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid workoutId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _deleteWorkout.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(workoutId), cancellationToken);
+
+            return NoContent();
         }
         catch (Exception exception)
         {

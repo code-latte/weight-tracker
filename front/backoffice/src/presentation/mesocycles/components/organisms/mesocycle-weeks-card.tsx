@@ -4,6 +4,7 @@ import AddOutlined from "@mui/icons-material/AddOutlined";
 import Box from "@mui/material/Box";
 import type { DomainErrorCode, MesocycleWeek, WorkoutListItem } from "@weight-tracker/core/domain";
 import { useTranslation } from "react-i18next";
+import Alert from "@/presentation/common/components/atoms/alert";
 import Button from "@/presentation/common/components/atoms/button";
 import Card from "@/presentation/common/components/atoms/card";
 import CardContent from "@/presentation/common/components/atoms/card-content";
@@ -35,6 +36,10 @@ interface MesocycleWeeksCardProps {
   /** The mesocycle's workouts; absent while the mesocycle does not exist. */
   workouts?: WeeksCardWorkouts;
   onCreateWorkout?: (weekNumber: number) => void;
+  /** Asks to delete one of the mesocycle's workouts; the card sends nothing itself. */
+  onDeleteWorkout?: (workout: WorkoutListItem) => void;
+  /** Why the last workout deletion failed, already translated; absent when it did not. */
+  deleteError?: string | null;
 }
 
 /**
@@ -50,8 +55,11 @@ export default function MesocycleWeeksCard({
   onEdit,
   workouts,
   onCreateWorkout,
+  onDeleteWorkout,
+  deleteError,
 }: MesocycleWeeksCardProps) {
   const { t } = useTranslation("mesocycles");
+  const { t: tc } = useTranslation();
 
   function body() {
     if (locked) {
@@ -91,12 +99,23 @@ export default function MesocycleWeeksCard({
                 rows={entries.map((workout) => ({
                   id: workout.id,
                   name: workout.name,
+                  status: workout.status,
+                  statusLabel: tc(`workoutStatus.${workout.status}`, {
+                    defaultValue: workout.status,
+                  }),
                   exerciseCount: workout.exercises.length,
                   href: `/workout?id=${encodeURIComponent(workout.id)}`,
                   editLabel: t("weeks.editWorkout", { name: workout.name }),
+                  deleteLabel: t("weeks.deleteWorkout", { name: workout.name }),
                 }))}
                 nameLabel={t("weeks.workoutsTable.name")}
                 exercisesLabel={t("weeks.workoutsTable.exercises")}
+                onDelete={(id) => {
+                  const workout = entries.find((entry) => entry.id === id);
+                  if (workout) {
+                    onDeleteWorkout?.(workout);
+                  }
+                }}
               />
             </MesocycleWeekListItem>
           );
@@ -135,6 +154,11 @@ export default function MesocycleWeeksCard({
             {t("weeks.add")}
           </Button>
         </Box>
+        {deleteError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {deleteError}
+          </Alert>
+        )}
         {workouts?.status === "failed" && workouts.errorCode && (
           <Box sx={{ mb: 2 }}>
             <LoadError code={workouts.errorCode} onRetry={workouts.reload} />

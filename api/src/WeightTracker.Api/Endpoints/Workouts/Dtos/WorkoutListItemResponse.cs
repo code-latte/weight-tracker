@@ -14,6 +14,7 @@ namespace WeightTracker.Api.Endpoints.Workouts.Dtos;
 /// <param name="Trainer">Prescribing trainer, the user whose id is <paramref name="TrainerId"/>, or <c>null</c>.</param>
 /// <param name="MesocycleId">Mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
 /// <param name="MesocycleWeekNumber">Week of the mesocycle the workout is placed in, <c>null</c> for a standalone workout.</param>
+/// <param name="CompletedAt">Last time the workout reached <c>COMPLETED</c>, in UTC, <c>null</c> until it is first completed. Kept when it leaves completed.</param>
 /// <param name="ReviewedAt">When the workout was reviewed, in UTC, <c>null</c> until it is reviewed.</param>
 /// <param name="ReviewedBy">User who reviewed the workout, <c>null</c> until it is reviewed.</param>
 /// <param name="ResultsUpdatedAt">Last time its set records changed, in UTC, <c>null</c> while they never changed. Send it back when reviewing.</param>
@@ -30,6 +31,7 @@ public sealed record WorkoutListItemResponse(
     UserProfileResponse? Trainer,
     Guid? MesocycleId,
     int? MesocycleWeekNumber,
+    DateTime? CompletedAt,
     DateTime? ReviewedAt,
     Guid? ReviewedBy,
     DateTime? ResultsUpdatedAt)
@@ -56,6 +58,7 @@ public sealed record WorkoutListItemResponse(
             workout.TrainerId is null ? null : UserProfileResponse.From(users[workout.TrainerId]),
             workout.MesocycleId?.Value,
             workout.MesocycleWeekNumber?.Value,
+            workout.CompletedAt,
             workout.ReviewedAt,
             workout.ReviewedBy?.Value,
             workout.ResultsUpdatedAt);

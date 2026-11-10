@@ -92,6 +92,20 @@
       "trainer": "Trainer"
     }
   },
+  "workoutStatus": {
+    "DRAFT": "Draft",
+    "PUBLISHED": "Published",
+    "STARTED": "In progress",
+    "COMPLETED": "Completed",
+    "REVIEWED": "Reviewed"
+  },
+  "deleteWorkout": {
+    "title": "Delete workout?",
+    "body": "The workout and its exercises will be deleted. This cannot be undone.",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "conflict": "Only draft workouts can be deleted."
+  },
   "workoutTemplatePicker": {
     "sectionsLabel": "Workout source",
     "sections": {

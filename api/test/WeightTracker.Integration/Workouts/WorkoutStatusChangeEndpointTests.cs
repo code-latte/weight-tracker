@@ -374,6 +374,90 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
     }
 
     [Fact]
+    public async Task AthleteOfAPrescribedWorkout_ShouldRecordWhenTheyCompleteIt()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "STARTED");
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await PutStatus(user, SeedData.TrainedWorkoutId, "COMPLETED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var completedAt = body.GetProperty("completedAt").GetDateTime();
+        completedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        (await CompletedAtOf(SeedData.TrainedWorkoutId)).Should().Be(completedAt);
+    }
+
+    [Fact]
+    public async Task Admin_ShouldRecordWhenTheyCompleteAWorkoutSkippingTheLifecycle()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await PutStatus(admin, SeedData.PrescribedDraftWorkoutId, "COMPLETED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await CompletedAtOf(SeedData.PrescribedDraftWorkoutId)).Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task Admin_ShouldKeepTheCompletionDateWhenReopeningACompletedWorkout()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "COMPLETED");
+        var completedAt = await CompletedAtOf(SeedData.TrainedWorkoutId);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await PutStatus(admin, SeedData.TrainedWorkoutId, "DRAFT");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("status").GetString().Should().Be("DRAFT");
+        completedAt.Should().NotBeNull();
+        body.GetProperty("completedAt").GetDateTime().Should().Be(completedAt!.Value);
+    }
+
+    [Fact]
+    public async Task Admin_ShouldOverwriteTheCompletionDateWhenTheWorkoutIsCompletedAgain()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "COMPLETED");
+        var firstCompletedAt = await CompletedAtOf(SeedData.TrainedWorkoutId);
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "STARTED");
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await PutStatus(admin, SeedData.TrainedWorkoutId, "COMPLETED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await CompletedAtOf(SeedData.TrainedWorkoutId)).Should().BeAfter(firstCompletedAt!.Value);
+    }
+
+    [Fact]
+    public async Task AthleteOfAWorkoutWithoutTrainer_ShouldKeepTheCompletionDateWhenAMoveIsRefused()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "COMPLETED");
+        var completedAt = await CompletedAtOf(SeedData.OwnedWorkoutId);
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await PutStatus(user, SeedData.OwnedWorkoutId, "STARTED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CompletedAtOf(SeedData.OwnedWorkoutId)).Should().Be(completedAt);
+    }
+
+    [Fact]
     public async Task Trainer_ShouldNotChangeTheStatusOfAWorkoutThatIsNotTheirs()
     {
         // Arrange

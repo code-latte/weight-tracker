@@ -116,6 +116,7 @@ function weekWorkoutOf(id: string, name: string, week: number): WorkoutListItem 
     trainer: luis,
     mesocycleId: "m-1",
     mesocycleWeekNumber: week,
+    completedAt: null,
     reviewedAt: null,
     reviewedBy: null,
     resultsUpdatedAt: null,
@@ -156,6 +157,7 @@ function createdWorkout(request: CreateWorkoutRequest): Workout {
     exercises: [],
     mesocycleId: request.mesocycleId ?? null,
     mesocycleWeekNumber: request.mesocycleWeekNumber ?? null,
+    completedAt: null,
     reviewedAt: null,
     reviewedBy: null,
     resultsUpdatedAt: null,
@@ -212,6 +214,7 @@ function renderMesocycle({
   createWorkout = async (request: CreateWorkoutRequest) => ok(createdWorkout(request)),
   getTemplates = async () => ok(weekTemplates),
   createFromTemplate = async () => ok({ ...createdWorkout({ name: "Pierna A" }), id: "w-9" }),
+  deleteWorkout = async () => ok(undefined),
 }: {
   search?: string;
   profile?: UserProfile;
@@ -226,6 +229,7 @@ function renderMesocycle({
   createWorkout?: (request: CreateWorkoutRequest) => Answer<Workout>;
   getTemplates?: (input: GetWorkoutTemplatesInput) => Answer<WorkoutTemplate[]>;
   createFromTemplate?: (input: CreateWorkoutFromTemplateInput) => Answer<Workout>;
+  deleteWorkout?: () => Answer<void>;
 } = {}) {
   navigation.search = search;
   const fakes = {
@@ -240,6 +244,7 @@ function renderMesocycle({
     createWorkout: vi.fn(createWorkout),
     getTemplates: vi.fn(getTemplates),
     createFromTemplate: vi.fn(createFromTemplate),
+    deleteWorkout: vi.fn(deleteWorkout),
   };
 
   return {
@@ -260,6 +265,7 @@ function renderMesocycle({
       createWorkoutUseCase: () => ({ execute: fakes.createWorkout }),
       getWorkoutTemplatesUseCase: () => ({ execute: fakes.getTemplates }),
       createWorkoutFromTemplateUseCase: () => ({ execute: fakes.createFromTemplate }),
+      deleteWorkoutUseCase: () => ({ execute: fakes.deleteWorkout }),
     }),
   };
 }
@@ -957,7 +963,7 @@ describe("MesocycleView", () => {
       // Arrange
       const { rendered } = renderMesocycle({
         search: "id=m-1",
-        getWorkouts: async () => ok([legs, pushDay]),
+        getWorkouts: async () => ok([legs, { ...pushDay, status: "PUBLISHED" }]),
       });
       await rendered;
       await openedEditForm();
@@ -978,12 +984,18 @@ describe("MesocycleView", () => {
         within(legsRow!)
           .getAllByRole("cell")
           .map((cell) => cell.textContent),
-      ).toEqual(["Pierna", "3", ""]);
+      ).toEqual(["PiernaBorrador", "3", ""]);
       expect(
         within(pushRow!)
           .getAllByRole("cell")
           .map((cell) => cell.textContent),
-      ).toEqual(["Empuje", "0", ""]);
+      ).toEqual(["EmpujePublicado", "0", ""]);
+      expect(within(legsRow!).getByText("Borrador").closest(".MuiChip-root")).toHaveClass(
+        "MuiChip-colorDefault",
+      );
+      expect(within(pushRow!).getByText("Publicado").closest(".MuiChip-root")).toHaveClass(
+        "MuiChip-colorInfo",
+      );
       expect(within(row).queryByRole("link", { name: "Pierna" })).toBeNull();
       expect(within(row).getByRole("link", { name: "Editar Pierna" })).toHaveAttribute(
         "href",
@@ -1213,6 +1225,223 @@ describe("MesocycleView", () => {
       // Assert
       expect(await within(weekRow(1)).findByText("1 entrenamiento")).toBeInTheDocument();
       expect(getWorkouts).toHaveBeenCalledTimes(2);
+    });
+
+    describe("deleting a workout", () => {
+      /** Expands the given week once its workouts are read. */
+      async function expandWeek(user: ReturnType<typeof userEvent.setup>, number: number) {
+        await user.click(
+          await within(weeksCard()).findByRole("button", {
+            name: `Mostrar entrenamientos de la semana ${number}`,
+          }),
+        );
+      }
+
+      /** Expands week 1 and asks to delete "Pierna", answering the confirmation dialog. */
+      async function confirmDialogForLegs(user: ReturnType<typeof userEvent.setup>) {
+        await expandWeek(user, 1);
+        await user.click(within(weekRow(1)).getByRole("button", { name: "Eliminar Pierna" }));
+        return screen.findByRole("dialog", { name: "¿Eliminar entrenamiento?" });
+      }
+
+      it("asks for confirmation and sends nothing when the trash button is pressed", async () => {
+        // Arrange
+        const { deleteWorkout, rendered } = renderMesocycle({
+          search: "id=m-1",
+          getWorkouts: async () => ok([legs, pushDay]),
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        await expandWeek(user, 1);
+
+        // Act
+        await user.click(within(weekRow(1)).getByRole("button", { name: "Eliminar Pierna" }));
+
+        // Assert
+        const dialog = await screen.findByRole("dialog", { name: "¿Eliminar entrenamiento?" });
+        expect(within(dialog).getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
+        expect(within(dialog).getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
+        expect(deleteWorkout).not.toHaveBeenCalled();
+      });
+
+      it("shows the delete action to an admin on each workout of the week", async () => {
+        // Arrange
+        const { rendered } = renderMesocycle({
+          search: "id=m-1",
+          profile: adminProfile,
+          getWorkouts: async () => ok([legs, { ...pushDay, status: "PUBLISHED" }]),
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+
+        // Act
+        await expandWeek(user, 1);
+
+        // Assert
+        const row = weekRow(1);
+        expect(within(row).getByRole("button", { name: "Eliminar Pierna" })).toBeInTheDocument();
+        expect(within(row).getByRole("button", { name: "Eliminar Empuje" })).toBeInTheDocument();
+      });
+
+      it("closes the dialog without deleting when Cancelar is pressed", async () => {
+        // Arrange
+        const { deleteWorkout, rendered } = renderMesocycle({
+          search: "id=m-1",
+          getWorkouts: async () => ok([legs, pushDay]),
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        const dialog = await confirmDialogForLegs(user);
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+        // Assert
+        await waitFor(() =>
+          expect(
+            screen.queryByRole("dialog", { name: "¿Eliminar entrenamiento?" }),
+          ).not.toBeInTheDocument(),
+        );
+        expect(deleteWorkout).not.toHaveBeenCalled();
+      });
+
+      it("deletes the workout once and reads the workouts again, but not the mesocycle", async () => {
+        // Arrange
+        const getWorkouts = vi
+          .fn<() => Answer<WorkoutListItem[]>>()
+          .mockResolvedValueOnce(ok([legs, pushDay]))
+          .mockResolvedValueOnce(ok([pushDay]));
+        const { deleteWorkout, getMesocycle, rendered, ...fakes } = renderMesocycle({
+          search: "id=m-1",
+          getWorkouts,
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        const dialog = await confirmDialogForLegs(user);
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+        // Assert
+        await waitFor(() =>
+          expect(
+            screen.queryByRole("dialog", { name: "¿Eliminar entrenamiento?" }),
+          ).not.toBeInTheDocument(),
+        );
+        await waitFor(() =>
+          expect(within(weeksCard()).getByText("1 entrenamiento")).toBeInTheDocument(),
+        );
+        expect(deleteWorkout).toHaveBeenCalledTimes(1);
+        expect(deleteWorkout).toHaveBeenCalledWith({ id: "w-1" });
+        expect(fakes.getWorkouts).toHaveBeenCalledTimes(2);
+        expect(getMesocycle).toHaveBeenCalledTimes(1);
+      });
+
+      it("leaves a week whose last workout was deleted with its create action and no expansion", async () => {
+        // Arrange
+        const getWorkouts = vi
+          .fn<() => Answer<WorkoutListItem[]>>()
+          .mockResolvedValueOnce(ok([legs]))
+          .mockResolvedValueOnce(ok([]));
+        const { rendered } = renderMesocycle({ search: "id=m-1", getWorkouts });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        const dialog = await confirmDialogForLegs(user);
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+        // Assert
+        await waitFor(() =>
+          expect(
+            within(weekRow(1)).queryByRole("button", { name: /entrenamientos de la semana 1/ }),
+          ).toBeNull(),
+        );
+        expect(
+          within(weekRow(1)).getByRole("button", { name: "Nuevo entrenamiento" }),
+        ).toBeInTheDocument();
+      });
+
+      it("explains in the weeks card that only drafts can be deleted when the API answers CONFLICT", async () => {
+        // Arrange
+        const { getWorkouts, rendered } = renderMesocycle({
+          search: "id=m-1",
+          getWorkouts: async () => ok([legs, pushDay]),
+          deleteWorkout: async () => fail(new DomainError("CONFLICT", "")),
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        const dialog = await confirmDialogForLegs(user);
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+        // Assert
+        await waitFor(() =>
+          expect(
+            screen.queryByRole("dialog", { name: "¿Eliminar entrenamiento?" }),
+          ).not.toBeInTheDocument(),
+        );
+        expect(
+          within(weeksCard()).getByText("Solo se pueden eliminar entrenamientos en borrador."),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByText("La operación entra en conflicto con el estado actual."),
+        ).not.toBeInTheDocument();
+        expect(getWorkouts).toHaveBeenCalledTimes(1);
+      });
+
+      it("shows the error for its code in the weeks card when the deletion fails for another reason", async () => {
+        // Arrange
+        const { getWorkouts, rendered } = renderMesocycle({
+          search: "id=m-1",
+          getWorkouts: async () => ok([legs, pushDay]),
+          deleteWorkout: async () => fail(new DomainError("FORBIDDEN", "")),
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        const dialog = await confirmDialogForLegs(user);
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+
+        // Assert
+        await waitFor(() =>
+          expect(
+            screen.queryByRole("dialog", { name: "¿Eliminar entrenamiento?" }),
+          ).not.toBeInTheDocument(),
+        );
+        expect(
+          within(weeksCard()).getByText("No tienes permiso para realizar esta acción."),
+        ).toBeInTheDocument();
+        expect(within(weekRow(1)).getByText("Pierna")).toBeInTheDocument();
+        expect(getWorkouts).toHaveBeenCalledTimes(1);
+      });
+
+      it("labels the delete action in the active language", async () => {
+        // Arrange
+        const { rendered } = renderMesocycle({
+          search: "id=m-1",
+          getWorkouts: async () => ok([legs]),
+        });
+        await rendered;
+        await openedEditForm();
+        const user = userEvent.setup();
+        await expandWeek(user, 1);
+
+        // Act
+        await act(() => i18n.changeLanguage("en"));
+
+        // Assert
+        expect(screen.getByRole("button", { name: "Delete Pierna" })).toBeInTheDocument();
+      });
     });
 
     describe("from a template", () => {

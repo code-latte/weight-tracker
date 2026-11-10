@@ -48,4 +48,14 @@ public abstract class WorkoutEndpointTest : IntegrationTest
 
         return value.ValueKind == JsonValueKind.Null ? null : value.GetDateTime();
     }
+
+    /// <summary>The <c>completedAt</c> of a workout as an admin reads it, <c>null</c> when it was never completed.</summary>
+    protected async Task<DateTime?> CompletedAtOf(Guid workoutId)
+    {
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+        var workout = await admin.GetFromJsonAsync<JsonElement>($"/workouts/{workoutId}", JsonOptions);
+        var value = workout.GetProperty("completedAt");
+
+        return value.ValueKind == JsonValueKind.Null ? null : value.GetDateTime();
+    }
 }

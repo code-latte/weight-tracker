@@ -2068,6 +2068,114 @@
         ]
       }
     },
+    "/workouts/{workoutId}": {
+      "delete": {
+        "tags": [
+          "Workouts"
+        ],
+        "parameters": [
+          {
+            "name": "workoutId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/workouts/{workoutId}/superseries": {
       "post": {
         "tags": [
@@ -9910,6 +10018,7 @@
           "exercises",
           "mesocycleId",
           "mesocycleWeekNumber",
+          "completedAt",
           "reviewedAt",
           "reviewedBy",
           "resultsUpdatedAt",
@@ -9971,6 +10080,13 @@
             ],
             "format": "int32"
           },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
           "reviewedAt": {
             "type": [
               "null",
@@ -10019,6 +10135,7 @@
           "exercises",
           "mesocycleId",
           "mesocycleWeekNumber",
+          "completedAt",
           "reviewedAt",
           "reviewedBy",
           "resultsUpdatedAt"
@@ -10077,6 +10194,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "reviewedAt": {
             "type": [
@@ -10245,6 +10369,7 @@
           "trainer",
           "mesocycleId",
           "mesocycleWeekNumber",
+          "completedAt",
           "reviewedAt",
           "reviewedBy",
           "resultsUpdatedAt"
@@ -10317,6 +10442,13 @@
             ],
             "format": "int32"
           },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
           "reviewedAt": {
             "type": [
               "null",
@@ -10352,6 +10484,7 @@
           "exercises",
           "mesocycleId",
           "mesocycleWeekNumber",
+          "completedAt",
           "reviewedAt",
           "reviewedBy",
           "resultsUpdatedAt"
@@ -10410,6 +10543,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "reviewedAt": {
             "type": [

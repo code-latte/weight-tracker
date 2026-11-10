@@ -17,20 +17,24 @@ public class ChangeWorkoutStatusUseCase
 
     private IUnitOfWork _unitOfWork;
 
+    private IClock _clock;
+
     public ChangeWorkoutStatusUseCase(
         IWorkoutRepository workouts,
         WorkoutStatusAuthorizer authorizer,
-        IUnitOfWork unitOfWork
+        IUnitOfWork unitOfWork,
+        IClock clock
     )
     {
         _workouts = workouts;
         _authorizer = authorizer;
         _unitOfWork = unitOfWork;
+        _clock = clock;
     }
 
     /// <summary>
     /// Moves an existing workout to another status. An admin may set any status; everybody else only
-    /// follows the lifecycle of the workout.
+    /// follows the lifecycle of the workout. Completing records the server time as the completion time.
     /// </summary>
     /// <returns>The updated workout.</returns>
     /// <exception cref="WorkoutNotFoundException">When no workout has the given id.</exception>
@@ -50,9 +54,9 @@ public class ChangeWorkoutStatusUseCase
         _authorizer.EnsureCanChange(workout, callerId, callerRole, target, "PUT /workouts/{workoutId}/status");
 
         if (callerRole == Role.ADMIN)
-            workout.OverrideStatus(target);
+            workout.OverrideStatus(target, _clock.UtcNow);
         else
-            workout.ChangeStatus(target);
+            workout.ChangeStatus(target, _clock.UtcNow);
 
         await _workouts.Save(workout, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

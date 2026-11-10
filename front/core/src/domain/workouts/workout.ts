@@ -29,6 +29,7 @@ export type WorkoutStatus = components["schemas"]["WorkoutStatus"];
 export type UpdateWorkoutInput = UpdateWorkoutRequest & { id: string };
 export type AddExerciseToWorkoutInput = AddExerciseRequest & { workoutId: string };
 export type GetWorkoutByIdInput = { id: string };
+export type DeleteWorkoutInput = { id: string };
 /** The list's query: `standalone` keeps only the workouts not placed in a mesocycle. */
 export type GetWorkoutsInput = { standalone?: boolean };
 /** Both ids travel in the path; `exerciseId` is the catalog exercise, not the workout entry. */

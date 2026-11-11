@@ -212,12 +212,25 @@ builder.Services.AddAuthorization();
 
 // Applied in Development only, so browsers and devices on the local network can call the API.
 const string DevelopmentCorsPolicy = "DevelopmentCors";
+
+// Applied in Production only: the website and the backoffice are the only browser clients.
+// Native mobile apps are not subject to CORS.
+const string ProductionCorsPolicy = "ProductionCors";
 builder.Services.AddCors(options =>
+{
     options.AddPolicy(
         DevelopmentCorsPolicy,
         policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()
-    )
-);
+    );
+    options.AddPolicy(
+        ProductionCorsPolicy,
+        policy =>
+            policy
+                .WithOrigins("https://trainera.es", "https://www.trainera.es", "https://app.trainera.es")
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+    );
+});
 
 // Applied per endpoint through [EnableRateLimiting]; endpoints without it are never limited.
 builder.Services.AddRateLimiter(options =>
@@ -253,14 +266,26 @@ builder.Services.AddOpenApi(options =>
 var app = builder.Build();
 
 // The document is also served under Testing so the integration suite can assert its contents.
-// The reference UI, the startup migration and the seeder stay Development only.
+// The reference UI and the seeder stay Development only.
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
     app.MapOpenApi();
 
+// The integration host migrates its own database, so Testing is skipped
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    DatabaseMigrator.MigrateUp(
+        connectionString,
+        builder.Configuration.GetSection(AdminUserOptions.SectionName).Get<AdminUserOptions>() ?? new AdminUserOptions()
+    );
+}
+
+// CORS must stay ahead of UseHttpsRedirection and UseAuthentication so preflight
+// requests are answered without a redirect or a bearer token.
+if (app.Environment.IsProduction())
+    app.UseCors(ProductionCorsPolicy);
+
 if (app.Environment.IsDevelopment())
 {
-    // Must stay ahead of UseHttpsRedirection and UseAuthentication so preflight
-    // requests are answered without a redirect or a bearer token.
     app.UseCors(DevelopmentCorsPolicy);
 
     app.MapScalarApiReference(options =>
@@ -268,11 +293,6 @@ if (app.Environment.IsDevelopment())
             .WithTitle("Weight Tracker API")
             .AddPreferredSecuritySchemes(BearerSecuritySchemeTransformer.SchemeName)
             .EnablePersistentAuthentication()
-    );
-
-    DatabaseMigrator.MigrateUp(
-        connectionString,
-        builder.Configuration.GetSection(AdminUserOptions.SectionName).Get<AdminUserOptions>() ?? new AdminUserOptions()
     );
 
     using var scope = app.Services.CreateScope();

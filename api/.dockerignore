@@ -1,0 +1,8 @@
+**/bin
+**/obj
+test
+openspec
+*.md
+Dockerfile
+.dockerignore
+**/appsettings.Development.json

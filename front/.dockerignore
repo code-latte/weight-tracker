@@ -1,0 +1,12 @@
+**/node_modules
+**/.next
+**/out
+**/.turbo
+**/.expo
+**/test-results
+**/*.tsbuildinfo
+**/.env*
+.git
+app
+**/Dockerfile
+.dockerignore

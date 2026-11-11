@@ -1,0 +1,145 @@
+name: Deploy Weight Tracker
+
+on:
+  push:
+    branches: [release]
+  workflow_dispatch:
+    inputs:
+      deploy_api:
+        description: "Deploy API"
+        type: boolean
+        default: false
+      deploy_backoffice:
+        description: "Deploy Backoffice"
+        type: boolean
+        default: false
+      deploy_website:
+        description: "Deploy Website"
+        type: boolean
+        default: false
+
+# Runs wait for each other instead of deploying over one another; a queued run is never cancelled.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  detect-changes:
+    runs-on: [self-hosted]
+    outputs:
+      api: ${{ steps.changes.outputs.api }}
+      backoffice: ${{ steps.changes.outputs.backoffice }}
+      website: ${{ steps.changes.outputs.website }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history, so the pushed range can be diffed however many commits it holds
+          fetch-depth: 0
+
+      - name: Detect changed folders
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "api=${{ inputs.deploy_api }}" >> $GITHUB_OUTPUT
+            echo "backoffice=${{ inputs.deploy_backoffice }}" >> $GITHUB_OUTPUT
+            echo "website=${{ inputs.deploy_website }}" >> $GITHUB_OUTPUT
+          else
+            # Compare against what release pointed to before the push. With no usable previous commit
+            # (first push of the branch, or a force push that rewrote it) everything is deployed.
+            BEFORE="${{ github.event.before }}"
+            if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+              changed() { echo true; }
+            else
+              changed() { git diff --name-only "$BEFORE" HEAD | grep -qE "$1" && echo true || echo false; }
+            fi
+            echo "api=$(changed '^api/')" >> $GITHUB_OUTPUT
+            # The backoffice consumes @weight-tracker/core, so core changes redeploy it too.
+            echo "backoffice=$(changed '^front/(backoffice|core)/|^front/pnpm-lock.yaml')" >> $GITHUB_OUTPUT
+            echo "website=$(changed '^front/website/|^front/pnpm-lock.yaml')" >> $GITHUB_OUTPUT
+          fi
+
+  deploy-api:
+    runs-on: [self-hosted]
+    needs: detect-changes
+    if: needs.detect-changes.outputs.api == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release
+
+      - name: Build API image
+        run: |
+          docker build -t trainera-api:latest ./api
+
+      # Secrets are written to an env file next to the compose file instead of being baked into the image.
+      # Values are single-quoted so compose takes them literally; they must not contain a single quote.
+      - name: Write API secrets
+        env:
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+          JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          for name in DB_CONNECTION_STRING JWT_SIGNING_KEY ADMIN_EMAIL ADMIN_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::Secret $name is not set"; exit 1; fi
+          done
+          umask 077
+          cat > /opt/docker/trainera/trainera-api.env <<EOF
+          ConnectionStrings__Default='${DB_CONNECTION_STRING}'
+          Jwt__SigningKey='${JWT_SIGNING_KEY}'
+          AdminUser__Email='${ADMIN_EMAIL}'
+          AdminUser__Password='${ADMIN_PASSWORD}'
+          EOF
+
+      - name: Deploy API
+        run: |
+          cd /opt/docker/trainera
+          docker compose up -d --no-deps --force-recreate trainera-api
+          docker image prune -f
+
+  deploy-backoffice:
+    runs-on: [self-hosted]
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backoffice == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release
+
+      # Build context is front/ (pnpm workspace root) so the image can resolve @weight-tracker/core.
+      - name: Build Backoffice image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }} \
+            -f ./front/backoffice/Dockerfile \
+            -t trainera-app:latest ./front
+
+      - name: Deploy Backoffice
+        run: |
+          cd /opt/docker/trainera
+          docker compose up -d --no-deps trainera-app
+          docker image prune -f
+
+  deploy-website:
+    runs-on: [self-hosted]
+    needs: detect-changes
+    if: needs.detect-changes.outputs.website == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release
+
+      - name: Build Website image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }} \
+            --build-arg NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }} \
+            --build-arg NEXT_PUBLIC_LAUNCH_STATE=${{ vars.NEXT_PUBLIC_LAUNCH_STATE }} \
+            -f ./front/website/Dockerfile \
+            -t trainera-web:latest ./front
+
+      - name: Deploy Website
+        run: |
+          cd /opt/docker/trainera
+          docker compose up -d --no-deps trainera-web
+          docker image prune -f

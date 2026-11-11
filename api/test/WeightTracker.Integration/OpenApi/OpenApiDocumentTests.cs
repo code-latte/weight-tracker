@@ -79,6 +79,7 @@ public class OpenApiDocumentTests : IntegrationTest
     [Theory]
     [InlineData("/auth/login")]
     [InlineData("/auth/refresh")]
+    [InlineData("/customer-leads")]
     public async Task AnonymousOperation_ShouldCarryNoSecurityRequirement(string path)
     {
         // Arrange & Act
@@ -376,6 +377,29 @@ public class OpenApiDocumentTests : IntegrationTest
         operation.GetProperty("security")[0].TryGetProperty("Bearer", out _).Should().BeTrue();
         operation.GetProperty("responses").EnumerateObject().Select(property => property.Name)
             .Should().Contain(["200", "401", "403", "404", "409"]);
+    }
+
+    [Fact]
+    public async Task ListCustomerLeads_ShouldDocumentItsSecurityResponsesAndItemSchema()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var operation = Operation(document, "/customer-leads", "get");
+
+        operation.GetProperty("security")[0].TryGetProperty("Bearer", out _).Should().BeTrue();
+        operation.GetProperty("responses").EnumerateObject().Select(property => property.Name)
+            .Should().Contain(["200", "401", "403"]);
+
+        var itemReference = operation
+            .GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("items").GetProperty("$ref").GetString();
+        itemReference.Should().Be("#/components/schemas/CustomerLeadResponse");
+
+        document.GetProperty("components").GetProperty("schemas").GetProperty("CustomerLeadResponse")
+            .GetProperty("properties").EnumerateObject().Select(property => property.Name)
+            .Should().BeEquivalentTo("email", "registeredAtUtc");
     }
 
     [Fact]

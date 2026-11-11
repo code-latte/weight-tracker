@@ -35,6 +35,10 @@
       "workoutFeedback": "Workout feedback",
       "weeklyReviews": "Weekly reviews",
       "pendingReview": "Pending review"
+    },
+    "marketing": {
+      "title": "Marketing",
+      "leads": "Leads"
     }
   },
   "header": {

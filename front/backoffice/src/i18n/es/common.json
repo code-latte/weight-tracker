@@ -35,6 +35,10 @@
       "workoutFeedback": "Feedback de entrenamientos",
       "weeklyReviews": "Revisiones semanales",
       "pendingReview": "Pendientes de revisión"
+    },
+    "marketing": {
+      "title": "Marketing",
+      "leads": "Leads"
     }
   },
   "header": {

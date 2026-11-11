@@ -8,3 +8,4 @@ export * from "./workout-templates";
 export * from "./mesocycles";
 export * from "./trainer-athletes";
 export * from "./athlete-invitations";
+export * from "./customer-leads";

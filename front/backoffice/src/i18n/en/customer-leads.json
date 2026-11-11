@@ -1,0 +1,10 @@
+{
+  "list": {
+    "title": "Leads",
+    "columns": {
+      "email": "Email",
+      "registeredAt": "Registered on"
+    },
+    "empty": "No leads yet."
+  }
+}

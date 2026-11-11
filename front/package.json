@@ -11,7 +11,8 @@
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
     "dev:backoffice": "turbo run dev --filter=backoffice",
-    "dev:app": "turbo run dev --filter=app"
+    "dev:app": "turbo run dev --filter=app",
+    "dev:website": "turbo run dev --filter=website"
   },
   "devDependencies": {
     "prettier": "^3.9.10",

@@ -1,0 +1,63 @@
+/*
+ * The website's design tokens. Colour values are the backoffice theme's, re-declared here: the website imports
+ * nothing from the other workspaces (STPR_INVARIANTS.md, section 4.4).
+ */
+:root {
+  /* Colour */
+  --color-primary: #0f766e;
+  --color-primary-light: #14b8a6;
+  --color-primary-bright: #2dd4bf;
+  --color-pine: #115e59;
+  --color-secondary: #f97316;
+  --color-secondary-dark: #c2410c;
+  --color-ink: #0f172a;
+  --color-ink-muted: #475569;
+  --color-background: #f8fafc;
+  --color-paper: #ffffff;
+  --color-fog: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-on-ink: #f1f5f9;
+  --color-on-ink-muted: #cbd5e1;
+  --color-error: #b91c1c;
+  --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-pine) 100%);
+
+  /* Type */
+  --font-heading:
+    var(--font-plus-jakarta-sans), "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --font-body: var(--font-inter), "Inter", system-ui, sans-serif;
+  --text-h1: clamp(2.25rem, 1.4rem + 3.6vw, 4rem); /* 36 → 64 px */
+  --text-h2: clamp(1.75rem, 1.3rem + 1.9vw, 2.75rem); /* 28 → 44 px */
+  --text-h3: clamp(1.25rem, 1.1rem + 0.7vw, 1.75rem); /* 20 → 28 px */
+  --text-lead: clamp(1.0625rem, 1rem + 0.25vw, 1.125rem); /* 17 → 18 px */
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-overline: 0.8125rem;
+
+  /* Shape */
+  --radius-card: 16px;
+  --radius-button: 12px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.06);
+  --shadow-raised: 0 2px 4px rgb(15 23 42 / 0.06), 0 16px 40px rgb(15 23 42 / 0.12);
+
+  /* Space */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --section-padding: clamp(4rem, 3rem + 4vw, 7rem);
+  --container: 1200px;
+  --gutter: clamp(1rem, 0.5rem + 2vw, 2rem);
+
+  /* Motion */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+
+  /* Layout */
+  --header-height: 72px;
+  --touch-target: 44px;
+}

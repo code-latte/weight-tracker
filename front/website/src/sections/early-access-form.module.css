@@ -1,0 +1,85 @@
+.form {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+
+.title {
+  font-size: var(--text-h3);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.label {
+  font-weight: 600;
+}
+
+.input {
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  transition: border-color var(--transition-fast);
+}
+
+.input:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--color-error);
+}
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.checkbox {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0.1rem 0 0;
+  accent-color: var(--color-primary);
+}
+
+.error {
+  color: var(--color-error);
+  font-size: var(--text-small);
+}
+
+.alert {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-button);
+  background: rgb(185 28 28 / 0.08);
+  color: var(--color-error);
+}
+
+/* Out of sight and out of the accessibility tree: only bots fill it in. */
+.honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.confirmation {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: rgb(20 184 166 / 0.1);
+  color: var(--color-pine);
+}
+
+.confirmation h3 {
+  font-size: var(--text-h3);
+}

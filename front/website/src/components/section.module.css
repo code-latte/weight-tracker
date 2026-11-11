@@ -1,0 +1,58 @@
+.section {
+  padding-block: var(--section-padding);
+}
+
+.paper {
+  background: var(--color-paper);
+}
+
+.fog {
+  background: var(--color-fog);
+}
+
+.background {
+  background: var(--color-background);
+}
+
+.ink {
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+.gradient {
+  background: var(--gradient-primary);
+  color: var(--color-paper);
+}
+
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.heading {
+  max-width: 48rem;
+  margin-bottom: var(--space-7);
+}
+
+.centered {
+  margin-inline: auto;
+  text-align: center;
+}
+
+.title {
+  font-size: var(--text-h2);
+  font-weight: 800;
+}
+
+.lead {
+  margin-top: var(--space-4);
+  font-size: var(--text-lead);
+  color: var(--color-ink-muted);
+}
+
+.ink .lead,
+.gradient .lead {
+  color: var(--color-on-ink-muted);
+}

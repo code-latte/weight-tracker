@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using WeightTracker.Domain.Common;
 using WeightTracker.Domain.Exercises;
 using WeightTracker.Domain.Mesocycles;
 using WeightTracker.Domain.Workouts;
@@ -49,6 +50,8 @@ public class WeightTrackerDbContext : DbContext
     public DbSet<MesocycleEntity> Mesocycles => Set<MesocycleEntity>();
 
     public DbSet<MesocycleWeekEntity> MesocycleWeeks => Set<MesocycleWeekEntity>();
+
+    public DbSet<CustomerLeadEntity> CustomerLeads => Set<CustomerLeadEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -419,6 +422,16 @@ public class WeightTrackerDbContext : DbContext
 
             // Lets EF delete a removed week before inserting a new one with the same number
             entity.HasIndex(week => new { week.MesocycleId, week.WeekNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<CustomerLeadEntity>(entity =>
+        {
+            entity.ToTable("CustomerLeads");
+            entity.HasKey(lead => lead.Id);
+            entity.Property(lead => lead.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(lead => lead.Email).HasColumnName("Email").HasMaxLength(Email.MaxLength).IsRequired();
+            entity.Property(lead => lead.RegisteredAtUtc).HasColumnName("RegisteredAtUtc").HasColumnType("timestamptz");
+            entity.HasIndex(lead => lead.Email).IsUnique();
         });
     }
 }

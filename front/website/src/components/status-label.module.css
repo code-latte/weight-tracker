@@ -1,0 +1,18 @@
+.label {
+  display: inline-block;
+  margin-inline-start: var(--space-2);
+  padding: 0.125rem var(--space-2);
+  border-radius: var(--radius-pill);
+  background: rgb(249 115 22 / 0.14);
+  color: var(--color-secondary-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.onInk {
+  background: rgb(249 115 22 / 0.2);
+  color: #fdba74;
+}

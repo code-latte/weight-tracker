@@ -1,0 +1,29 @@
+.grid {
+  display: grid;
+  gap: var(--space-7);
+  align-items: center;
+}
+
+.panel {
+  padding: var(--space-6);
+  border: 1px solid rgb(45 212 191 / 0.25);
+  border-radius: var(--radius-card);
+  background: rgb(255 255 255 / 0.03);
+}
+
+.motto {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  font-family: var(--font-heading);
+  font-size: var(--text-h3);
+  font-weight: 800;
+  color: var(--color-primary-bright);
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: 1.1fr 1fr;
+  }
+}

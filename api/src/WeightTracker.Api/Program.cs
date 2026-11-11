@@ -1,16 +1,21 @@
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using WeightTracker.Api.Common;
+using WeightTracker.Api.Endpoints.CustomerLeads;
 using WeightTracker.Api.OpenApi;
 using WeightTracker.Application.Common;
 using WeightTracker.Application.Interfaces;
 using WeightTracker.Application.Services;
 using WeightTracker.Application.UseCases.AthleteInvitations;
 using WeightTracker.Application.UseCases.Auth;
+using WeightTracker.Application.UseCases.CustomerLeads;
 using WeightTracker.Application.UseCases.ExerciseFavorites;
 using WeightTracker.Application.UseCases.Exercises;
 using WeightTracker.Application.UseCases.Mesocycles;
@@ -61,6 +66,17 @@ if (trainerInvitationOptions.ExpirationDays < TrainerInvitationOptions.MinimumEx
             + "Supply it through configuration or the TrainerInvitations__ExpirationDays environment variable."
     );
 
+// Bound through options rather than read here, so the limiter sees the host's final configuration.
+// Fail fast on start: a zero limit or window would reject every lead or never reset.
+builder.Services.AddOptions<CustomerLeadsRateLimitOptions>()
+    .Bind(builder.Configuration.GetSection(CustomerLeadsRateLimitOptions.SectionName))
+    .Validate(
+        options => options.PermitLimit >= 1 && options.WindowSeconds >= 1,
+        "RateLimiting:CustomerLeads:PermitLimit and RateLimiting:CustomerLeads:WindowSeconds must be at least 1. "
+            + "Supply them through configuration or the RateLimiting__CustomerLeads__* environment variables."
+    )
+    .ValidateOnStart();
+
 builder.Services.AddDbContext<WeightTrackerDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
@@ -75,6 +91,7 @@ builder.Services.AddScoped<ITrainerAthleteRepository, TrainerAthleteRepository>(
 builder.Services.AddScoped<ITrainerInvitationRepository, TrainerInvitationRepository>();
 builder.Services.AddScoped<IMesocycleRepository, MesocycleRepository>();
 builder.Services.AddScoped<IWorkoutTemplateRepository, WorkoutTemplateRepository>();
+builder.Services.AddScoped<ICustomerLeadRepository, CustomerLeadRepository>();
 
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
@@ -125,6 +142,7 @@ builder.Services.AddScoped<RemoveSetRecordUseCase>();
 builder.Services.AddScoped<ReorderSetRecordsUseCase>();
 builder.Services.AddScoped<LoginUseCase>();
 builder.Services.AddScoped<SignupUseCase>();
+builder.Services.AddScoped<RegisterCustomerLeadUseCase>();
 builder.Services.AddScoped<RefreshTokenUseCase>();
 builder.Services.AddScoped<GetAuthenticatedUserUseCase>();
 builder.Services.AddScoped<UpdateMyProfileUseCase>();
@@ -201,6 +219,28 @@ builder.Services.AddCors(options =>
     )
 );
 
+// Applied per endpoint through [EnableRateLimiting]; endpoints without it are never limited.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // The test server has no remote address, so every test request shares one partition
+    options.AddPolicy(CustomerLeadsRateLimitOptions.PolicyName, context =>
+    {
+        var limit = context.RequestServices.GetRequiredService<IOptions<CustomerLeadsRateLimitOptions>>().Value;
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = limit.PermitLimit,
+                Window = TimeSpan.FromSeconds(limit.WindowSeconds),
+                QueueLimit = 0,
+            }
+        );
+    });
+});
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi(options =>
 {
@@ -240,6 +280,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Ahead of UseAuthentication so a rejected request costs no token validation
+app.UseRateLimiter();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

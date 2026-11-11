@@ -1,0 +1,21 @@
+.card {
+  height: 100%;
+  padding: var(--space-6);
+  background: var(--color-paper);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition:
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-raised);
+  transform: translateY(-2px);
+}
+
+.flat:hover {
+  box-shadow: var(--shadow-card);
+  transform: none;
+}

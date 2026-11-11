@@ -1,0 +1,74 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  cursor: progress;
+  opacity: 0.7;
+  transform: none;
+}
+
+/* The corporate orange with ink text: the only colour pairing with enough contrast. */
+.cta {
+  background: var(--color-secondary);
+  color: var(--color-ink);
+  box-shadow: 0 6px 16px rgb(249 115 22 / 0.25);
+}
+
+.cta:hover {
+  background: #fb8a3c;
+}
+
+.primary {
+  background: var(--color-primary);
+  color: var(--color-paper);
+}
+
+.primary:hover {
+  background: var(--color-pine);
+}
+
+.outline {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-ink);
+}
+
+.outline:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.large {
+  min-height: 52px;
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--text-lead);
+}
+
+.block {
+  width: 100%;
+}

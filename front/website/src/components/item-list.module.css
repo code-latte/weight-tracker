@@ -1,0 +1,32 @@
+.list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.mark {
+  flex: none;
+  display: inline-flex;
+  margin-top: 0.15rem;
+  color: var(--color-primary);
+}
+
+.soon .mark {
+  color: var(--color-border);
+}
+
+.onInk .mark {
+  color: var(--color-primary-bright);
+}
+
+.onInk .soon .mark {
+  color: #475569;
+}

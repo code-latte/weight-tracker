@@ -337,6 +337,21 @@ Only aggregate roots get a repository. Keep these shapes so every repository rea
 - "Not found" is `null`, never an exception. The caller decides whether that is an error.
 - `Save` stages both inserts and updates, branching on `IsNew`. It never commits.
 
+### Non-domain records
+
+The single exception to "only aggregate roots get a repository". A non-domain record is data the system
+stores but never models: it has no invariants beyond those of the value objects it holds, no lifecycle, and the
+API never reads it back. `CustomerLeads` is the example.
+
+- It gets no domain type and no mapper. Its repository contract takes value objects (`Id`, `Email`, ...) and
+  primitives instead of an aggregate, and still never exposes EF entities.
+- Because there is no `IsNew` to branch on, the write is named for what it does (`Add`), not `Save`.
+- Every other repository rule still applies: contract in `Application/Interfaces`, implementation in
+  `Infra/Repositories`, EF entities built inside it, and committing only through `IUnitOfWork`.
+- Input is still validated through the shared value objects before anything is staged.
+- The moment such a record gains a rule, a state change or a read, it stops qualifying and is modelled as an
+  aggregate.
+
 ### Unit of work
 
 - `IUnitOfWork` is the transaction boundary. It is scoped per request, sharing one `DbContext`

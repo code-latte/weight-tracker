@@ -7,3 +7,4 @@ export { default as ExerciseRepository } from "./exercise-repository";
 export { default as ExerciseFavoriteRepository } from "./exercise-favorite-repository";
 export { default as TrainerAthleteRepository } from "./trainer-athlete-repository";
 export { default as AthleteInvitationRepository } from "./athlete-invitation-repository";
+export { default as CustomerLeadRepository } from "./customer-lead-repository";

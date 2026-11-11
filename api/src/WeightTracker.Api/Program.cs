@@ -143,6 +143,7 @@ builder.Services.AddScoped<ReorderSetRecordsUseCase>();
 builder.Services.AddScoped<LoginUseCase>();
 builder.Services.AddScoped<SignupUseCase>();
 builder.Services.AddScoped<RegisterCustomerLeadUseCase>();
+builder.Services.AddScoped<GetAllCustomerLeadsUseCase>();
 builder.Services.AddScoped<RefreshTokenUseCase>();
 builder.Services.AddScoped<GetAuthenticatedUserUseCase>();
 builder.Services.AddScoped<UpdateMyProfileUseCase>();

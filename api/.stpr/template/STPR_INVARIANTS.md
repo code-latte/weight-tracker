@@ -341,16 +341,19 @@ Only aggregate roots get a repository. Keep these shapes so every repository rea
 
 The single exception to "only aggregate roots get a repository". A non-domain record is data the system
 stores but never models: it has no invariants beyond those of the value objects it holds, no lifecycle, and the
-API never reads it back. `CustomerLeads` is the example.
+only read the API offers is an administrator listing it. `CustomerLeads` is the example.
 
 - It gets no domain type and no mapper. Its repository contract takes value objects (`Id`, `Email`, ...) and
   primitives instead of an aggregate, and still never exposes EF entities.
+- It may have one read: an admin-only, read-only list. The repository returns an Application view record
+  declared next to the use case (never an EF entity, never a domain type), and the use case rejects any role other
+  than `ADMIN` before reading.
 - Because there is no `IsNew` to branch on, the write is named for what it does (`Add`), not `Save`.
 - Every other repository rule still applies: contract in `Application/Interfaces`, implementation in
   `Infra/Repositories`, EF entities built inside it, and committing only through `IUnitOfWork`.
 - Input is still validated through the shared value objects before anything is staged.
-- The moment such a record gains a rule, a state change or a read, it stops qualifying and is modelled as an
-  aggregate.
+- The moment such a record gains a rule, a state change or a read by anyone other than an administrator, it
+  stops qualifying and is modelled as an aggregate.
 
 ### Unit of work
 

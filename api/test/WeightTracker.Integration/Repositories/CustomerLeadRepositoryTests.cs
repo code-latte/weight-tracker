@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using WeightTracker.Application.Common;
 using WeightTracker.Application.Exceptions;
 using WeightTracker.Application.Interfaces;
+using WeightTracker.Application.UseCases.CustomerLeads;
 using WeightTracker.Domain.Common;
 using WeightTracker.Infra.Entities;
 using WeightTracker.Infra.Persistence;
@@ -33,6 +34,10 @@ public class CustomerLeadRepositoryTests : IntegrationTest
     private Task<bool> Exists(Email email)
         => Factory.WithScope(services => services.GetRequiredService<ICustomerLeadRepository>()
             .ExistsByEmail(email, CancellationToken.None));
+
+    private Task<IReadOnlyList<CustomerLeadView>> GetAll()
+        => Factory.WithScope(services => services.GetRequiredService<ICustomerLeadRepository>()
+            .GetAll(CancellationToken.None));
 
     private Task<List<CustomerLeadEntity>> StoredLeads()
         => Factory.WithScope(services => services.GetRequiredService<WeightTrackerDbContext>()
@@ -79,6 +84,56 @@ public class CustomerLeadRepositoryTests : IntegrationTest
 
         // Assert
         exists.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldBeEmptyWhenNoLeadIsStored()
+    {
+        // Arrange
+        // No lead is stored after the baseline reseed
+
+        // Act
+        var leads = await GetAll();
+
+        // Assert
+        leads.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldReturnEveryLeadNewestFirst()
+    {
+        // Arrange
+        await Write(async repository =>
+        {
+            await repository.Add(Id.New(), Email.From("first@example.com"), Start, CancellationToken.None);
+            await repository.Add(Id.New(), Email.From("second@example.com"), Start.AddMinutes(1), CancellationToken.None);
+        });
+
+        // Act
+        var leads = await GetAll();
+
+        // Assert
+        leads.Should().Equal(
+            new CustomerLeadView(Email.From("second@example.com"), Start.AddMinutes(1)),
+            new CustomerLeadView(Email.From("first@example.com"), Start));
+        leads.Should().OnlyContain(lead => lead.RegisteredAtUtc.Kind == DateTimeKind.Utc);
+    }
+
+    [Fact]
+    public async Task GetAll_ShouldOrderLeadsWithTheSameTimeByEmail()
+    {
+        // Arrange
+        await Write(async repository =>
+        {
+            await repository.Add(Id.New(), Email.From("zed@example.com"), Start, CancellationToken.None);
+            await repository.Add(Id.New(), Email.From("amy@example.com"), Start, CancellationToken.None);
+        });
+
+        // Act
+        var leads = await GetAll();
+
+        // Assert
+        leads.Select(lead => lead.Email.Value).Should().Equal("amy@example.com", "zed@example.com");
     }
 
     [Fact]

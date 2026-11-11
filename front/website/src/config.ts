@@ -16,9 +16,16 @@ export function baseUrlOf(value: string | undefined, fallback: string): string {
   return url.replace(/\/+$/, "");
 }
 
+/** A setting that may be absent: its trimmed value, or `null` for none or a blank one. */
+export function optionalSettingOf(value: string | undefined): string | null {
+  return value?.trim() || null;
+}
+
 /** Read once at build time: `NEXT_PUBLIC_*` values are inlined into the static export. */
 export const config = {
   apiUrl: baseUrlOf(process.env.NEXT_PUBLIC_API_URL, DEFAULT_API_URL),
   siteUrl: baseUrlOf(process.env.NEXT_PUBLIC_SITE_URL, DEFAULT_SITE_URL),
   launchState: launchStateOf(process.env.NEXT_PUBLIC_LAUNCH_STATE),
+  /** The Cookiebot domain group id. Without one the consent banner is not loaded, as in local runs and tests. */
+  cookiebotId: optionalSettingOf(process.env.NEXT_PUBLIC_COOKIEBOT_ID),
 };

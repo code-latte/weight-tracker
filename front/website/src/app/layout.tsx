@@ -37,6 +37,20 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="es" className={`${inter.variable} ${plusJakartaSans.variable}`}>
+      <head>
+        {config.cookiebotId && (
+          // Cookiebot asks to be the first script in <head>, loaded synchronously: its automatic blocking holds back
+          // every later script that sets cookies until the visitor consents. next/script cannot guarantee that order.
+          // eslint-disable-next-line @next/next/no-sync-scripts
+          <script
+            id="Cookiebot"
+            src="https://consent.cookiebot.com/uc.js"
+            data-cbid={config.cookiebotId}
+            data-blockingmode="auto"
+            type="text/javascript"
+          />
+        )}
+      </head>
       <body>{children}</body>
     </html>
   );

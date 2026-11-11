@@ -109,12 +109,10 @@ test("keeps the header on screen and compacts it once the page scrolls", async (
 
 test("shows the pending notice on a legal page without its text", async ({ page }) => {
   // Arrange & Act
-  await page.goto("/privacidad");
+  await page.goto("/cookies");
 
   // Assert
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Política de privacidad" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Política de cookies" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Contenido pendiente" })).toBeVisible();
 });
 

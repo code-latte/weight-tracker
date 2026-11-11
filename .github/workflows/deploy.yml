@@ -135,6 +135,7 @@ jobs:
             --build-arg NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }} \
             --build-arg NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }} \
             --build-arg NEXT_PUBLIC_LAUNCH_STATE=${{ vars.NEXT_PUBLIC_LAUNCH_STATE }} \
+            --build-arg NEXT_PUBLIC_COOKIEBOT_ID=${{ vars.NEXT_PUBLIC_COOKIEBOT_ID }} \
             -f ./front/website/Dockerfile \
             -t trainera-web:latest ./front
 

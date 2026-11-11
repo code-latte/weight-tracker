@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseUrlOf, launchStateOf } from "@/config";
+import { baseUrlOf, launchStateOf, optionalSettingOf } from "@/config";
 
 describe("launchStateOf", () => {
   it("is prelaunch when the setting is missing", () => {
@@ -57,5 +57,40 @@ describe("baseUrlOf", () => {
 
     // Assert
     expect(urls).toEqual(["http://localhost:5199", "http://localhost:5199"]);
+  });
+});
+
+describe("optionalSettingOf", () => {
+  it("is null when the setting is missing", () => {
+    // Arrange
+    const value = undefined;
+
+    // Act
+    const setting = optionalSettingOf(value);
+
+    // Assert
+    expect(setting).toBeNull();
+  });
+
+  it("is null for a blank setting", () => {
+    // Arrange
+    const value = "   ";
+
+    // Act
+    const setting = optionalSettingOf(value);
+
+    // Assert
+    expect(setting).toBeNull();
+  });
+
+  it("keeps a value, trimmed", () => {
+    // Arrange
+    const value = " 5bbf7ae5-6f1a-422a-be81-5ed8552043e3 ";
+
+    // Act
+    const setting = optionalSettingOf(value);
+
+    // Assert
+    expect(setting).toBe("5bbf7ae5-6f1a-422a-be81-5ed8552043e3");
   });
 });

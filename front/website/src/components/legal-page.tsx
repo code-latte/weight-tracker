@@ -39,7 +39,7 @@ function withLinks(text: string): ReactNode[] {
 function inline(text: string): ReactNode[] {
   return text
     .split(boldPattern)
-    .flatMap((part, index) =>
+    .flatMap<ReactNode>((part, index) =>
       index % 2 === 1
         ? [<strong key={index}>{withLinks(part.slice(2, -2))}</strong>]
         : withLinks(part),

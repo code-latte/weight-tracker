@@ -1,0 +1,32 @@
+.figure {
+  margin: 0;
+}
+
+.frame {
+  overflow: hidden;
+  background: var(--color-paper);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-raised);
+}
+
+.phone {
+  border: 6px solid var(--color-ink);
+  border-radius: 28px;
+}
+
+.image {
+  width: 100%;
+  height: auto;
+}
+
+.caption {
+  margin-top: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.onInk .caption {
+  color: var(--color-on-ink-muted);
+}

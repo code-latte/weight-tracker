@@ -1,0 +1,57 @@
+.grid {
+  display: grid;
+  gap: var(--space-7);
+  align-items: center;
+}
+
+.benefits {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.benefit strong {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+}
+
+.benefit span {
+  color: var(--color-ink-muted);
+}
+
+.columnTitle {
+  font-size: var(--text-h3);
+}
+
+.athlete {
+  display: grid;
+  gap: var(--space-5);
+  align-items: center;
+}
+
+.athleteCopy {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.athleteCopy p {
+  color: var(--color-ink-muted);
+}
+
+.phone {
+  width: min(260px, 70%);
+  margin-inline: auto;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr 1.4fr;
+  }
+
+  .athlete {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}

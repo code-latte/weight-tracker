@@ -6,16 +6,18 @@ and maintenance. The front is maintained with the STPR workflow. Architectural r
 
 ## Project Overview
 
-`front/` is a pnpm + Turborepo monorepo with three workspaces:
+`front/` is a pnpm + Turborepo monorepo with four workspaces:
 
 | Workspace     | Package                | Stack                                     | Users                 |
 | ------------- | ---------------------- | ----------------------------------------- | --------------------- |
 | `core/`       | `@weight-tracker/core` | Plain TypeScript                          | shared by both fronts |
 | `backoffice/` | `backoffice`           | Next.js static SPA + MUI                  | `ADMIN`, `TRAINER`    |
 | `app/`        | `app`                  | Expo (managed / CNG) + React Native Paper | athletes (`USER`)     |
+| `website/`    | `website`              | Next.js static site, no UI library        | public visitors       |
 
-It follows a layered Clean Architecture with an anemic domain generated from the API contract, and uses **STPR**
-as its development workflow. It is independent from the API's STPR in `api/.stpr/`. All modified code must align with:
+`core`, `backoffice` and `app` follow a layered Clean Architecture with an anemic domain generated from the API contract, and use **STPR**
+as their development workflow. `website` stands outside those layers and depends on no other workspace (see
+`.stpr/template/STPR_INVARIANTS.md`, section 4.4). The front is independent from the API's STPR in `api/.stpr/`. All modified code must align with:
 
 1. `.stpr/template/STPR_INVARIANTS.md`
 2. `AGENTS.md`
@@ -85,6 +87,8 @@ Detailed architectural rules, classification and reference examples belong in `.
   and every branch of the HTTP error mapper.
 - **Backoffice** (`backoffice/test`, Vitest + React Testing Library + jsdom; `backoffice/e2e`, Playwright): a
   component test per view, and an E2E per user flow the plan names.
+- **Website** (`website/test`, Vitest + React Testing Library + jsdom; `website/e2e`, Playwright): a component test
+  per section with behaviour and for the lead form, and an E2E per user flow the plan names.
 - **App** (`app/test`, Jest + `jest-expo` + React Native Testing Library): a component test per view. App E2E is
   a known gap, accepted for now.
 - **Roles.** When a view differs per role, cover every role branch and assert what is hidden, not only what is shown.
@@ -105,6 +109,7 @@ Requires Node `^22.13.0 || >=24` (jsdom's floor) and pnpm (version pinned in `pa
 pnpm install
 pnpm dev:backoffice   # next dev
 pnpm dev:app          # expo start
+pnpm dev:website      # next dev on port 3001
 pnpm typecheck
 pnpm lint             # ESLint + Prettier check
 pnpm format           # Prettier write
@@ -181,7 +186,7 @@ done
 - [ ] Components sit in their atomic level folder, imports flow downward, and only atoms import the UI library's widgets.
 - [ ] `src/app` holds routes only, and presentation never imports `@weight-tracker/core/infrastructure`.
 - [ ] New repositories, adapters and use cases are registered in each affected front's `container.ts`.
-- [ ] `backoffice` and `app` share no UI and do not import each other.
+- [ ] `backoffice`, `app` and `website` share no UI and do not import each other; `website` imports no workspace.
 - [ ] The backoffice is still a static export with no server-side code.
 - [ ] No file was hand-edited under `app/ios` or `app/android`.
 - [ ] Every user-visible string is translated in `es` and `en`.

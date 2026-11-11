@@ -75,6 +75,9 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             {
                 ["ConnectionStrings:Default"] = ConnectionString,
                 ["Jwt:SigningKey"] = SigningKey,
+                // High enough that the limiter, whose state survives ResetDatabase, never rejects a test.
+                // Tests of the limit itself build a derived factory with a lower one.
+                ["RateLimiting:CustomerLeads:PermitLimit"] = "10000",
             }));
     }
 
@@ -120,6 +123,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await context.Database.ExecuteSqlRawAsync(
             """
             TRUNCATE TABLE
+                "CustomerLeads",
                 "FavoriteExercises",
                 "MesocycleWeeks",
                 "Mesocycles",

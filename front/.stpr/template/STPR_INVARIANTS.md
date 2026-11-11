@@ -2,8 +2,9 @@
 
 This file is the front's technical contract under the STPR method.
 
-Use this file only for non-negotiable rules. It covers the three workspaces of `front/` (`core`, `backoffice`,
-`app`). The API has its own, independent STPR under `api/.stpr/`; nothing here applies to it and nothing there
+Use this file only for non-negotiable rules. It covers the three layered workspaces of `front/` (`core`,
+`backoffice`, `app`) and, through section 4.4 only, the `website` workspace, which stands outside the layered
+architecture. The API has its own, independent STPR under `api/.stpr/`; nothing here applies to it and nothing there
 applies here.
 
 ## 1. STPR Method Invariants
@@ -101,6 +102,7 @@ the API owns every business rule, and the front's domain is named from the API c
   `tsconfig` (`lib: ["ES2022"]`, `types: []`) enforces this; do not widen it.
 - `core/src/infrastructure` may use web-standard APIs present on both platforms (`fetch`, `URL`), nothing else.
 - `backoffice` and `app` never import each other. They are independent applications that share only `core`.
+- `website` never imports `core`, `backoffice` or `app`, and none of them imports it. It shares nothing with them.
 - Inside a front, `src/presentation` imports `core/domain` and `core/application` freely, but never
   `core/infrastructure`; only `src/infrastructure` (the composition root) touches it.
 - The one exception is the root providers component (`src/presentation/common/components/app-providers.tsx`),
@@ -479,3 +481,23 @@ Navigation:
   Views and components read colours with `useTheme()`; no colour literal appears outside `theme.ts`.
 - Styles are a `StyleSheet.create` at the bottom of the file. Inline style objects are allowed only for values read
   from the theme.
+
+### 4.4 Website: Next.js static site
+
+- `website` is Trainera's public website. It is not built with the layers of section 2: it holds no domain, no use
+  cases, no container and no atomic-design folders, and the rules of sections 2 and 4.2 do not apply to it except
+  where this section repeats them.
+- It depends on no other workspace and does not use the generated contract. It calls only public, anonymous API
+  endpoints, with `fetch`, through one module per endpoint; those endpoints are not added to `core`. ESLint
+  `no-restricted-imports` forbids `@weight-tracker/*` and relative imports into the other workspaces.
+- Next.js 16 with `output: "export"`: no server runtime, so no server actions, route handlers, middleware or
+  server-side data access. Read the relevant guide in `node_modules/next/dist/docs/` before writing Next code.
+- Copy is Spanish only and lives in `src/content`; components receive their texts from it and hold none. What the site
+  says about the product shows only what exists; anything else is labelled "Próximamente".
+- Its colours, type and spacing are its own CSS custom properties in `src/styles/tokens.css`; it never imports styles,
+  components or translations from the other workspaces.
+- It stores nothing in the browser and sets no cookie until a change adds analytics with consent. Forms send only
+  what the endpoint needs.
+- Tests live outside `src`: component and unit tests in `website/test` (Vitest + React Testing Library + jsdom), E2E
+  in `website/e2e` (Playwright, API intercepted with `page.route`), with the Arrange / Act / Assert convention of
+  section 3.

@@ -1,0 +1,19 @@
+.content {
+  display: grid;
+  gap: var(--space-5);
+  justify-items: center;
+  max-width: 44rem;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.title {
+  font-size: var(--text-h2);
+  font-weight: 800;
+  color: var(--color-paper);
+}
+
+.description {
+  font-size: var(--text-lead);
+  color: rgb(255 255 255 / 0.85);
+}

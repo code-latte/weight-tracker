@@ -1,0 +1,49 @@
+.panel {
+  display: grid;
+  gap: var(--space-7);
+  padding: clamp(1.5rem, 1rem + 3vw, 3rem);
+  background: var(--color-paper);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius-card) * 1.5);
+  box-shadow: var(--shadow-raised);
+}
+
+.copy {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  justify-items: start;
+}
+
+.title {
+  font-size: var(--text-h2);
+  font-weight: 800;
+}
+
+.description {
+  color: var(--color-ink-muted);
+  font-size: var(--text-lead);
+}
+
+.limit {
+  padding: var(--space-2) var(--space-4);
+  border-left: 4px solid var(--color-secondary);
+  background: rgb(249 115 22 / 0.08);
+  font-weight: 700;
+}
+
+.benefitsTitle {
+  font-size: 1.125rem;
+}
+
+.development {
+  color: var(--color-ink-muted);
+  font-size: var(--text-small);
+}
+
+@media (min-width: 900px) {
+  .panel {
+    grid-template-columns: 1.1fr 1fr;
+    align-items: start;
+  }
+}

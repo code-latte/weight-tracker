@@ -2,6 +2,7 @@ packages:
   - core
   - backoffice
   - app
+  - website
 
 allowBuilds:
   "@parcel/watcher": false

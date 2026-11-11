@@ -105,3 +105,4 @@ export type {
   InvitationTokenRequest,
   InviteAthleteRequest,
 } from "./athlete-invitations/athlete-invitation";
+export type { CustomerLead } from "./customer-leads/customer-lead";

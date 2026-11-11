@@ -34,6 +34,7 @@ import {
   EndTrainerAthleteUseCase,
   GetAthleteInvitationsUseCase,
   GetAthleteMesocyclesUseCase,
+  GetCustomerLeadsUseCase,
   GetExerciseFavoritesUseCase,
   GetExercisesUseCase,
   GetMesocycleByIdUseCase,
@@ -73,6 +74,7 @@ import {
   AthleteInvitationRepository,
   AuthRepository,
   Container,
+  CustomerLeadRepository,
   ExerciseFavoriteRepository,
   ExerciseRepository,
   FetchHttpClient,
@@ -106,6 +108,7 @@ const container = new Container<Dependencies>({
   exerciseFavoriteRepository: (c) => new ExerciseFavoriteRepository(c.resolve("httpClient")),
   trainerAthleteRepository: (c) => new TrainerAthleteRepository(c.resolve("httpClient")),
   athleteInvitationRepository: (c) => new AthleteInvitationRepository(c.resolve("httpClient")),
+  customerLeadRepository: (c) => new CustomerLeadRepository(c.resolve("httpClient")),
   signupUseCase: (c) =>
     new SignupUseCase(c.resolve("authRepository"), c.resolve("keyValueStore"), 2), // TRAINER
   loginUseCase: (c) => new LoginUseCase(c.resolve("authRepository"), c.resolve("keyValueStore")),
@@ -207,6 +210,7 @@ const container = new Container<Dependencies>({
     new AcceptAthleteInvitationUseCase(c.resolve("athleteInvitationRepository")),
   rejectAthleteInvitationUseCase: (c) =>
     new RejectAthleteInvitationUseCase(c.resolve("athleteInvitationRepository")),
+  getCustomerLeadsUseCase: (c) => new GetCustomerLeadsUseCase(c.resolve("customerLeadRepository")),
 });
 
 export default container;

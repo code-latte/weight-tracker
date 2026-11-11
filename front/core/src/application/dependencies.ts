@@ -5,6 +5,7 @@ import type {
   AuthResponse,
   CreatedAthleteInvitation,
   CreatedUserResponse,
+  CustomerLead,
   CreateUserRequest,
   CreateExerciseRequest,
   CreateMesocycleRequest,
@@ -68,6 +69,7 @@ import type {
 import type {
   AthleteInvitationRepositoryInterface,
   AuthRepositoryInterface,
+  CustomerLeadRepositoryInterface,
   ExerciseFavoriteRepositoryInterface,
   ExerciseRepositoryInterface,
   HttpClientInterface,
@@ -95,6 +97,7 @@ export default interface Dependencies {
   exerciseFavoriteRepository: ExerciseFavoriteRepositoryInterface;
   trainerAthleteRepository: TrainerAthleteRepositoryInterface;
   athleteInvitationRepository: AthleteInvitationRepositoryInterface;
+  customerLeadRepository: CustomerLeadRepositoryInterface;
   signupUseCase: UseCaseInterface<SignupCredentials, AuthResponse>;
   loginUseCase: UseCaseInterface<LoginRequest, AuthResponse>;
   getSessionUseCase: UseCaseInterface<void, Session | null>;
@@ -184,4 +187,5 @@ export default interface Dependencies {
   revokeAthleteInvitationUseCase: UseCaseInterface<string, AthleteInvitation>;
   acceptAthleteInvitationUseCase: UseCaseInterface<InvitationResponseInput, AthleteInvitation>;
   rejectAthleteInvitationUseCase: UseCaseInterface<InvitationResponseInput, AthleteInvitation>;
+  getCustomerLeadsUseCase: UseCaseInterface<void, CustomerLead[]>;
 }

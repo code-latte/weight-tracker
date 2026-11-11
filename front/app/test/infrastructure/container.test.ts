@@ -83,6 +83,8 @@ const keys: (keyof Dependencies)[] = [
   "revokeAthleteInvitationUseCase",
   "acceptAthleteInvitationUseCase",
   "rejectAthleteInvitationUseCase",
+  "customerLeadRepository",
+  "getCustomerLeadsUseCase",
 ];
 
 describe("container", () => {

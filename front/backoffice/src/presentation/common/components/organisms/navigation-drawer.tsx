@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import AssignmentIndOutlined from "@mui/icons-material/AssignmentIndOutlined";
 import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
 import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
+import CampaignOutlined from "@mui/icons-material/CampaignOutlined";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import EventNoteOutlined from "@mui/icons-material/EventNoteOutlined";
 import FitnessCenterOutlined from "@mui/icons-material/FitnessCenterOutlined";
@@ -122,6 +123,12 @@ const sections: { title: string; items: MenuItemDefinition[] }[] = [
   },
 ];
 
+/** The last section, for an admin only: anyone else, or a visitor whose profile has not loaded yet, does not see it. */
+const marketingSection: { title: string; items: MenuItemDefinition[] } = {
+  title: "menu.marketing.title",
+  items: [{ label: "menu.marketing.leads", icon: CampaignOutlined, href: "/customer-leads" }],
+};
+
 /** One entry: an icon and its label, or the icon alone with the label as a tooltip when the drawer is collapsed. */
 function DrawerItem({ label, icon: Icon, href, selected, expanded }: DrawerItemProps) {
   const linkProps = href ? { component: NextLink, href, selected } : {};
@@ -152,6 +159,12 @@ export default function NavigationDrawer() {
   const pathname = usePathname();
   const { expanded, toggleExpanded } = useNavigationDrawer();
   const { profile } = useCurrentUser();
+  const isAdmin = profile?.role === "ADMIN";
+  const visibleSections = [
+    peopleSection(isAdmin),
+    ...sections,
+    ...(isAdmin ? [marketingSection] : []),
+  ];
   const width = expanded ? DRAWER_WIDTH : COLLAPSED_WIDTH;
   const widthTransition = (theme: Theme) =>
     theme.transitions.create("width", { duration: theme.transitions.duration.shorter });
@@ -200,7 +213,7 @@ export default function NavigationDrawer() {
           expanded={expanded}
         />
       </List>
-      {[peopleSection(profile?.role === "ADMIN"), ...sections].map((section) => (
+      {visibleSections.map((section) => (
         <List
           key={section.title}
           subheader={expanded ? <ListSubheader>{t(section.title)}</ListSubheader> : undefined}

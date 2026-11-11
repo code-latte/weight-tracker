@@ -98,6 +98,7 @@ const unusedDependencies: Registrations<Dependencies> = {
     accept: async () => undefined as never,
     reject: async () => undefined as never,
   }),
+  customerLeadRepository: () => ({ getAll: async () => undefined as never }),
   signupUseCase: () => ({ execute: async () => undefined as never }),
   loginUseCase: () => ({ execute: async () => undefined as never }),
   getSessionUseCase: () => ({ execute: async () => ok(null) }),
@@ -167,6 +168,7 @@ const unusedDependencies: Registrations<Dependencies> = {
   revokeAthleteInvitationUseCase: () => ({ execute: async () => undefined as never }),
   acceptAthleteInvitationUseCase: () => ({ execute: async () => undefined as never }),
   rejectAthleteInvitationUseCase: () => ({ execute: async () => undefined as never }),
+  getCustomerLeadsUseCase: () => ({ execute: async () => undefined as never }),
 };
 
 /** Fixed safe-area metrics, so safe-area views render without a native measurement. */

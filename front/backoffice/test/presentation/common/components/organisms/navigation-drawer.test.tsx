@@ -410,6 +410,78 @@ describe("NavigationDrawer", () => {
     expect(screen.queryByText("Todos los usuarios")).not.toBeInTheDocument();
   });
 
+  it("shows the admin the Marketing section last, with Leads linked to its screen", async () => {
+    // Arrange & Act
+    await renderAsAdmin();
+
+    // Assert
+    const entry = await screen.findByRole("link", { name: "Leads" });
+    expect(entry).toHaveAttribute("href", "/customer-leads");
+    expect(entry).not.toHaveClass("Mui-selected");
+    const nav = screen.getByRole("navigation", { name: "Menú principal" });
+    expect(
+      within(nav)
+        .getAllByText(/./)
+        .map((element) => element.textContent)
+        .slice(-6),
+    ).toEqual([
+      "Seguimiento",
+      "Feedback de entrenamientos",
+      "Revisiones semanales",
+      "Pendientes de revisión",
+      "Marketing",
+      "Leads",
+    ]);
+  });
+
+  it("selects Leads and not Inicio on the leads screen", async () => {
+    // Arrange
+    navigation.pathname = "/customer-leads";
+
+    // Act
+    await renderAsAdmin();
+
+    // Assert
+    expect(await screen.findByRole("link", { name: "Leads" })).toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveClass("Mui-selected");
+    expect(screen.getByRole("link", { name: "Todos los usuarios" })).not.toHaveClass(
+      "Mui-selected",
+    );
+  });
+
+  it("hides the Marketing section from a trainer", async () => {
+    // Arrange & Act
+    await renderDrawerFor(async () => ok(completeProfile));
+
+    // Assert
+    expect(await screen.findByText("Atletas")).toBeInTheDocument();
+    expect(screen.queryByText("Marketing")).not.toBeInTheDocument();
+    expect(screen.queryByText("Leads")).not.toBeInTheDocument();
+  });
+
+  it("hides the Marketing section while the profile loads", async () => {
+    // Arrange & Act
+    await renderDrawerFor(() => new Promise(() => {}));
+
+    // Assert
+    expect(screen.getByText("Atletas")).toBeInTheDocument();
+    expect(screen.queryByText("Marketing")).not.toBeInTheDocument();
+    expect(screen.queryByText("Leads")).not.toBeInTheDocument();
+  });
+
+  it("shows the Marketing section in English to an admin", async () => {
+    // Arrange
+    await renderAsAdmin();
+    await screen.findByRole("link", { name: "Leads" });
+
+    // Act
+    await act(() => i18n.changeLanguage("en"));
+
+    // Assert
+    expect(screen.getByText("Marketing")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Leads" })).toHaveAttribute("href", "/customer-leads");
+  });
+
   it("shows the collapse button in the logo row, expanded", async () => {
     // Arrange & Act
     await renderWithProviders(

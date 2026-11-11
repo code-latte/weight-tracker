@@ -1,6 +1,7 @@
 import enAthletes from "./en/athletes.json";
 import enAuth from "./en/auth.json";
 import enCommon from "./en/common.json";
+import enCustomerLeads from "./en/customer-leads.json";
 import enErrors from "./en/errors.json";
 import enInvitations from "./en/invitations.json";
 import enMesocycles from "./en/mesocycles.json";
@@ -12,6 +13,7 @@ import enWorkouts from "./en/workouts.json";
 import esAthletes from "./es/athletes.json";
 import esAuth from "./es/auth.json";
 import esCommon from "./es/common.json";
+import esCustomerLeads from "./es/customer-leads.json";
 import esErrors from "./es/errors.json";
 import esInvitations from "./es/invitations.json";
 import esMesocycles from "./es/mesocycles.json";
@@ -26,6 +28,7 @@ const resources = {
     athletes: esAthletes,
     auth: esAuth,
     common: esCommon,
+    customerLeads: esCustomerLeads,
     errors: esErrors,
     invitations: esInvitations,
     mesocycles: esMesocycles,
@@ -39,6 +42,7 @@ const resources = {
     athletes: enAthletes,
     auth: enAuth,
     common: enCommon,
+    customerLeads: enCustomerLeads,
     errors: enErrors,
     invitations: enInvitations,
     mesocycles: enMesocycles,

@@ -14,3 +14,4 @@ export type { default as ExerciseRepositoryInterface } from "./exercise-reposito
 export type { default as ExerciseFavoriteRepositoryInterface } from "./exercise-favorite-repository-interface";
 export type { default as TrainerAthleteRepositoryInterface } from "./trainer-athlete-repository-interface";
 export type { default as AthleteInvitationRepositoryInterface } from "./athlete-invitation-repository-interface";
+export type { default as CustomerLeadRepositoryInterface } from "./customer-lead-repository-interface";

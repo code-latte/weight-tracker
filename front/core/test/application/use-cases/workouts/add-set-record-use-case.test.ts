@@ -45,7 +45,9 @@ const workoutDetail: WorkoutDetail = {
       setRecords: [
         {
           id: "4c5d6e7f-8091-4b2c-9d3e-4f5a6b7c8d9e",
+          type: "Reps",
           reps: 8,
+          durationSeconds: null,
           weight: 60.5,
           registeredAtUtc: "2026-11-02T10:15:00Z",
         },
@@ -177,6 +179,18 @@ describe("AddSetRecordUseCase", () => {
     // Assert
     expect(repository.calls).toEqual([{ workoutId, exerciseId, request }]);
     expect(repository.otherCalls).toBe(0);
+  });
+
+  it("forwards a timed set without a weight unchanged", async () => {
+    // Arrange
+    const repository = new FakeWorkoutRepository(ok(workoutDetail));
+    const useCase = new AddSetRecordUseCase(repository);
+
+    // Act
+    await useCase.execute({ workoutId, exerciseId, durationSeconds: 45 });
+
+    // Assert
+    expect(repository.calls).toEqual([{ workoutId, exerciseId, request: { durationSeconds: 45 } }]);
   });
 
   it.each(["VALIDATION", "FORBIDDEN", "NOT_FOUND", "CONFLICT"] as const)(

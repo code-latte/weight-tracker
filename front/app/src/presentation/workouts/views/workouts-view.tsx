@@ -1,5 +1,6 @@
 import { FlatList, StyleSheet, View } from "react-native";
-import { router } from "expo-router";
+import { useCallback, useRef } from "react";
+import { router, useFocusEffect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import type { WorkoutListItem } from "@weight-tracker/core/domain";
 import RefreshControl from "@/presentation/common/components/atoms/refresh-control";
@@ -33,6 +34,7 @@ export default function WorkoutsView() {
   const {
     state,
     retry,
+    reload,
     refreshing,
     refresh,
     weekStart,
@@ -44,6 +46,19 @@ export default function WorkoutsView() {
     previousWeek,
     nextWeek,
   } = useWeekWorkouts();
+
+  // The stack keeps this list mounted under a workout's screen, so a status changed there is read again on coming
+  // back. The first focus is the mount, which already reads.
+  const mounted = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!mounted.current) {
+        mounted.current = true;
+        return;
+      }
+      reload();
+    }, [reload]),
+  );
 
   const range = formatWeekRange(weekStart, i18n.language);
   const named = isCurrentWeek || isNextWeek;

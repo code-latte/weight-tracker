@@ -61,6 +61,15 @@ export default function useWeekWorkouts() {
     void readWorkouts(container).then(setState);
   }, [container]);
 
+  /** Reads again without any sign of it, for when the screen regains focus. A failed read keeps what is shown. */
+  const reload = useCallback(() => {
+    void readWorkouts(container).then((next) => {
+      if (next.status === "ready") {
+        setState(next);
+      }
+    });
+  }, [container]);
+
   /** Reads again while the list stays on screen; the viewed week is kept. */
   const refresh = useCallback(() => {
     setRefreshing(true);
@@ -88,6 +97,7 @@ export default function useWeekWorkouts() {
   return {
     state,
     retry,
+    reload,
     refreshing,
     refresh,
     weekStart,

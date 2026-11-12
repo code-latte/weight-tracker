@@ -1,12 +1,13 @@
-import { act, fireEvent, screen } from "@testing-library/react-native";
-import { Linking } from "react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { DomainError, fail, ok } from "@weight-tracker/core/domain";
 import type {
   Result,
   SetRecord,
   UserProfile,
+  Exercise,
   WorkoutById,
   WorkoutByIdExercise,
+  WorkoutDetail,
   WorkoutMesocycle,
 } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
@@ -14,9 +15,19 @@ import WorkoutView from "@/presentation/workouts/views/workout-view";
 import renderWithProviders from "../../../support/render-with-providers";
 
 const mockBack = jest.fn();
+const mockPush = jest.fn();
+const mockFocus: { current: (() => void) | null } = { current: null };
 
 jest.mock("expo-router", () => ({
-  router: { back: () => mockBack() },
+  router: { back: () => mockBack(), push: (href: unknown) => mockPush(href) },
+  // Runs the effect on mount, as the router does on the first focus, and keeps it so a test can focus again.
+  useFocusEffect: (effect: () => void) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("react").useEffect(() => {
+      mockFocus.current = effect;
+      effect();
+    }, [effect]);
+  },
   useLocalSearchParams: () => ({ id: "wk1" }),
 }));
 
@@ -49,7 +60,9 @@ const TYPE_LABELS = /^(Fuerza|Cardio|Estiramiento)$/;
 function records(count: number): SetRecord[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `r${index}`,
+    type: "Reps",
     reps: 10,
+    durationSeconds: null,
     weight: 20,
     registeredAtUtc: "2026-11-10T10:00:00Z",
   }));
@@ -141,17 +154,33 @@ function workout(overrides: Partial<WorkoutById> = {}): WorkoutById {
   };
 }
 
+/** The catalog: CHEST has one muscle (so it shows alone), LEGS has two. */
+const catalog = [
+  { bodyPart: "CHEST", muscle: "CHEST" },
+  { bodyPart: "LEGS", muscle: "QUADRICEPS" },
+  { bodyPart: "LEGS", muscle: "HAMSTRINGS" },
+] as Exercise[];
+
 interface SetupOptions {
+  catalogResult?: () => Promise<Result<Exercise[], DomainError>>;
   workoutResult?: () => Promise<Result<WorkoutById, DomainError>>;
+  statusResult?: () => Promise<Result<WorkoutDetail, DomainError>>;
 }
 
-function setup({ workoutResult = async () => ok(workout()) }: SetupOptions = {}) {
+function setup({
+  catalogResult = async () => ok(catalog),
+  workoutResult = async () => ok(workout()),
+  statusResult = async () => ok(workout() as unknown as WorkoutDetail),
+}: SetupOptions = {}) {
   const getWorkout = jest.fn(workoutResult);
+  const changeStatus = jest.fn(statusResult);
   const dependencies = {
     getWorkoutByIdUseCase: () => ({ execute: getWorkout }),
+    changeWorkoutStatusUseCase: () => ({ execute: changeStatus }),
+    getExercisesUseCase: () => ({ execute: jest.fn(catalogResult) }),
   };
 
-  return { getWorkout, dependencies };
+  return { getWorkout, changeStatus, dependencies };
 }
 
 /** The accessible labels of the icons whose label matches, in screen order. */
@@ -165,6 +194,7 @@ function iconLabels(pattern: RegExp): string[] {
 describe("WorkoutView", () => {
   beforeEach(() => {
     mockBack.mockClear();
+    mockPush.mockClear();
   });
 
   it("shows a loading indicator and the back button while the workout is read", async () => {
@@ -272,31 +302,6 @@ describe("WorkoutView", () => {
     expect(iconLabels(/^Ver detalle$/)).toHaveLength(6);
   });
 
-  it("shows the video link only for exercises with a video", async () => {
-    // Arrange & Act
-    const { dependencies } = setup();
-    await renderWithProviders(<WorkoutView />, dependencies);
-
-    // Assert
-    await screen.findByText("Press inclinado");
-    expect(screen.getAllByRole("link", { name: "Ver vídeo" })).toHaveLength(1);
-  });
-
-  it("opens the exercise's video when its link is pressed", async () => {
-    // Arrange
-    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(undefined);
-    const { dependencies } = setup();
-    await renderWithProviders(<WorkoutView />, dependencies);
-    await screen.findByText("Press inclinado");
-
-    // Act
-    await fireEvent.press(screen.getByRole("link", { name: "Ver vídeo" }));
-
-    // Assert
-    expect(openURL).toHaveBeenCalledWith("https://v.example/1");
-    openURL.mockRestore();
-  });
-
   it("shows 0 / 0 ejercicios and an empty bar for a workout without exercises", async () => {
     // Arrange & Act
     const { dependencies } = setup({ workoutResult: async () => ok(workout({ exercises: [] })) });
@@ -368,5 +373,307 @@ describe("WorkoutView", () => {
     expect(screen.getByText("Hipertrofia otoño · Week 3")).toBeOnTheScreen();
     expect(screen.getByText("3 / 6 exercises")).toBeOnTheScreen();
     expect(screen.getByText("Incline press")).toBeOnTheScreen();
+  });
+  it("opens the exercise screen when a row is pressed", async () => {
+    // Arrange
+    const { dependencies } = setup();
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await screen.findByText("Press inclinado");
+
+    // Act
+    await fireEvent.press(screen.getByText("Press inclinado"));
+
+    // Assert
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/workouts/[id]/exercises/[exerciseId]",
+      params: { id: "wk1", exerciseId: "we1" },
+    });
+  });
+
+  it("starts a published workout, reads it again and then offers Finalizar", async () => {
+    // Arrange
+    const workoutResult = jest
+      .fn<Promise<Result<WorkoutById, DomainError>>, []>()
+      .mockResolvedValueOnce(ok(workout({ status: "PUBLISHED" })))
+      .mockResolvedValueOnce(ok(workout({ status: "STARTED" })));
+    const { getWorkout, changeStatus, dependencies } = setup({ workoutResult });
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await screen.findByRole("heading", { name: "Tren superior A" });
+
+    // Act
+    await fireEvent.press(screen.getByRole("button", { name: "Iniciar entrenamiento" }));
+
+    // Assert
+    expect(changeStatus).toHaveBeenCalledTimes(1);
+    expect(changeStatus).toHaveBeenCalledWith({ workoutId: "wk1", status: "STARTED" });
+    expect(await screen.findByRole("button", { name: "Finalizar entrenamiento" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Iniciar entrenamiento" })).not.toBeOnTheScreen();
+    expect(getWorkout).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["COMPLETED", "REVIEWED"])(
+    "shows a disabled Finalizado for a %s workout",
+    async (status) => {
+      // Arrange
+      const { dependencies } = setup({
+        workoutResult: async () => ok(workout({ status } as never)),
+      });
+
+      // Act
+      await renderWithProviders(<WorkoutView />, dependencies);
+
+      // Assert
+      expect(await screen.findByRole("button", { name: "Finalizado" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Iniciar entrenamiento" })).not.toBeOnTheScreen();
+      expect(
+        screen.queryByRole("button", { name: "Finalizar entrenamiento" }),
+      ).not.toBeOnTheScreen();
+    },
+  );
+
+  it("offers Finalizar, and not Iniciar, for a started workout", async () => {
+    // Arrange
+    const { dependencies } = setup();
+
+    // Act
+    await renderWithProviders(<WorkoutView />, dependencies);
+
+    // Assert
+    expect(await screen.findByRole("button", { name: "Finalizar entrenamiento" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Iniciar entrenamiento" })).not.toBeOnTheScreen();
+  });
+
+  it("asks before finishing and sends nothing until it is confirmed", async () => {
+    // Arrange
+    const { changeStatus, dependencies } = setup();
+    await renderWithProviders(<WorkoutView />, dependencies);
+
+    // Act
+    await fireEvent.press(await screen.findByRole("button", { name: "Finalizar entrenamiento" }));
+
+    // Assert
+    expect(await screen.findByText("¿Finalizar el entrenamiento?")).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        "Se enviará a tu entrenador para su revisión. Podrás cambiar los registros hasta que lo revise.",
+      ),
+    ).toBeOnTheScreen();
+    expect(changeStatus).not.toHaveBeenCalled();
+  });
+
+  it("closes the question without finishing when it is cancelled", async () => {
+    // Arrange
+    const { changeStatus, dependencies } = setup();
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await fireEvent.press(await screen.findByRole("button", { name: "Finalizar entrenamiento" }));
+    await screen.findByText("¿Finalizar el entrenamiento?");
+
+    // Act
+    await fireEvent.press(screen.getByRole("button", { name: "Cancelar" }));
+
+    // Assert
+    expect(changeStatus).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByText("¿Finalizar el entrenamiento?")).not.toBeOnTheScreen(),
+    );
+  });
+
+  it("finishes the workout once confirmed and reads it again", async () => {
+    // Arrange
+    const workoutResult = jest
+      .fn<Promise<Result<WorkoutById, DomainError>>, []>()
+      .mockResolvedValueOnce(ok(workout({ status: "STARTED" })))
+      .mockResolvedValueOnce(ok(workout({ status: "COMPLETED" })));
+    const { getWorkout, changeStatus, dependencies } = setup({ workoutResult });
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await fireEvent.press(await screen.findByRole("button", { name: "Finalizar entrenamiento" }));
+    await screen.findByText("¿Finalizar el entrenamiento?");
+
+    // Act
+    await fireEvent.press(screen.getByRole("button", { name: "Finalizar" }));
+
+    // Assert
+    expect(changeStatus).toHaveBeenCalledTimes(1);
+    expect(changeStatus).toHaveBeenCalledWith({ workoutId: "wk1", status: "COMPLETED" });
+    expect(await screen.findByRole("button", { name: "Finalizado" })).toBeDisabled();
+    expect(getWorkout).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes the question and shows the error when finishing fails", async () => {
+    // Arrange
+    const { getWorkout, dependencies } = setup({
+      statusResult: async () => fail(new DomainError("CONFLICT", "Not allowed")),
+    });
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await fireEvent.press(await screen.findByRole("button", { name: "Finalizar entrenamiento" }));
+    await screen.findByText("¿Finalizar el entrenamiento?");
+
+    // Act
+    await fireEvent.press(screen.getByRole("button", { name: "Finalizar" }));
+
+    // Assert
+    expect(await screen.findByText(i18n.t("errors:CONFLICT"))).toBeOnTheScreen();
+    await waitFor(() =>
+      expect(screen.queryByText("¿Finalizar el entrenamiento?")).not.toBeOnTheScreen(),
+    );
+    expect(getWorkout).toHaveBeenCalledTimes(1);
+  });
+
+  it("words the question for a workout without a trainer", async () => {
+    // Arrange
+    const { dependencies } = setup({
+      workoutResult: async () => ok(workout({ trainerId: null, trainer: null })),
+    });
+    await renderWithProviders(<WorkoutView />, dependencies);
+
+    // Act
+    await fireEvent.press(await screen.findByRole("button", { name: "Finalizar entrenamiento" }));
+
+    // Assert
+    expect(
+      await screen.findByText("Quedará completado. Podrás seguir cambiando los registros."),
+    ).toBeOnTheScreen();
+  });
+
+  it("shows no start button for a draft workout", async () => {
+    // Arrange
+    const { dependencies } = setup({ workoutResult: async () => ok(workout({ status: "DRAFT" })) });
+
+    // Act
+    await renderWithProviders(<WorkoutView />, dependencies);
+
+    // Assert
+    await screen.findByRole("heading", { name: "Tren superior A" });
+    expect(screen.queryByRole("button", { name: "Iniciar entrenamiento" })).not.toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Finalizar entrenamiento" })).not.toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Finalizado" })).not.toBeOnTheScreen();
+  });
+
+  it("shows the error and keeps Iniciar when starting fails", async () => {
+    // Arrange
+    const { getWorkout, dependencies } = setup({
+      workoutResult: async () => ok(workout({ status: "PUBLISHED" })),
+      statusResult: async () => fail(new DomainError("CONFLICT", "Not allowed")),
+    });
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await screen.findByRole("heading", { name: "Tren superior A" });
+
+    // Act
+    await fireEvent.press(screen.getByRole("button", { name: "Iniciar entrenamiento" }));
+
+    // Assert
+    expect(await screen.findByText(i18n.t("errors:CONFLICT"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Iniciar entrenamiento" })).toBeEnabled();
+    expect(getWorkout).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the start button in English", async () => {
+    // Arrange
+    const { dependencies } = setup({
+      workoutResult: async () => ok(workout({ status: "PUBLISHED" })),
+    });
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await screen.findByRole("heading", { name: "Tren superior A" });
+
+    // Act
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    // Assert
+    expect(screen.getByRole("button", { name: "Start workout" })).toBeOnTheScreen();
+  });
+  it("reads the workout again, keeping what is shown, when the screen is focused again", async () => {
+    // Arrange
+    // The fourth exercise has no records; after the first one is recorded it is in progress.
+    const started = exercises.map((exercise, index) =>
+      index === 3 ? { ...exercise, setRecords: records(1) } : exercise,
+    );
+    const workoutResult = jest
+      .fn<Promise<Result<WorkoutById, DomainError>>, []>()
+      .mockResolvedValueOnce(ok(workout()))
+      .mockResolvedValueOnce(ok(workout({ exercises: started })));
+    const { getWorkout, dependencies } = setup({ workoutResult });
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await screen.findByText("Estiramiento de isquios");
+    expect(getWorkout).toHaveBeenCalledTimes(1);
+    const before = iconLabels(PROGRESS_LABELS);
+
+    // Act
+    await act(async () => {
+      mockFocus.current?.();
+    });
+
+    // Assert
+    expect(getWorkout).toHaveBeenCalledTimes(2);
+    expect(iconLabels(PROGRESS_LABELS)).not.toEqual(before);
+  });
+  it("shows only the body part when it has a single muscle in the catalog", async () => {
+    // Arrange
+    const { dependencies } = setup();
+
+    // Act
+    await renderWithProviders(<WorkoutView />, dependencies);
+
+    // Assert
+    await screen.findByText("Press inclinado");
+    await waitFor(() => expect(screen.getAllByText("Pecho")).toHaveLength(6));
+  });
+
+  it("shows the body part and the muscle when the body part has several", async () => {
+    // Arrange
+    const legs = {
+      ...workoutExercise("we1", "STRENGTH", { es: "Sentadilla" }, [3], 0),
+      bodyPart: "LEGS",
+      muscle: "QUADRICEPS",
+    };
+    const { dependencies } = setup({
+      workoutResult: async () => ok(workout({ exercises: [legs] })),
+    });
+
+    // Act
+    await renderWithProviders(<WorkoutView />, dependencies);
+
+    // Assert
+    expect(await screen.findByText("Piernas")).toBeOnTheScreen();
+    expect(screen.getByText("Cuádriceps")).toBeOnTheScreen();
+  });
+
+  it("shows both chips when the catalog cannot be read", async () => {
+    // Arrange
+    const { dependencies } = setup({
+      catalogResult: async () => fail(new DomainError("NETWORK", "")),
+    });
+
+    // Act
+    await renderWithProviders(<WorkoutView />, dependencies);
+
+    // Assert
+    await screen.findByText("Press inclinado");
+    expect(screen.getAllByText("Pecho")).toHaveLength(12);
+  });
+
+  it("shows the chips in English", async () => {
+    // Arrange
+    const legs = {
+      ...workoutExercise("we1", "STRENGTH", { es: "Sentadilla" }, [3], 0),
+      bodyPart: "LEGS",
+      muscle: "QUADRICEPS",
+    };
+    const { dependencies } = setup({
+      workoutResult: async () => ok(workout({ exercises: [legs] })),
+    });
+    await renderWithProviders(<WorkoutView />, dependencies);
+    await screen.findByText("Piernas");
+
+    // Act
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    // Assert
+    expect(screen.getByText("Legs")).toBeOnTheScreen();
+    expect(screen.getByText("Quadriceps")).toBeOnTheScreen();
   });
 });

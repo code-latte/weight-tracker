@@ -14,7 +14,8 @@ export interface WorkoutExerciseRowData {
   id: string;
   name: string | null;
   type: string;
-  videoUrl: string | null;
+  bodyPart: string;
+  muscle: string;
   progress: ExerciseProgress;
 }
 
@@ -75,6 +76,15 @@ export default function useWorkout(id: string) {
     void readWorkout(container, id).then(setState);
   }, [container, id]);
 
+  /** Reads the workout again without leaving the ready state, so what is on screen does not flash. */
+  const reload = useCallback(() => {
+    void readWorkout(container, id).then((next) => {
+      if (next.status === "ready") {
+        setState(next);
+      }
+    });
+  }, [container, id]);
+
   const rows = useMemo<WorkoutExerciseRowData[]>(() => {
     if (state.status !== "ready") {
       return [];
@@ -89,7 +99,8 @@ export default function useWorkout(id: string) {
         id: exercise.id,
         name: translation?.name ?? null,
         type: exercise.type,
-        videoUrl: exercise.videoUrl,
+        bodyPart: exercise.bodyPart,
+        muscle: exercise.muscle,
         progress: exerciseProgressOf(exercise),
       };
     });
@@ -100,6 +111,7 @@ export default function useWorkout(id: string) {
   return {
     state,
     retry,
+    reload,
     rows,
     done: rows.filter((row) => row.progress === "done").length,
     total: rows.length,

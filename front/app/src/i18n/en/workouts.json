@@ -35,6 +35,65 @@
       "strength": "Strength",
       "cardio": "Cardio",
       "stretching": "Stretching"
+    },
+    "start": "Start workout",
+    "finish": "Finish workout",
+    "finished": "Finished",
+    "finishDialog": {
+      "title": "Finish the workout?",
+      "message": "It goes to your trainer for review. You can change your records until they review it.",
+      "messageNoTrainer": "It will be marked as completed. You can keep changing your records.",
+      "confirm": "Finish",
+      "cancel": "Cancel"
     }
+  },
+  "exercise": {
+    "navigator": "Exercises",
+    "target": {
+      "reps": "{{count}} reps",
+      "range": "{{min}}–{{max}} reps",
+      "max": "max reps",
+      "seconds": "{{count}} s",
+      "minutes": "{{count}} min"
+    },
+    "reps": "Reps",
+    "weight": "Weight (kg)",
+    "save": "Save",
+    "saved": "Saved",
+    "repsRequired": "Enter the reps.",
+    "weightInvalid": "Invalid weight.",
+    "rest": "Rest: {{time}}",
+    "noRest": "No rest",
+    "errors": {
+      "CONFLICT": "This set cannot be recorded."
+    }
+  },
+  "muscles": {
+    "ABDOMINALS": "Abdominals",
+    "ABDUCTORS": "Abductors",
+    "ADDUCTORS": "Adductors",
+    "BICEPS": "Biceps",
+    "CALVES": "Calves",
+    "CHEST": "Chest",
+    "FOREARMS": "Forearms",
+    "GLUTES": "Glutes",
+    "HAMSTRINGS": "Hamstrings",
+    "LATS": "Lats",
+    "LOWER_BACK": "Lower back",
+    "MIDDLE_BACK": "Middle back",
+    "NECK": "Neck",
+    "QUADRICEPS": "Quadriceps",
+    "SHOULDERS": "Shoulders",
+    "TRAPS": "Traps",
+    "TRICEPS": "Triceps"
+  },
+  "bodyParts": {
+    "ARMS": "Arms",
+    "LEGS": "Legs",
+    "CHEST": "Chest",
+    "BACK": "Back",
+    "SHOULDERS": "Shoulders",
+    "CORE": "Core",
+    "NECK": "Neck"
   }
 }

@@ -2,10 +2,10 @@ import { StyleSheet, View } from "react-native";
 import Card from "@/presentation/common/components/atoms/card";
 import Icon from "@/presentation/common/components/atoms/icon";
 import Text from "@/presentation/common/components/atoms/text";
-import TextLink from "@/presentation/common/components/atoms/text-link";
 import ExerciseProgressIcon, {
   type ExerciseProgress,
 } from "@/presentation/workouts/components/molecules/exercise-progress-icon";
+import ExerciseTags from "@/presentation/workouts/components/molecules/exercise-tags";
 import ExerciseTypeIcon from "@/presentation/workouts/components/molecules/exercise-type-icon";
 
 interface WorkoutExerciseRowProps {
@@ -15,11 +15,13 @@ interface WorkoutExerciseRowProps {
   type: string | null;
   typeLabel: string;
   detailsLabel: string;
-  /** Shown only when the exercise has a video. */
-  video?: { label: string; onPress: () => void };
+  /** The body part and, when it says more than the body part, the muscle. */
+  chips?: { bodyPart: string; muscle?: string };
+  /** Opens the exercise. */
+  onPress?: () => void;
 }
 
-/** One exercise of a workout: its progress and type, its name and video, and the way to its detail. */
+/** One exercise of a workout: its progress and type, its name and body part and muscle, and the way to its detail. */
 export default function WorkoutExerciseRow({
   name,
   progress,
@@ -27,16 +29,17 @@ export default function WorkoutExerciseRow({
   type,
   typeLabel,
   detailsLabel,
-  video,
+  chips,
+  onPress,
 }: WorkoutExerciseRowProps) {
   return (
-    <Card mode="outlined">
+    <Card mode="outlined" onPress={onPress}>
       <View style={styles.row}>
         <ExerciseProgressIcon progress={progress} label={progressLabel} />
         <ExerciseTypeIcon type={type} label={typeLabel} />
         <View style={styles.body}>
           <Text variant="titleMedium">{name}</Text>
-          {video && <TextLink label={video.label} onPress={video.onPress} />}
+          {chips && <ExerciseTags bodyPart={chips.bodyPart} muscle={chips.muscle} />}
         </View>
         <Icon source="chevron-right" accessibilityLabel={detailsLabel} />
       </View>
@@ -53,6 +56,6 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    gap: 2,
+    gap: 6,
   },
 });

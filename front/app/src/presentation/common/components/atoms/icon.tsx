@@ -2,7 +2,7 @@ import { View } from "react-native";
 import { Icon as PaperIcon } from "react-native-paper";
 import { useAppTheme } from "@/presentation/common/theme";
 
-type IconTone = "primary" | "secondary" | "success" | "onPrimary" | "default";
+type IconTone = "primary" | "secondary" | "success" | "onPrimary" | "onAccent" | "default";
 
 interface IconProps {
   /** A Material Community Icons name. */
@@ -26,6 +26,8 @@ export default function Icon({
     secondary: theme.colors.secondary,
     success: theme.custom.semantic.success,
     onPrimary: theme.colors.onPrimary,
+    // White in both modes: for an icon sitting on the orange of a selected control.
+    onAccent: theme.custom.brand.white,
     default: theme.colors.onSurfaceVariant,
   };
 

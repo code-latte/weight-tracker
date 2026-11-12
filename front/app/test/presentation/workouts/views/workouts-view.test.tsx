@@ -7,8 +7,18 @@ import renderWithProviders from "../../../support/render-with-providers";
 
 const mockPush = jest.fn();
 
+const mockFocus: { current: (() => void) | null } = { current: null };
+
 jest.mock("expo-router", () => ({
   router: { push: (href: unknown) => mockPush(href) },
+  // Runs the effect on mount, as the router does on the first focus, and keeps it so a test can focus again.
+  useFocusEffect: (effect: () => void) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("react").useEffect(() => {
+      mockFocus.current = effect;
+      effect();
+    }, [effect]);
+  },
 }));
 
 // Paper's icons load their font through expo-font, which has no assets under Jest.
@@ -421,5 +431,36 @@ describe("WorkoutsView", () => {
       expect(screen.getByText("No hay conexión con el servidor.")).toBeOnTheScreen();
       expect(screen.getByRole("button", { name: "Reintentar" })).toBeOnTheScreen();
     });
+  });
+  it("reads the workouts again, without a spinner, when the screen is focused again", async () => {
+    // Arrange
+    const started = workouts.find((item) => item.status === "STARTED")!;
+    const finished = workouts.map((item) =>
+      item === started
+        ? { ...item, status: "COMPLETED", completedAt: "2026-11-10T10:00:00Z" }
+        : item,
+    );
+    const workoutsResult = jest
+      .fn<Promise<Result<WorkoutListItem[], DomainError>>, []>()
+      .mockResolvedValueOnce(ok(workouts))
+      .mockResolvedValueOnce(ok(finished));
+    const { getWorkouts, dependencies } = setup({ workoutsResult });
+    await renderWithProviders(<WorkoutsView />, dependencies);
+    await screen.findByText("Empuje");
+    expect(
+      screen.getAllByRole("image").map((element) => element.props.accessibilityLabel),
+    ).toContain("En curso");
+
+    // Act
+    await act(async () => {
+      mockFocus.current?.();
+    });
+
+    // Assert
+    expect(getWorkouts).toHaveBeenCalledTimes(2);
+    expect(isRefreshing()).toBe(false);
+    expect(
+      screen.getAllByRole("image").map((element) => element.props.accessibilityLabel),
+    ).not.toContain("En curso");
   });
 });

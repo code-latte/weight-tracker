@@ -220,11 +220,13 @@ public class WorkoutExerciseTests
 
     private static readonly DateTime TenOClock = new(2026, 11, 7, 10, 0, 0, DateTimeKind.Utc);
 
+    private static SetResult Reps(int value) => new SetResult.Reps(RepCount.From(value));
+
     [Fact]
     public void SetRecordCreate_ShouldMarkTheSetRecordAsNewWithAFreshIdAndKeepItsValues()
     {
         // Arrange
-        var reps = RepCount.From(8);
+        var reps = Reps(8);
         var weight = Weight.From(62.5m);
 
         // Act
@@ -233,9 +235,23 @@ public class WorkoutExerciseTests
         // Assert
         setRecord.IsNew.Should().BeTrue();
         setRecord.Id.Should().NotBeNull();
-        setRecord.Reps.Should().Be(reps);
+        setRecord.Result.Should().Be(reps);
         setRecord.Weight.Should().Be(weight);
         setRecord.RegisteredAtUtc.Should().Be(TenOClock);
+    }
+
+    [Fact]
+    public void SetRecordCreate_ShouldAcceptADurationWithoutWeight()
+    {
+        // Arrange
+        var seconds = new SetResult.Duration(DurationInSeconds.From(45));
+
+        // Act
+        var setRecord = SetRecord.Create(seconds, null, TenOClock);
+
+        // Assert
+        setRecord.Result.Should().Be(seconds);
+        setRecord.Weight.Should().BeNull();
     }
 
     [Fact]
@@ -245,13 +261,13 @@ public class WorkoutExerciseTests
         var id = Id.New();
 
         // Act
-        var setRecord = SetRecord.Rehydrate(id, RepCount.From(12), Weight.From(0), TenOClock);
+        var setRecord = SetRecord.Rehydrate(id, Reps(12), Weight.From(0), TenOClock);
 
         // Assert
         setRecord.IsNew.Should().BeFalse();
         setRecord.Id.Should().Be(id);
-        setRecord.Reps.Value.Should().Be(12);
-        setRecord.Weight.Value.Should().Be(0);
+        setRecord.Result.Should().Be(Reps(12));
+        setRecord.Weight.Should().Be(Weight.From(0));
         setRecord.RegisteredAtUtc.Should().Be(TenOClock);
     }
 
@@ -272,9 +288,9 @@ public class WorkoutExerciseTests
     public void Rehydrate_ShouldRestoreStoredSetRecordsInTheGivenOrder()
     {
         // Arrange
-        var atTenOFive = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), TenOClock.AddMinutes(5));
-        var atTenOOne = SetRecord.Rehydrate(Id.New(), RepCount.From(10), Weight.From(55), TenOClock.AddMinutes(1));
-        var atTenOThree = SetRecord.Rehydrate(Id.New(), RepCount.From(9), Weight.From(57.5m), TenOClock.AddMinutes(3));
+        var atTenOFive = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), TenOClock.AddMinutes(5));
+        var atTenOOne = SetRecord.Rehydrate(Id.New(), Reps(10), Weight.From(55), TenOClock.AddMinutes(1));
+        var atTenOThree = SetRecord.Rehydrate(Id.New(), Reps(9), Weight.From(57.5m), TenOClock.AddMinutes(3));
 
         // Act
         var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [TwoByTen], setRecords: [atTenOFive, atTenOOne, atTenOThree]);
@@ -287,7 +303,7 @@ public class WorkoutExerciseTests
     public void Rehydrate_ShouldRestoreStoredSetRecordsWhateverThePrescriptions()
     {
         // Arrange
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(20), TenOClock);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(20), TenOClock);
         var duration = new SetPrescription(3, new SetTarget.Duration(40));
 
         // Act
@@ -301,7 +317,7 @@ public class WorkoutExerciseTests
     public void SetRecords_ShouldNotExposeTheInternalCollectionForMutation()
     {
         // Arrange
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(20), TenOClock);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(20), TenOClock);
         var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [TwoByTen], setRecords: [stored]);
 
         // Act

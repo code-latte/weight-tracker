@@ -20,6 +20,8 @@ namespace WeightTracker.Integration.Repositories;
 /// </summary>
 public class WorkoutRepositoryTests : IntegrationTest
 {
+    private static SetResult Reps(int value) => new SetResult.Reps(RepCount.From(value));
+
     public WorkoutRepositoryTests(ApiFactory factory) : base(factory)
     { }
 
@@ -662,9 +664,9 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca, Sentadilla);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(62.5m), RecordedAt);
-        workout.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(65), RecordedAt.AddMinutes(3));
-        workout.AddSetRecord(Sentadilla, RepCount.From(12), Weight.From(0), RecordedAt.AddMinutes(9));
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(62.5m), RecordedAt);
+        workout.AddSetRecord(PressBanca, Reps(6), Weight.From(65), RecordedAt.AddMinutes(3));
+        workout.AddSetRecord(Sentadilla, Reps(12), Weight.From(0), RecordedAt.AddMinutes(9));
 
         await Write(repository => repository.Save(workout, CancellationToken.None));
 
@@ -677,7 +679,7 @@ public class WorkoutRepositoryTests : IntegrationTest
             var expected = EntryFor(workout, exerciseId).SetRecords;
             var actual = EntryFor(stored!, exerciseId).SetRecords;
             actual.Select(setRecord => setRecord.Id).Should().Equal(expected.Select(setRecord => setRecord.Id));
-            actual.Select(setRecord => setRecord.Reps).Should().Equal(expected.Select(setRecord => setRecord.Reps));
+            actual.Select(setRecord => setRecord.Result).Should().Equal(expected.Select(setRecord => setRecord.Result));
             actual.Select(setRecord => setRecord.Weight).Should().Equal(expected.Select(setRecord => setRecord.Weight));
             actual.Select(setRecord => setRecord.RegisteredAtUtc).Should().Equal(expected.Select(setRecord => setRecord.RegisteredAtUtc));
         }
@@ -688,12 +690,12 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt);
         await Write(repository => repository.Save(workout, CancellationToken.None));
         var earlier = EntryFor(workout, PressBanca).SetRecords.Single();
 
         var reloaded = await Read(workout.Id);
-        reloaded!.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(2));
+        reloaded!.AddSetRecord(PressBanca, Reps(7), Weight.From(60), RecordedAt.AddMinutes(2));
         await Write(repository => repository.Save(reloaded, CancellationToken.None));
 
         // Act
@@ -703,8 +705,8 @@ public class WorkoutRepositoryTests : IntegrationTest
         var setRecords = EntryFor(stored!, PressBanca).SetRecords;
         setRecords.Should().HaveCount(2);
         setRecords[0].Id.Should().Be(earlier.Id);
-        setRecords[0].Reps.Value.Should().Be(8);
-        setRecords[1].Reps.Value.Should().Be(7);
+        setRecords[0].Result.Should().Be(Reps(8));
+        setRecords[1].Result.Should().Be(Reps(7));
     }
 
     [Fact]
@@ -712,20 +714,20 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt.AddMinutes(5));
-        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(5));
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt.AddMinutes(5));
+        workout.AddSetRecord(PressBanca, Reps(7), Weight.From(60), RecordedAt.AddMinutes(5));
         await Write(repository => repository.Save(workout, CancellationToken.None));
 
         var reloaded = await Read(workout.Id);
-        reloaded!.AddSetRecord(PressBanca, RepCount.From(10), Weight.From(55), RecordedAt);
-        reloaded.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(60), RecordedAt.AddMinutes(5));
+        reloaded!.AddSetRecord(PressBanca, Reps(10), Weight.From(55), RecordedAt);
+        reloaded.AddSetRecord(PressBanca, Reps(6), Weight.From(60), RecordedAt.AddMinutes(5));
         await Write(repository => repository.Save(reloaded, CancellationToken.None));
 
         // Act
         var stored = await Read(workout.Id);
 
         // Assert
-        EntryFor(stored!, PressBanca).SetRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(8, 7, 10, 6);
+        EntryFor(stored!, PressBanca).SetRecords.Select(setRecord => setRecord.Result).Should().Equal(Reps(8), Reps(7), Reps(10), Reps(6));
     }
 
     [Fact]
@@ -733,8 +735,8 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca, Sentadilla);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
-        workout.AddSetRecord(Sentadilla, RepCount.From(5), Weight.From(100), RecordedAt);
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(Sentadilla, Reps(5), Weight.From(100), RecordedAt);
         await Write(repository => repository.Save(workout, CancellationToken.None));
         var removedEntryId = EntryFor(workout, PressBanca).Id.Value;
         var keptEntryId = EntryFor(workout, Sentadilla).Id.Value;
@@ -756,8 +758,8 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
-        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, Reps(7), Weight.From(60), RecordedAt.AddMinutes(2));
         await Write(repository => repository.Save(workout, CancellationToken.None));
 
         // Act
@@ -767,7 +769,7 @@ public class WorkoutRepositoryTests : IntegrationTest
         // Assert
         var entry = EntryFor(workouts.Single(item => item.Id == workout.Id), PressBanca);
         entry.Sets.Should().Equal(new SetPrescription(3, new SetTarget.Reps(10)));
-        entry.SetRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(8, 7);
+        entry.SetRecords.Select(setRecord => setRecord.Result).Should().Equal(Reps(8), Reps(7));
     }
 
     [Fact]
@@ -775,13 +777,13 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
-        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, Reps(7), Weight.From(60), RecordedAt.AddMinutes(2));
         await Write(repository => repository.Save(workout, CancellationToken.None));
         var edited = EntryFor(workout, PressBanca).SetRecords[0];
 
         var reloaded = await Read(workout.Id);
-        reloaded!.UpdateSetRecord(PressBanca, edited.Id, RepCount.From(10), Weight.From(62.5m), RecordedAt);
+        reloaded!.UpdateSetRecord(PressBanca, edited.Id, Reps(10), Weight.From(62.5m), RecordedAt);
         await Write(repository => repository.Save(reloaded, CancellationToken.None));
 
         // Act
@@ -790,10 +792,10 @@ public class WorkoutRepositoryTests : IntegrationTest
         // Assert
         var setRecords = EntryFor(stored!, PressBanca).SetRecords;
         setRecords[0].Id.Should().Be(edited.Id);
-        setRecords[0].Reps.Value.Should().Be(10);
-        setRecords[0].Weight.Value.Should().Be(62.5m);
+        setRecords[0].Result.Should().Be(Reps(10));
+        setRecords[0].Weight.Should().Be(Weight.From(62.5m));
         setRecords[0].RegisteredAtUtc.Should().Be(RecordedAt);
-        setRecords[1].Reps.Value.Should().Be(7);
+        setRecords[1].Result.Should().Be(Reps(7));
     }
 
     [Fact]
@@ -801,9 +803,9 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
-        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(60), RecordedAt.AddMinutes(2));
-        workout.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(60), RecordedAt.AddMinutes(4));
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, Reps(7), Weight.From(60), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(PressBanca, Reps(6), Weight.From(60), RecordedAt.AddMinutes(4));
         await Write(repository => repository.Save(workout, CancellationToken.None));
         var setRecordIds = EntryFor(workout, PressBanca).SetRecords.Select(setRecord => setRecord.Id).ToList();
 
@@ -824,9 +826,9 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
-        workout.AddSetRecord(PressBanca, RepCount.From(7), Weight.From(62.5m), RecordedAt.AddMinutes(2));
-        workout.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(65), RecordedAt.AddMinutes(4));
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, Reps(7), Weight.From(62.5m), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(PressBanca, Reps(6), Weight.From(65), RecordedAt.AddMinutes(4));
         await Write(repository => repository.Save(workout, CancellationToken.None));
         var setRecordIds = EntryFor(workout, PressBanca).SetRecords.Select(setRecord => setRecord.Id).ToList();
 
@@ -840,8 +842,8 @@ public class WorkoutRepositoryTests : IntegrationTest
         // Assert
         var setRecords = EntryFor(stored!, PressBanca).SetRecords;
         setRecords.Select(setRecord => setRecord.Id).Should().Equal(setRecordIds[2], setRecordIds[0], setRecordIds[1]);
-        setRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(6, 8, 7);
-        setRecords.Select(setRecord => setRecord.Weight.Value).Should().Equal(65, 60, 62.5m);
+        setRecords.Select(setRecord => setRecord.Result).Should().Equal(Reps(6), Reps(8), Reps(7));
+        setRecords.Select(setRecord => setRecord.Weight).Should().Equal(Weight.From(65), Weight.From(60), Weight.From(62.5m));
     }
 
     private static readonly DateTime ReviewedAt = new(2026, 11, 8, 9, 0, 0, DateTimeKind.Utc);
@@ -855,7 +857,7 @@ public class WorkoutRepositoryTests : IntegrationTest
         workout.AddExercise(PressBanca, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))]);
         workout.ChangeStatus(WorkoutStatus.PUBLISHED, RecordedAt);
         workout.ChangeStatus(WorkoutStatus.STARTED, RecordedAt);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt);
         workout.ChangeStatus(WorkoutStatus.COMPLETED, CompletedAt);
 
         return workout;
@@ -907,7 +909,7 @@ public class WorkoutRepositoryTests : IntegrationTest
     {
         // Arrange
         var workout = AStartedWorkoutWith(PressBanca);
-        workout.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt.AddTicks(1234567));
+        workout.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt.AddTicks(1234567));
         await Write(repository => repository.Save(workout, CancellationToken.None));
 
         // Act
@@ -929,10 +931,10 @@ public class WorkoutRepositoryTests : IntegrationTest
         var slowCopy = await slowRepository.GetById(workout.Id, CancellationToken.None);
 
         var fastCopy = await Read(workout.Id);
-        fastCopy!.AddSetRecord(PressBanca, RepCount.From(8), Weight.From(60), RecordedAt);
+        fastCopy!.AddSetRecord(PressBanca, Reps(8), Weight.From(60), RecordedAt);
         await Write(repository => repository.Save(fastCopy, CancellationToken.None));
 
-        slowCopy!.AddSetRecord(PressBanca, RepCount.From(6), Weight.From(65), RecordedAt.AddMinutes(1));
+        slowCopy!.AddSetRecord(PressBanca, Reps(6), Weight.From(65), RecordedAt.AddMinutes(1));
         await slowRepository.Save(slowCopy, CancellationToken.None);
 
         // Act
@@ -941,7 +943,7 @@ public class WorkoutRepositoryTests : IntegrationTest
         // Assert
         await act.Should().ThrowAsync<WorkoutConcurrencyConflictException>();
         var stored = await Read(workout.Id);
-        EntryFor(stored!, PressBanca).SetRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(8);
+        EntryFor(stored!, PressBanca).SetRecords.Select(setRecord => setRecord.Result).Should().Equal(Reps(8));
     }
 
     [Fact]
@@ -957,7 +959,7 @@ public class WorkoutRepositoryTests : IntegrationTest
 
         var corrected = await Read(workout.Id);
         var setRecordId = EntryFor(corrected!, PressBanca).SetRecords.Single().Id;
-        corrected!.UpdateSetRecord(PressBanca, setRecordId, RepCount.From(10), Weight.From(60), RecordedAt.AddMinutes(30));
+        corrected!.UpdateSetRecord(PressBanca, setRecordId, Reps(10), Weight.From(60), RecordedAt.AddMinutes(30));
         await Write(repository => repository.Save(corrected, CancellationToken.None));
 
         // The reviewer still holds the results it read, so the aggregate alone cannot notice the correction
@@ -971,7 +973,7 @@ public class WorkoutRepositoryTests : IntegrationTest
         await act.Should().ThrowAsync<WorkoutConcurrencyConflictException>();
         var stored = await Read(workout.Id);
         stored!.Status.Should().Be(WorkoutStatus.COMPLETED);
-        EntryFor(stored, PressBanca).SetRecords.Single().Reps.Value.Should().Be(10);
+        EntryFor(stored, PressBanca).SetRecords.Single().Result.Should().Be(Reps(10));
     }
 
     private static Workout ADraftWorkoutWith(params Id[] exerciseIds)

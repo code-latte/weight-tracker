@@ -205,7 +205,111 @@ public class SetRecordUpdateEndpointTests : SetRecordEndpointTest
     }
 
     [Fact]
-    public async Task Put_ShouldRejectAMissingReps()
+    public async Task Put_ShouldRejectAnEmptyBodyAndKeepThePreviousValues()
+    {
+        // Arrange
+        var ids = await GivenRecordedSets((10, 60), (8, 60));
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PutAsJsonAsync(SetRecordRoute(StartedWorkoutId, StartedExerciseId, ids[1]), new { });
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Select(record => (record.Id, record.Reps, record.Weight))
+            .Should().Equal((ids[0], 10, 60m), (ids[1], 8, 60m));
+    }
+
+    [Fact]
+    public async Task Put_ShouldRejectBothRepsAndDurationAndKeepThePreviousValues()
+    {
+        // Arrange
+        var ids = await GivenRecordedSets((10, 60), (8, 60));
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PutAsJsonAsync(SetRecordRoute(StartedWorkoutId, StartedExerciseId, ids[1]), new { reps = 9, durationSeconds = 40 });
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Select(record => (record.Id, record.Reps, record.Weight))
+            .Should().Equal((ids[0], 10, 60m), (ids[1], 8, 60m));
+    }
+
+    [Fact]
+    public async Task Put_ShouldClearTheWeightWhenItIsOmitted()
+    {
+        // Arrange
+        var ids = await GivenRecordedSets((10, 60), (8, 60));
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PutAsJsonAsync(SetRecordRoute(StartedWorkoutId, StartedExerciseId, ids[1]), SetRecordBody(9));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stored = await SetRecordsOf(StartedWorkoutId, StartedExerciseId);
+        stored[1].Reps.Should().Be(9);
+        stored[1].Weight.Should().BeNull();
+        stored[0].Weight.Should().Be(60m);
+    }
+
+    [Fact]
+    public async Task Put_ShouldCorrectADurationForATimeBasedExerciseAndKeepIdTimeAndPosition()
+    {
+        // Arrange
+        var ids = await GivenRecordedTimedSets((40, 10m), (40, 10m));
+        var before = await SetRecordsOf(TimedWorkoutId, TimedExerciseId);
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PutAsJsonAsync(SetRecordRoute(TimedWorkoutId, TimedExerciseId, ids[1]), DurationBody(35));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stored = await SetRecordsOf(TimedWorkoutId, TimedExerciseId);
+        stored.Select(record => record.Id).Should().Equal(ids);
+        stored[1].Type.Should().Be("Duration");
+        stored[1].DurationSeconds.Should().Be(35);
+        stored[1].Reps.Should().BeNull();
+        stored[1].Weight.Should().BeNull();
+        stored[1].RegisteredAtUtc.Should().Be(before[1].RegisteredAtUtc);
+        stored[0].Should().Be(before[0]);
+    }
+
+    [Fact]
+    public async Task Put_ShouldConflictOnADurationForARepBasedExerciseAndKeepThePreviousValues()
+    {
+        // Arrange
+        var ids = await GivenRecordedSets((10, 60), (8, 60));
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PutAsJsonAsync(SetRecordRoute(StartedWorkoutId, StartedExerciseId, ids[1]), DurationBody(40));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Select(record => (record.Id, record.Reps, record.Weight))
+            .Should().Equal((ids[0], 10, 60m), (ids[1], 8, 60m));
+    }
+
+    [Fact]
+    public async Task Put_ShouldConflictOnRepsForATimeBasedExerciseAndKeepThePreviousValues()
+    {
+        // Arrange
+        var ids = await GivenRecordedTimedSets((40, null));
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PutAsJsonAsync(SetRecordRoute(TimedWorkoutId, TimedExerciseId, ids[0]), SetRecordBody(10));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await SetRecordsOf(TimedWorkoutId, TimedExerciseId)).Single().DurationSeconds.Should().Be(40);
+    }
+
+    [Fact]
+    public async Task Put_ShouldRejectAMissingResult()
     {
         // Arrange
         var ids = await GivenRecordedSets((10, 60), (8, 60));

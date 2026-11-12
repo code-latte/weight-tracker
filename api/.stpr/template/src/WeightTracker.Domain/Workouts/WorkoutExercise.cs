@@ -106,12 +106,12 @@ public sealed class WorkoutExercise : Entity
     /// </summary>
     /// <exception cref="InvalidEffortException">When the effort is not a defined value.</exception>
     /// <exception cref="WorkoutExerciseRequiresSetsException">When no set prescription is given.</exception>
-    /// <exception cref="SetRecordNotAllowedForTargetException">When the entry has set records and a new prescription is not rep-based.</exception>
+    /// <exception cref="SetRecordNotAllowedForTargetException">When the entry has set records and the new prescriptions are not of the same kind as the current ones.</exception>
     internal void Replace(Effort effort, IEnumerable<SetPrescription> sets, bool perSide, TimeInMinutes? rest)
     {
         var prescriptions = EnsureValid(effort, sets);
 
-        if (_setRecords.Count > 0 && AreRepBased(prescriptions) == false)
+        if (_setRecords.Count > 0 && KindOf(prescriptions) != KindOf(_sets))
             throw new SetRecordNotAllowedForTargetException(ExerciseId);
 
         Effort = effort;
@@ -135,23 +135,66 @@ public sealed class WorkoutExercise : Entity
     }
 
     /// <summary>
-    /// Appends a set actually performed. Only its root calls it, because recording depends on the workout status.
+    /// Appends a set actually performed. Without a result, the set counts as done as prescribed: the value comes from the
+    /// next prescribed set, the one at the position given by the sets already recorded. Only its root calls it, because
+    /// recording depends on the workout status.
     /// </summary>
-    /// <exception cref="SetRecordNotAllowedForTargetException">When any prescription of the entry is not rep-based.</exception>
-    internal void AddSetRecord(SetRecord setRecord)
+    /// <exception cref="SetRecordNotAllowedForTargetException">When the entry mixes rep-based and time-based prescriptions, or the result is not of the entry's kind.</exception>
+    /// <exception cref="SetResultRequiredException">When no result is given and the next prescribed set has no single value or there is none left.</exception>
+    internal void AddSetRecord(SetResult? result, Weight? weight, DateTime registeredAtUtc)
     {
-        if (AreRepBased(_sets) == false)
+        var kind = KindOf(_sets);
+
+        if (kind == PrescriptionKind.Mixed)
             throw new SetRecordNotAllowedForTargetException(ExerciseId);
 
-        _setRecords.Add(setRecord);
+        var resolved = result ?? PrescribedResult();
+
+        if (KindOf(resolved) != kind)
+            throw new SetRecordNotAllowedForTargetException(ExerciseId);
+
+        _setRecords.Add(SetRecord.Create(resolved, weight, registeredAtUtc));
     }
 
     /// <summary>
-    /// Replaces the reps and weight of one set record. Only its root calls it, because recording depends on the workout status.
+    /// Replaces the result and weight of one set record. Only its root calls it, because recording depends on the workout status.
     /// </summary>
     /// <exception cref="SetRecordNotFoundException">When the set record is not recorded for this entry.</exception>
-    internal void UpdateSetRecord(Id setRecordId, RepCount reps, Weight weight)
-        => FindSetRecord(setRecordId).Change(reps, weight);
+    /// <exception cref="SetRecordNotAllowedForTargetException">When the entry mixes rep-based and time-based prescriptions, or the result is not of the entry's kind.</exception>
+    internal void UpdateSetRecord(Id setRecordId, SetResult result, Weight? weight)
+    {
+        var setRecord = FindSetRecord(setRecordId);
+        var kind = KindOf(_sets);
+
+        if (kind == PrescriptionKind.Mixed || KindOf(result) != kind)
+            throw new SetRecordNotAllowedForTargetException(ExerciseId);
+
+        setRecord.Change(result, weight);
+    }
+
+    /// <summary>
+    /// Value of the next prescribed set: the prescriptions expanded in order into one target per set, at the position given by the
+    /// number of sets already recorded. Minutes become seconds, rounded to the nearest second.
+    /// </summary>
+    /// <exception cref="SetResultRequiredException">When every prescribed set is already recorded, or the target is a range or max reps.</exception>
+    private SetResult PrescribedResult()
+    {
+        var targets = _sets.SelectMany(set => Enumerable.Repeat(set.target, set.count)).ToList();
+
+        if (_setRecords.Count >= targets.Count)
+            throw new SetResultRequiredException(ExerciseId, "every prescribed set is already recorded");
+
+        var target = targets[_setRecords.Count];
+
+        return target switch
+        {
+            SetTarget.Reps reps => new SetResult.Reps(RepCount.From(reps.value)),
+            SetTarget.Duration duration => new SetResult.Duration(DurationInSeconds.From(duration.value)),
+            SetTarget.Minutes minutes => new SetResult.Duration(DurationInSeconds.From(
+                Math.Max(1, (int)decimal.Round(minutes.value.Value * 60, MidpointRounding.AwayFromZero)))),
+            _ => throw new SetResultRequiredException(ExerciseId, $"the prescribed set is '{target}', which has no single value"),
+        };
+    }
 
     /// <summary>
     /// Removes one set record; the others keep their order. Only its root calls it, because recording depends on the workout status.
@@ -161,7 +204,7 @@ public sealed class WorkoutExercise : Entity
         => _setRecords.Remove(FindSetRecord(setRecordId));
 
     /// <summary>
-    /// Puts the set records of this entry in the given order. Ids, reps, weight and registration times are kept.
+    /// Puts the set records of this entry in the given order. Ids, results, weights and registration times are kept.
     /// Only its root calls it, because recording depends on the workout status.
     /// </summary>
     /// <exception cref="SetRecordOrderMismatchException">When the ids are not exactly the set records of this entry.</exception>
@@ -189,10 +232,26 @@ public sealed class WorkoutExercise : Entity
             ?? throw new SetRecordNotFoundException(setRecordId, ExerciseId);
 
     /// <summary>
-    /// Set records carry a number of reps, so they only make sense for fixed reps, reps ranges and max reps.
+    /// What the prescriptions of an entry measure. Set records only make sense when every prescription measures the same thing,
+    /// and each record then measures that same thing.
     /// </summary>
-    private static bool AreRepBased(IEnumerable<SetPrescription> prescriptions)
-        => prescriptions.All(set => set.target is SetTarget.Reps or SetTarget.RepsRange or SetTarget.MaxReps);
+    private enum PrescriptionKind { RepBased, TimeBased, Mixed }
+
+    private static PrescriptionKind KindOf(IEnumerable<SetPrescription> prescriptions)
+    {
+        var targets = prescriptions.Select(set => set.target).ToList();
+
+        if (targets.All(target => target is SetTarget.Reps or SetTarget.RepsRange or SetTarget.MaxReps))
+            return PrescriptionKind.RepBased;
+
+        if (targets.All(target => target is SetTarget.Duration or SetTarget.Minutes))
+            return PrescriptionKind.TimeBased;
+
+        return PrescriptionKind.Mixed;
+    }
+
+    private static PrescriptionKind KindOf(SetResult result)
+        => result is SetResult.Reps ? PrescriptionKind.RepBased : PrescriptionKind.TimeBased;
 
     internal void JoinSuperSeries(SuperSeriesId superSeriesId) => SuperSeriesId = superSeriesId;
 

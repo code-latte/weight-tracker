@@ -76,8 +76,9 @@ public static class WorkoutMapper
                     Id = setRecord.Id.Value,
                     WorkoutExerciseId = workoutExercise.Id,
                     Position = setRecordPosition++,
-                    Reps = setRecord.Reps.Value,
-                    Weight = setRecord.Weight.Value,
+                    Reps = (setRecord.Result as SetResult.Reps)?.Count.Value,
+                    DurationSeconds = (setRecord.Result as SetResult.Duration)?.Value.Value,
+                    Weight = setRecord.Weight?.Value,
                     RegisterDatetimeUtc = setRecord.RegisteredAtUtc,
                 });
             }
@@ -112,8 +113,8 @@ public static class WorkoutMapper
                         .OrderBy(setRecord => setRecord.Position)
                         .Select(setRecord => SetRecord.Rehydrate(
                             Id.From(setRecord.Id),
-                            RepCount.From(setRecord.Reps),
-                            Weight.From(setRecord.Weight),
+                            MapSetResult(setRecord),
+                            setRecord.Weight is null ? null : Weight.From(setRecord.Weight.Value),
                             setRecord.RegisterDatetimeUtc))))
                 .ToList();
 
@@ -182,4 +183,14 @@ public static class WorkoutMapper
 
     private static decimal RequireMinutes(string targetType, decimal? targetMinutes)
         => targetMinutes ?? throw new PersistenceMappingException($"Set target '{targetType}' requires minutes");
+
+    /// <summary>
+    /// The kind of a stored set record is read from which column is set: exactly one of <c>Reps</c> and <c>DurationSeconds</c>.
+    /// </summary>
+    private static SetResult MapSetResult(SetRecordEntity setRecord) => (setRecord.Reps, setRecord.DurationSeconds) switch
+    {
+        (int reps, null) => new SetResult.Reps(RepCount.From(reps)),
+        (null, int seconds) => new SetResult.Duration(DurationInSeconds.From(seconds)),
+        _ => throw new PersistenceMappingException($"Set record '{setRecord.Id}' must hold exactly one of reps and duration"),
+    };
 }

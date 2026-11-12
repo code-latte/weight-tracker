@@ -37,19 +37,31 @@ Set records SHALL only be added, edited, removed or reordered while the workout 
 - **WHEN** an admin edits a set record of a `REVIEWED` workout
 - **THEN** the operation fails with a domain error and the set record is unchanged
 
-### Requirement: Set records only for rep-based exercises
-A set record SHALL only be added to an exercise whose prescriptions are all rep-based: fixed reps, reps range or max reps, in any mix. If any prescription is a duration or minutes target, the operation fails with a domain error that maps to 409 and nothing changes.
+### Requirement: Set records only for single-kind exercises
+A set record SHALL only be added to an exercise whose prescriptions are all rep-based (fixed reps, reps range or max reps, in any mix) or all time-based (duration or minutes, in any mix). A set record of a rep-based exercise holds reps, and one of a time-based exercise holds a duration. An exercise that mixes both kinds, or a result of the other kind, fails with a domain error that maps to 409 and nothing changes.
 
 #### Scenario: Mixed rep-based prescriptions
-- **WHEN** a set record is added to an exercise prescribed as 1 set of 10 reps, 2 sets of 8-12 reps and 1 set of max reps
+- **WHEN** a set record of 10 reps is added to an exercise prescribed as 1 set of 10 reps, 2 sets of 8-12 reps and 1 set of max reps
 - **THEN** the set record is added
 
 #### Scenario: Exercise with a duration prescription
-- **WHEN** a set record is added to an exercise prescribed as 3 sets of 40 seconds
-- **THEN** the operation fails with a domain error and no set record is added
+- **WHEN** a set record of 40 seconds is added to an exercise prescribed as 3 sets of 40 seconds
+- **THEN** the set record is added with 40 seconds
+
+#### Scenario: Mixed time-based prescriptions
+- **WHEN** a set record of 60 seconds is added to an exercise prescribed as 2 sets of 40 seconds and 1 set of 1.5 minutes
+- **THEN** the set record is added
 
 #### Scenario: Exercise mixing reps and minutes
 - **WHEN** a set record is added to an exercise prescribed as 2 sets of 10 reps and 1 set of 1.5 minutes
+- **THEN** the operation fails with a domain error and no set record is added
+
+#### Scenario: Reps on a time-based exercise
+- **WHEN** a set record of 10 reps is added to an exercise prescribed as 3 sets of 40 seconds
+- **THEN** the operation fails with a domain error and no set record is added
+
+#### Scenario: Duration on a rep-based exercise
+- **WHEN** a set record of 40 seconds is added to an exercise prescribed as 3 sets of 10 reps
 - **THEN** the operation fails with a domain error and no set record is added
 
 ### Requirement: Set records are not capped by the prescription
@@ -64,11 +76,19 @@ An exercise SHALL accept any number of set records, more or fewer than its total
 - **THEN** the set record is added with 14 reps
 
 ### Requirement: Set record values are validated
-The reps of a set record SHALL be at least 1. The weight SHALL be in kilograms, at least 0 (0 means bodyweight), at most the stored maximum and with at most 2 decimals. Invalid values fail with a domain error that maps to 400 and nothing changes.
+The reps of a set record SHALL be at least 1, and a duration SHALL be a whole number of seconds, at least 1. The weight is optional. When it is present, it SHALL be in kilograms, at least 0 (0 means bodyweight), at most the stored maximum and with at most 2 decimals. A missing weight means the weight is not tracked. Invalid values fail with a domain error that maps to 400 and nothing changes.
 
 #### Scenario: Bodyweight set
 - **WHEN** a set record of 12 reps at 0 kg is added
 - **THEN** the set record is added with 0 kg
+
+#### Scenario: Set without weight
+- **WHEN** a set record of 10 reps without a weight is added
+- **THEN** the set record is added with no weight, which is different from 0 kg
+
+#### Scenario: Weighted timed set
+- **WHEN** a set record of 45 seconds at 10 kg is added to a time-based exercise
+- **THEN** the set record is added with 45 seconds and 10 kg
 
 #### Scenario: Weight with two decimals
 - **WHEN** a set record at 22.75 kg is added
@@ -76,6 +96,10 @@ The reps of a set record SHALL be at least 1. The weight SHALL be in kilograms, 
 
 #### Scenario: Zero reps
 - **WHEN** a set record of 0 reps is added
+- **THEN** the operation fails with a domain error and no set record is added
+
+#### Scenario: Zero seconds
+- **WHEN** a set record of 0 seconds is added
 - **THEN** the operation fails with a domain error and no set record is added
 
 #### Scenario: Negative weight
@@ -97,15 +121,23 @@ Adding, editing, removing and reordering set records SHALL NOT count as editing 
 - **WHEN** the athlete of a prescribed `STARTED` workout, who may not edit its content, adds a set record
 - **THEN** the set record is added
 
-### Requirement: Exercises with set records stay rep-based
-While an exercise has set records, updating it SHALL refuse any duration or minutes prescription, for every caller including an admin. The operation fails with a domain error that maps to 409 and the exercise keeps its effort, sets, per-side flag, rest and set records. Changes among rep-based targets are allowed.
+### Requirement: Exercises with set records keep their kind
+While an exercise has set records, updating it SHALL refuse prescriptions of the other kind: a rep-based exercise cannot switch to time-based prescriptions, a time-based one cannot switch to rep-based prescriptions, and neither can switch to a mix of both. This applies to every caller, including an admin. The operation fails with a domain error that maps to 409, and the exercise keeps its effort, sets, per-side flag, rest and set records. Changes within the same kind are allowed.
 
 #### Scenario: Switch to a duration target
-- **WHEN** an exercise with set records is updated to 3 sets of 40 seconds
+- **WHEN** a rep-based exercise with set records is updated to 3 sets of 40 seconds
+- **THEN** the operation fails with a domain error and the exercise is unchanged
+
+#### Scenario: Switch to a reps target
+- **WHEN** a time-based exercise with set records is updated to 3 sets of 10 reps
 - **THEN** the operation fails with a domain error and the exercise is unchanged
 
 #### Scenario: Change between rep-based targets
 - **WHEN** an exercise with set records is updated from 3 sets of 10 reps to 3 sets of 8-12 reps
+- **THEN** the exercise is updated and keeps its set records
+
+#### Scenario: Change between time-based targets
+- **WHEN** an exercise with set records is updated from 3 sets of 40 seconds to 3 sets of 1 minute
 - **THEN** the exercise is updated and keeps its set records
 
 #### Scenario: Exercise without set records
@@ -113,11 +145,11 @@ While an exercise has set records, updating it SHALL refuse any duration or minu
 - **THEN** the exercise is updated
 
 ### Requirement: Set records are stored with the workout
-Set records SHALL be persisted with the workout and restored unchanged when it is loaded again. A workout created from a template starts with no set records. Removing an exercise from a workout also removes its set records.
+Set records SHALL be persisted with the workout and restored unchanged when it is loaded again, whether they hold reps or a duration and whether or not they have a weight. A workout created from a template starts with no set records. Removing an exercise from a workout also removes its set records.
 
 #### Scenario: Round trip
-- **WHEN** a workout with set records on two exercises is saved and loaded again
-- **THEN** each exercise holds the same set records, in the same order, with the same reps, weight and registration time
+- **WHEN** a workout is saved and loaded again with set records on two exercises: reps with weight, reps without weight, and a duration with and without weight
+- **THEN** each exercise holds the same set records, in the same order, with the same result, weight (or no weight) and registration time
 
 #### Scenario: Recording on a stored workout keeps earlier set records
 - **WHEN** a set record is added to a stored workout whose exercise already has set records, and the workout is saved and loaded again
@@ -132,7 +164,7 @@ Set records SHALL be persisted with the workout and restored unchanged when it i
 - **THEN** its set records are no longer stored
 
 ### Requirement: Add a set record at the end of an exercise
-A workout SHALL let a set record be added to one of its exercises, identified by the catalog exercise identifier. A set record holds the reps done, the weight lifted in kilograms and the moment it was registered, in UTC. A new set record is placed after the existing set records of that exercise, whatever its registration time.
+A workout SHALL let a set record be added to one of its exercises, identified by the catalog exercise identifier. A set record holds the result (reps done or seconds held), an optional weight in kilograms and the moment it was registered, in UTC. A new set record is placed after the existing set records of that exercise, whatever its registration time.
 
 #### Scenario: Record a set
 - **WHEN** a set record of 8 reps at 62.5 kg is added to an exercise of a started workout
@@ -152,25 +184,41 @@ A workout SHALL let a set record be added to one of its exercises, identified by
 - **THEN** the operation fails with a domain error and no set record is added
 
 ### Requirement: Record a set through the API
-`POST /workouts/{workoutId}/exercises/{exerciseId}/set-records` SHALL add a set record with the reps and weight of the request body. The registration time is set by the server at the moment of the request; the request cannot supply it. The response is 200 with the whole updated workout.
+`POST /workouts/{workoutId}/exercises/{exerciseId}/set-records` SHALL add a set record from the request body. The body has optional `reps`, `durationSeconds` and `weight` fields. An empty result (neither `reps` nor `durationSeconds`) means the set was done as prescribed. The registration time is set by the server at the moment of the request; the request cannot supply it. The response is 200 with the whole updated workout.
 
 #### Scenario: Athlete records a set
 - **WHEN** the owner of a `STARTED` workout posts 8 reps at 62.5 kg for one of its exercises
 - **THEN** the response is 200 and that exercise lists one more set record, last, with 8 reps, 62.5 kg and a server registration time
+
+#### Scenario: Athlete records a timed set
+- **WHEN** the owner of a `STARTED` workout posts 30 seconds for an exercise prescribed as 3 sets of 45 seconds
+- **THEN** the response is 200 and the exercise lists one more set record with 30 seconds and no weight
 
 #### Scenario: Admin records a set
 - **WHEN** an admin posts a set record for an exercise of a `STARTED` workout they do not own
 - **THEN** the response is 200 and the set record is added
 
 ### Requirement: Edit a set record
-`PUT /workouts/{workoutId}/exercises/{exerciseId}/set-records/{setRecordId}` SHALL replace the reps and weight of that set record. Its identifier, registration time and position are kept. The response is 200 with the whole updated workout.
+`PUT /workouts/{workoutId}/exercises/{exerciseId}/set-records/{setRecordId}` SHALL replace the result and the weight of that set record. The request must give the result explicitly. A missing weight clears it. The identifier, registration time and position are kept. The response is 200 with the whole updated workout.
 
 #### Scenario: Correct reps and weight
 - **WHEN** the owner edits a set record of 8 reps at 60 kg to 10 reps at 62.5 kg
 - **THEN** the response is 200 and the set record has 10 reps and 62.5 kg, with the same id, registration time and position
 
+#### Scenario: Correct a duration and clear the weight
+- **WHEN** the owner edits a set record of 45 seconds at 10 kg to 40 seconds without a weight
+- **THEN** the response is 200 and the set record has 40 seconds and no weight, with the same id, registration time and position
+
+#### Scenario: Edit without a result
+- **WHEN** a set record is edited with neither `reps` nor `durationSeconds`
+- **THEN** the response is 400 and the set record keeps its previous values
+
+#### Scenario: Edit to the other kind
+- **WHEN** a set record of a rep-based exercise is edited to 40 seconds
+- **THEN** the response is 409 and the set record keeps its previous values
+
 #### Scenario: Invalid values leave the set record unchanged
-- **WHEN** a set record is edited to 0 reps or to -5 kg
+- **WHEN** a set record is edited to 0 reps, 0 seconds or -5 kg
 - **THEN** the response is 400 and the set record keeps its previous values
 
 ### Requirement: Remove a set record
@@ -259,10 +307,14 @@ Every set record route SHALL reject a request without a token or with an invalid
 - **THEN** the response is 401
 
 ### Requirement: Set record requests are structurally validated
-Add and edit requests SHALL require `reps` and `weight`, and the reorder request SHALL require `setRecordIds`. A missing field fails with 400 and nothing changes.
+Add and edit requests SHALL NOT send both `reps` and `durationSeconds`. The reorder request SHALL require `setRecordIds`. A request that breaks either rule fails with 400 and nothing changes.
 
 #### Scenario: Missing weight
-- **WHEN** a set record is posted without `weight`
+- **WHEN** a set record is posted with `reps` and without `weight`
+- **THEN** the response is 200 and the set record has no weight
+
+#### Scenario: Both reps and duration
+- **WHEN** a set record is posted with both `reps` and `durationSeconds`
 - **THEN** the response is 400 and no set record is added
 
 #### Scenario: Missing list
@@ -270,12 +322,24 @@ Add and edit requests SHALL require `reps` and `weight`, and the reorder request
 - **THEN** the response is 400 and the order is unchanged
 
 ### Requirement: The workout response lists set records
-The workout detail response SHALL list, for each exercise, its set records in order, each with its id, reps, weight in kilograms and registration time in UTC. An exercise without set records lists an empty collection.
+The workout detail response SHALL list each exercise's set records in order. Each one has:
+
+- its id;
+- a `type` of `Reps` or `Duration`;
+- `reps` or `durationSeconds`, set according to the type, with the other one null;
+- the weight in kilograms, or null when it is not tracked;
+- the registration time in UTC.
+
+An exercise without set records lists an empty collection.
 
 #### Scenario: Read a workout with set records
 - **WHEN** a workout with two set records on one exercise is read by id
-- **THEN** that exercise lists both set records in order with id, reps, weight and registration time
+- **THEN** that exercise lists both set records in order with id, type, result, weight and registration time
 - **AND** the other exercises list no set records
+
+#### Scenario: Read a timed set without weight
+- **WHEN** a workout with a 45-second set record without weight is read by id
+- **THEN** the set record has type `Duration`, 45 `durationSeconds`, null `reps` and null `weight`
 
 ### Requirement: Every change to the results is timestamped
 Adding, editing, removing or reordering a set record SHALL set the workout's `resultsUpdatedAt` to the server time of the request, in UTC. A workout whose set records were never changed SHALL have `resultsUpdatedAt` `null`. Operations that fail SHALL leave it unchanged.
@@ -295,3 +359,37 @@ Adding, editing, removing or reordering a set record SHALL set the workout's `re
 #### Scenario: Failed change keeps the timestamp
 - **WHEN** a set record change on a `REVIEWED` workout is refused
 - **THEN** the workout's `resultsUpdatedAt` is unchanged
+### Requirement: Check a set as done as prescribed
+Adding a set record without a result SHALL record the value of the next prescribed set: the prescriptions expanded in order into one target per set, at the position given by the number of existing set records. Fixed reps and durations are copied, and minutes become seconds rounded to the nearest second. A reps range, max reps or no prescribed set left fails with a domain error that maps to 400 and nothing changes. The weight stays optional.
+
+#### Scenario: Done as prescribed with reps
+- **WHEN** a set record without a result and without a weight is added to an exercise prescribed as 3 sets of 10 reps
+- **THEN** the exercise holds one set record with 10 reps and no weight
+
+#### Scenario: Done as prescribed with a duration
+- **WHEN** a set record without a result is added to an exercise prescribed as 3 sets of 45 seconds
+- **THEN** the exercise holds one set record with 45 seconds
+
+#### Scenario: Done as prescribed with minutes
+- **WHEN** a set record without a result is added to an exercise prescribed as 2 sets of 1.5 minutes
+- **THEN** the exercise holds one set record with 90 seconds
+
+#### Scenario: Next set of a mixed rep prescription
+- **WHEN** an exercise prescribed as 2 sets of 10 reps and 1 set of 8 reps already has two set records, and a set record without a result is added
+- **THEN** the new set record has 8 reps
+
+#### Scenario: Position follows removals
+- **WHEN** an exercise prescribed as 2 sets of 10 reps and 1 set of 8 reps has two set records, one is removed, and a set record without a result is added
+- **THEN** the new set record has 10 reps
+
+#### Scenario: Range or max target
+- **WHEN** a set record without a result is added to an exercise prescribed as 3 sets of 8-12 reps or 3 sets of max reps
+- **THEN** the operation fails with a domain error and no set record is added
+
+#### Scenario: Beyond the prescription
+- **WHEN** an exercise prescribed as 3 sets of 10 reps already has three set records, and a set record without a result is added
+- **THEN** the operation fails with a domain error and no set record is added
+
+#### Scenario: Through the API
+- **WHEN** the owner of a `STARTED` workout posts an empty body for an exercise prescribed as 3 sets of 45 seconds
+- **THEN** the response is 200 and the exercise lists one more set record with type `Duration`, 45 `durationSeconds` and no weight

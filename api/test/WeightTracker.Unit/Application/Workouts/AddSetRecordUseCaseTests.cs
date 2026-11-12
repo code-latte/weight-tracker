@@ -15,6 +15,8 @@ namespace WeightTracker.Unit.Application.Workouts;
 
 public class AddSetRecordUseCaseTests
 {
+    private static SetResult Reps(int value) => new SetResult.Reps(RepCount.From(value));
+
     private static readonly DateTime WorkoutDate = new(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly WorkoutName Name = WorkoutName.From("Leg day");
     private static readonly DateTime RecordedAt = new(2026, 11, 7, 10, 0, 0, DateTimeKind.Utc);
@@ -40,9 +42,9 @@ public class AddSetRecordUseCaseTests
     {
         setRecords =
         [
-            SetRecord.Rehydrate(Id.New(), RepCount.From(10), Weight.From(60), RecordedAt),
-            SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(62.5m), RecordedAt.AddMinutes(2)),
-            SetRecord.Rehydrate(Id.New(), RepCount.From(7), Weight.From(65), RecordedAt.AddMinutes(4)),
+            SetRecord.Rehydrate(Id.New(), Reps(10), Weight.From(60), RecordedAt),
+            SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(62.5m), RecordedAt.AddMinutes(2)),
+            SetRecord.Rehydrate(Id.New(), Reps(7), Weight.From(65), RecordedAt.AddMinutes(4)),
         ];
 
         return Workout.Rehydrate(Id.New(), ownerId ?? OwnerId, prescribed ? TrainerId : null, Name, null, WorkoutDate, status,
@@ -77,15 +79,15 @@ public class AddSetRecordUseCaseTests
         GivenSaveAndCommitSucceed(workout);
 
         // Act
-        var result = await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        var result = await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         result.ResultsUpdatedAt.Should().Be(Now);
         result.Should().BeSameAs(workout);
         var added = SetRecordsOf(workout).Should().HaveCount(4).And.Subject.Last();
         added.IsNew.Should().BeTrue();
-        added.Reps.Value.Should().Be(9);
-        added.Weight.Value.Should().Be(67.5m);
+        added.Result.Should().Be(Reps(9));
+        added.Weight.Should().Be(Weight.From(67.5m));
         added.RegisteredAtUtc.Should().Be(Now);
         _workouts.Verify(repository => repository.Save(workout, It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWork.Verify(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -100,7 +102,7 @@ public class AddSetRecordUseCaseTests
         var workoutId = Id.New();
 
         // Act
-        var act = () => AUseCase().Execute(OwnerId, Role.USER, workoutId, ExerciseId, reps, weight, CancellationToken.None);
+        var act = () => AUseCase().Execute(OwnerId, Role.USER, workoutId, ExerciseId, reps, null, weight, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<DomainException>();
@@ -117,11 +119,11 @@ public class AddSetRecordUseCaseTests
         GivenSaveAndCommitSucceed(workout);
 
         // Act
-        await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         SetRecordsOf(workout).Should().HaveCount(4);
-        SetRecordsOf(workout)[3].Reps.Value.Should().Be(9);
+        SetRecordsOf(workout)[3].Result.Should().Be(Reps(9));
     }
 
     [Fact]
@@ -133,11 +135,11 @@ public class AddSetRecordUseCaseTests
         GivenSaveAndCommitSucceed(workout);
 
         // Act
-        await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         SetRecordsOf(workout).Should().HaveCount(4);
-        SetRecordsOf(workout)[3].Reps.Value.Should().Be(9);
+        SetRecordsOf(workout)[3].Result.Should().Be(Reps(9));
     }
 
     [Fact]
@@ -149,11 +151,11 @@ public class AddSetRecordUseCaseTests
         GivenSaveAndCommitSucceed(workout);
 
         // Act
-        await AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        await AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         SetRecordsOf(workout).Should().HaveCount(4);
-        SetRecordsOf(workout)[3].Reps.Value.Should().Be(9);
+        SetRecordsOf(workout)[3].Result.Should().Be(Reps(9));
     }
 
     [Fact]
@@ -164,7 +166,7 @@ public class AddSetRecordUseCaseTests
         _workouts.Setup(repository => repository.GetById(workout.Id, It.IsAny<CancellationToken>())).ReturnsAsync((Workout?)null);
 
         // Act
-        var act = () => AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        var act = () => AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<WorkoutNotFoundException>();
@@ -179,7 +181,7 @@ public class AddSetRecordUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
@@ -195,7 +197,7 @@ public class AddSetRecordUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        var act = () => AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
@@ -211,7 +213,7 @@ public class AddSetRecordUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(Id.New(), Role.USER, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        var act = () => AUseCase().Execute(Id.New(), Role.USER, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
@@ -227,7 +229,7 @@ public class AddSetRecordUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(Id.New(), Role.USER, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        var act = () => AUseCase().Execute(Id.New(), Role.USER, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<UnauthorizedOperationException>();
@@ -242,11 +244,117 @@ public class AddSetRecordUseCaseTests
         GivenStored(workout);
 
         // Act
-        var act = () => AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, ExerciseId, 9, 67.5m, CancellationToken.None);
+        var act = () => AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, ExerciseId, 9, null, 67.5m, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<WorkoutResultsLockedException>();
         SetRecordsOf(workout).Should().Equal(setRecords);
+        VerifyNothingSavedOrCommitted();
+    }
+
+    private static SetResult Seconds(int value) => new SetResult.Duration(DurationInSeconds.From(value));
+
+    /// <summary>A started workout, owned by the user and prescribed by the trainer, with one exercise of 3 sets and no set records yet.</summary>
+    private static Workout AStoredWorkoutWithoutSetRecords(SetTarget target)
+        => Workout.Rehydrate(Id.New(), OwnerId, TrainerId, Name, null, WorkoutDate, WorkoutStatus.STARTED,
+            [WorkoutExercise.Rehydrate(Id.New(), ExerciseId, Effort.MID, [new SetPrescription(3, target)])]);
+
+    [Fact]
+    public async Task Execute_ShouldRecordADurationWithoutWeightOnATimeBasedExercise()
+    {
+        // Arrange
+        var workout = AStoredWorkoutWithoutSetRecords(new SetTarget.Duration(45));
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, null, 40, null, CancellationToken.None);
+
+        // Assert
+        var added = SetRecordsOf(workout).Should().ContainSingle().Subject;
+        added.Result.Should().Be(Seconds(40));
+        added.Weight.Should().BeNull();
+        _workouts.Verify(repository => repository.Save(workout, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldPassNoResultSoTheAggregateCopiesThePrescription()
+    {
+        // Arrange
+        var workout = AStoredWorkoutWithoutSetRecords(new SetTarget.Reps(10));
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, null, null, null, CancellationToken.None);
+
+        // Assert
+        var added = SetRecordsOf(workout).Should().ContainSingle().Subject;
+        added.Result.Should().Be(Reps(10));
+        added.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldKeepTheWeightWhenTheResultIsCopiedFromThePrescription()
+    {
+        // Arrange
+        var workout = AStoredWorkoutWithoutSetRecords(new SetTarget.Reps(10));
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        await AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, null, null, 60m, CancellationToken.None);
+
+        // Assert
+        var added = SetRecordsOf(workout).Should().ContainSingle().Subject;
+        added.Result.Should().Be(Reps(10));
+        added.Weight.Should().Be(Weight.From(60));
+    }
+
+    [Fact]
+    public async Task Execute_ShouldPropagateAMissingResultForARangeWithoutSavingOrCommitting()
+    {
+        // Arrange
+        var workout = AStoredWorkoutWithoutSetRecords(new SetTarget.RepsRange(8, 12));
+        GivenStored(workout);
+
+        // Act
+        var act = () => AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, null, null, 60m, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<SetResultRequiredException>();
+        SetRecordsOf(workout).Should().BeEmpty();
+        VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRejectAnInvalidDurationBeforeLoadingTheWorkout()
+    {
+        // Arrange
+        var workoutId = Id.New();
+
+        // Act
+        var act = () => AUseCase().Execute(OwnerId, Role.USER, workoutId, ExerciseId, null, 0, null, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidDurationInSecondsException>();
+        _workouts.VerifyNoOtherCalls();
+        _unitOfWork.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldPropagateAResultOfTheWrongKindWithoutSavingOrCommitting()
+    {
+        // Arrange
+        var workout = AStoredWorkoutWithoutSetRecords(new SetTarget.Duration(45));
+        GivenStored(workout);
+
+        // Act
+        var act = () => AUseCase().Execute(OwnerId, Role.USER, workout.Id, ExerciseId, 10, null, null, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<SetRecordNotAllowedForTargetException>();
+        SetRecordsOf(workout).Should().BeEmpty();
         VerifyNothingSavedOrCommitted();
     }
 }

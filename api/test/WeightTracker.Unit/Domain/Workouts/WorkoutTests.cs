@@ -1724,6 +1724,10 @@ public class WorkoutTests
 
     private static readonly DateTime RecordedAt = new(2026, 11, 7, 10, 0, 0, DateTimeKind.Utc);
 
+    private static SetResult Reps(int value) => new SetResult.Reps(RepCount.From(value));
+
+    private static SetResult Seconds(int value) => new SetResult.Duration(DurationInSeconds.From(value));
+
     private static Workout AStartedWorkoutWith(params (Id ExerciseId, SetPrescription[] Sets)[] entries)
         => AWorkoutWith(WorkoutStatus.STARTED, entries);
 
@@ -1744,13 +1748,13 @@ public class WorkoutTests
         var workout = AStartedWorkoutWith((bench, [FourByTen]), (row, [ThreeByTen]));
 
         // Act
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(62.5m), RecordedAt);
+        workout.AddSetRecord(bench, Reps(8), Weight.From(62.5m), RecordedAt);
 
         // Assert
         var setRecord = EntryFor(workout, bench).SetRecords.Should().ContainSingle().Subject;
         setRecord.IsNew.Should().BeTrue();
-        setRecord.Reps.Value.Should().Be(8);
-        setRecord.Weight.Value.Should().Be(62.5m);
+        setRecord.Result.Should().Be(Reps(8));
+        setRecord.Weight.Should().Be(Weight.From(62.5m));
         setRecord.RegisteredAtUtc.Should().Be(RecordedAt);
         EntryFor(workout, row).SetRecords.Should().BeEmpty();
     }
@@ -1761,11 +1765,11 @@ public class WorkoutTests
         // Arrange
         var bench = Id.New();
         var workout = AStartedWorkoutWith((bench, [FourByTen]));
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt.AddMinutes(5));
-        workout.AddSetRecord(bench, RepCount.From(10), Weight.From(55), RecordedAt.AddMinutes(1));
+        workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt.AddMinutes(5));
+        workout.AddSetRecord(bench, Reps(10), Weight.From(55), RecordedAt.AddMinutes(1));
 
         // Act
-        workout.AddSetRecord(bench, RepCount.From(9), Weight.From(57.5m), RecordedAt.AddMinutes(3));
+        workout.AddSetRecord(bench, Reps(9), Weight.From(57.5m), RecordedAt.AddMinutes(3));
 
         // Assert
         EntryFor(workout, bench).SetRecords.Select(record => record.RegisteredAtUtc)
@@ -1778,13 +1782,13 @@ public class WorkoutTests
         // Arrange
         var bench = Id.New();
         var workout = AStartedWorkoutWith((bench, [FourByTen]));
-        workout.AddSetRecord(bench, RepCount.From(10), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, Reps(10), Weight.From(60), RecordedAt);
 
         // Act
-        workout.AddSetRecord(bench, RepCount.From(7), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, Reps(7), Weight.From(60), RecordedAt);
 
         // Assert
-        EntryFor(workout, bench).SetRecords.Select(record => record.Reps.Value).Should().Equal(10, 7);
+        EntryFor(workout, bench).SetRecords.Select(record => record.Result).Should().Equal(Reps(10), Reps(7));
     }
 
     [Theory]
@@ -1798,7 +1802,7 @@ public class WorkoutTests
         var workout = AWorkoutWith(status, (bench, [FourByTen]));
 
         // Act
-        var act = () => workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+        var act = () => workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt);
 
         // Assert
         act.Should().Throw<WorkoutResultsLockedException>();
@@ -1813,7 +1817,7 @@ public class WorkoutTests
         var workout = AStartedWorkoutWith((bench, [FourByTen]));
 
         // Act
-        var act = () => workout.AddSetRecord(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var act = () => workout.AddSetRecord(Id.New(), Reps(8), Weight.From(60), RecordedAt);
 
         // Assert
         act.Should().Throw<ExerciseNotInWorkoutException>();
@@ -1821,18 +1825,240 @@ public class WorkoutTests
     }
 
     [Fact]
-    public void AddSetRecord_ShouldRejectAnExerciseWithADurationPrescription()
+    public void AddSetRecord_ShouldAcceptADurationResultOnAnExerciseWithADurationPrescription()
     {
         // Arrange
         var plank = Id.New();
         var workout = AStartedWorkoutWith((plank, [new SetPrescription(3, new SetTarget.Duration(40))]));
 
         // Act
-        var act = () => workout.AddSetRecord(plank, RepCount.From(8), Weight.From(0), RecordedAt);
+        workout.AddSetRecord(plank, Seconds(40), null, RecordedAt);
+
+        // Assert
+        var setRecord = EntryFor(workout, plank).SetRecords.Should().ContainSingle().Subject;
+        setRecord.Result.Should().Be(Seconds(40));
+        setRecord.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldAcceptAMixOfTimeBasedPrescriptions()
+    {
+        // Arrange
+        var plank = Id.New();
+        var oneByMinutes = new SetPrescription(1, new SetTarget.Minutes(TimeInMinutes.From(1.5m)));
+        var workout = AStartedWorkoutWith((plank, [new SetPrescription(2, new SetTarget.Duration(40)), oneByMinutes]));
+
+        // Act
+        workout.AddSetRecord(plank, Seconds(60), null, RecordedAt);
+
+        // Assert
+        EntryFor(workout, plank).SetRecords.Should().ContainSingle().Which.Result.Should().Be(Seconds(60));
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRejectARepsResultOnATimeBasedExercise()
+    {
+        // Arrange
+        var plank = Id.New();
+        var workout = AStartedWorkoutWith((plank, [new SetPrescription(3, new SetTarget.Duration(40))]));
+
+        // Act
+        var act = () => workout.AddSetRecord(plank, Reps(10), null, RecordedAt);
 
         // Assert
         act.Should().Throw<SetRecordNotAllowedForTargetException>();
         EntryFor(workout, plank).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRejectADurationResultOnARepBasedExercise()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
+
+        // Act
+        var act = () => workout.AddSetRecord(bench, Seconds(40), null, RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        EntryFor(workout, bench).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldAcceptASetWithoutWeight()
+    {
+        // Arrange
+        var jumpingJacks = Id.New();
+        var workout = AStartedWorkoutWith((jumpingJacks, [ThreeByTen]));
+
+        // Act
+        workout.AddSetRecord(jumpingJacks, Reps(10), null, RecordedAt);
+
+        // Assert
+        var setRecord = EntryFor(workout, jumpingJacks).SetRecords.Should().ContainSingle().Subject;
+        setRecord.Result.Should().Be(Reps(10));
+        setRecord.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldAcceptAWeightedTimedSet()
+    {
+        // Arrange
+        var plank = Id.New();
+        var workout = AStartedWorkoutWith((plank, [new SetPrescription(3, new SetTarget.Duration(45))]));
+
+        // Act
+        workout.AddSetRecord(plank, Seconds(45), Weight.From(10), RecordedAt);
+
+        // Assert
+        var setRecord = EntryFor(workout, plank).SetRecords.Should().ContainSingle().Subject;
+        setRecord.Result.Should().Be(Seconds(45));
+        setRecord.Weight.Should().Be(Weight.From(10));
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldResolveAnEmptyResultFromAFixedRepsPrescription()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
+
+        // Act
+        workout.AddSetRecord(bench, null, null, RecordedAt);
+
+        // Assert
+        var setRecord = EntryFor(workout, bench).SetRecords.Should().ContainSingle().Subject;
+        setRecord.Result.Should().Be(Reps(10));
+        setRecord.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldResolveAnEmptyResultFromADurationPrescription()
+    {
+        // Arrange
+        var plank = Id.New();
+        var workout = AStartedWorkoutWith((plank, [new SetPrescription(3, new SetTarget.Duration(45))]));
+
+        // Act
+        workout.AddSetRecord(plank, null, null, RecordedAt);
+
+        // Assert
+        EntryFor(workout, plank).SetRecords.Should().ContainSingle().Which.Result.Should().Be(Seconds(45));
+    }
+
+    [Theory]
+    [InlineData(1.5, 90)]
+    [InlineData(1.01, 61)]
+    [InlineData(0.01, 1)]
+    public void AddSetRecord_ShouldResolveAnEmptyResultFromAMinutesPrescriptionAsRoundedSeconds(decimal minutes, int seconds)
+    {
+        // Arrange
+        var bike = Id.New();
+        var workout = AStartedWorkoutWith((bike, [new SetPrescription(2, new SetTarget.Minutes(TimeInMinutes.From(minutes)))]));
+
+        // Act
+        workout.AddSetRecord(bike, null, null, RecordedAt);
+
+        // Assert
+        EntryFor(workout, bike).SetRecords.Should().ContainSingle().Which.Result.Should().Be(Seconds(seconds));
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldResolveAnEmptyResultFromThePrescribedSetAtThePositionOfTheNextRecord()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [new SetPrescription(2, new SetTarget.Reps(10)), new SetPrescription(1, new SetTarget.Reps(8))]));
+        workout.AddSetRecord(bench, null, null, RecordedAt);
+        workout.AddSetRecord(bench, null, null, RecordedAt.AddMinutes(2));
+
+        // Act
+        workout.AddSetRecord(bench, null, null, RecordedAt.AddMinutes(4));
+
+        // Assert
+        EntryFor(workout, bench).SetRecords.Select(record => record.Result).Should().Equal(Reps(10), Reps(10), Reps(8));
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldFollowTheCountOfRecordsAfterARemovalWhenResolvingAnEmptyResult()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [new SetPrescription(2, new SetTarget.Reps(10)), new SetPrescription(1, new SetTarget.Reps(8))]));
+        workout.AddSetRecord(bench, null, null, RecordedAt);
+        workout.AddSetRecord(bench, null, null, RecordedAt.AddMinutes(2));
+        workout.RemoveSetRecord(bench, EntryFor(workout, bench).SetRecords[0].Id, RecordedAt.AddMinutes(3));
+
+        // Act
+        workout.AddSetRecord(bench, null, null, RecordedAt.AddMinutes(4));
+
+        // Assert
+        EntryFor(workout, bench).SetRecords.Select(record => record.Result).Should().Equal(Reps(10), Reps(10));
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRequireAResultForARepsRangePrescription()
+    {
+        // Arrange
+        var squat = Id.New();
+        var workout = AStartedWorkoutWith((squat, [new SetPrescription(3, new SetTarget.RepsRange(8, 12))]));
+
+        // Act
+        var act = () => workout.AddSetRecord(squat, null, null, RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetResultRequiredException>();
+        EntryFor(workout, squat).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRequireAResultForAMaxRepsPrescription()
+    {
+        // Arrange
+        var pullUps = Id.New();
+        var workout = AStartedWorkoutWith((pullUps, [new SetPrescription(3, new SetTarget.MaxReps())]));
+
+        // Act
+        var act = () => workout.AddSetRecord(pullUps, null, null, RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetResultRequiredException>();
+        EntryFor(workout, pullUps).SetRecords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRequireAResultBeyondThePrescribedSets()
+    {
+        // Arrange
+        var bench = Id.New();
+        var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
+        workout.AddSetRecord(bench, null, null, RecordedAt);
+        workout.AddSetRecord(bench, null, null, RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(bench, null, null, RecordedAt.AddMinutes(4));
+
+        // Act
+        var act = () => workout.AddSetRecord(bench, null, null, RecordedAt.AddMinutes(6));
+
+        // Assert
+        act.Should().Throw<SetResultRequiredException>();
+        EntryFor(workout, bench).SetRecords.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void AddSetRecord_ShouldRejectAnEmptyResultOnAMixedExerciseBeforeResolvingIt()
+    {
+        // Arrange
+        var burpees = Id.New();
+        var oneByMinutes = new SetPrescription(1, new SetTarget.Minutes(TimeInMinutes.From(1.5m)));
+        var workout = AStartedWorkoutWith((burpees, [new SetPrescription(2, new SetTarget.Reps(10)), oneByMinutes]));
+
+        // Act
+        var act = () => workout.AddSetRecord(burpees, null, null, RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        EntryFor(workout, burpees).SetRecords.Should().BeEmpty();
     }
 
     [Fact]
@@ -1844,7 +2070,7 @@ public class WorkoutTests
         var workout = AStartedWorkoutWith((burpees, [new SetPrescription(2, new SetTarget.Reps(10)), oneByMinutes]));
 
         // Act
-        var act = () => workout.AddSetRecord(burpees, RepCount.From(10), Weight.From(0), RecordedAt);
+        var act = () => workout.AddSetRecord(burpees, Reps(10), Weight.From(0), RecordedAt);
 
         // Assert
         act.Should().Throw<SetRecordNotAllowedForTargetException>();
@@ -1864,11 +2090,11 @@ public class WorkoutTests
         ]));
 
         // Act
-        workout.AddSetRecord(squat, RepCount.From(14), Weight.From(80), RecordedAt);
+        workout.AddSetRecord(squat, Reps(14), Weight.From(80), RecordedAt);
 
         // Assert
         EntryFor(workout, squat).SetRecords.Should().ContainSingle()
-            .Which.Reps.Value.Should().Be(14);
+            .Which.Result.Should().Be(Reps(14));
     }
 
     [Fact]
@@ -1877,12 +2103,12 @@ public class WorkoutTests
         // Arrange
         var bench = Id.New();
         var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
-        workout.AddSetRecord(bench, RepCount.From(10), Weight.From(60), RecordedAt);
-        workout.AddSetRecord(bench, RepCount.From(10), Weight.From(60), RecordedAt.AddMinutes(2));
-        workout.AddSetRecord(bench, RepCount.From(9), Weight.From(60), RecordedAt.AddMinutes(4));
+        workout.AddSetRecord(bench, Reps(10), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, Reps(10), Weight.From(60), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(bench, Reps(9), Weight.From(60), RecordedAt.AddMinutes(4));
 
         // Act
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt.AddMinutes(6));
+        workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt.AddMinutes(6));
 
         // Assert
         EntryFor(workout, bench).SetRecords.Should().HaveCount(4);
@@ -1896,7 +2122,7 @@ public class WorkoutTests
         var workout = AStartedWorkoutWith((bench, [FourByTen]));
 
         // Act
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt);
 
         // Assert
         workout.IsLocked.Should().BeTrue();
@@ -1907,7 +2133,7 @@ public class WorkoutTests
     public void Rehydrate_ShouldRestoreTheStoredSetRecordsOfEachExercise()
     {
         // Arrange
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), RecordedAt);
         var bench = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [FourByTen], setRecords: [stored]);
 
         // Act
@@ -1937,7 +2163,7 @@ public class WorkoutTests
         // Arrange
         var bench = Id.New();
         var rest = TimeInMinutes.From(2);
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), RecordedAt);
         var entry = WorkoutExercise.Rehydrate(Id.New(), bench, Effort.MID, [ThreeByTen], perSide: true, rest: rest, setRecords: [stored]);
         var workout = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED, [entry]);
 
@@ -1960,7 +2186,7 @@ public class WorkoutTests
         // Arrange
         var bench = Id.New();
         var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt);
         var minutes = new SetPrescription(1, new SetTarget.Minutes(TimeInMinutes.From(1.5m)));
 
         // Act
@@ -1977,7 +2203,7 @@ public class WorkoutTests
         // Arrange
         var bench = Id.New();
         var workout = AStartedWorkoutWith((bench, [ThreeByTen]));
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt);
         var range = new SetPrescription(3, new SetTarget.RepsRange(8, 12));
 
         // Act
@@ -2004,8 +2230,67 @@ public class WorkoutTests
         EntryFor(workout, bench).Sets.Should().Equal(duration);
     }
 
+    [Fact]
+    public void UpdateExercise_ShouldRejectARepsTargetForATimeBasedExerciseWithSetRecordsAndChangeNothing()
+    {
+        // Arrange
+        var plank = Id.New();
+        var rest = TimeInMinutes.From(1);
+        var threeByForty = new SetPrescription(3, new SetTarget.Duration(40));
+        var stored = SetRecord.Rehydrate(Id.New(), Seconds(40), null, RecordedAt);
+        var entry = WorkoutExercise.Rehydrate(Id.New(), plank, Effort.MID, [threeByForty], perSide: true, rest: rest, setRecords: [stored]);
+        var workout = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED, [entry]);
+
+        // Act
+        var act = () => workout.UpdateExercise(plank, Effort.HIGH, [ThreeByTen]);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        var unchanged = EntryFor(workout, plank);
+        unchanged.Effort.Should().Be(Effort.MID);
+        unchanged.Sets.Should().Equal(threeByForty);
+        unchanged.PerSide.Should().BeTrue();
+        unchanged.Rest.Should().Be(rest);
+        unchanged.SetRecords.Should().Equal(stored);
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldRejectAMixOfKindsForATimeBasedExerciseWithSetRecords()
+    {
+        // Arrange
+        var plank = Id.New();
+        var threeByForty = new SetPrescription(3, new SetTarget.Duration(40));
+        var workout = AStartedWorkoutWith((plank, [threeByForty]));
+        workout.AddSetRecord(plank, Seconds(40), null, RecordedAt);
+
+        // Act
+        var act = () => workout.UpdateExercise(plank, Effort.MID, [threeByForty, ThreeByTen]);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        EntryFor(workout, plank).Sets.Should().Equal(threeByForty);
+    }
+
+    [Fact]
+    public void UpdateExercise_ShouldAcceptATimeBasedChangeForATimeBasedExerciseWithSetRecordsAndKeepThem()
+    {
+        // Arrange
+        var plank = Id.New();
+        var workout = AStartedWorkoutWith((plank, [new SetPrescription(3, new SetTarget.Duration(40))]));
+        workout.AddSetRecord(plank, Seconds(40), null, RecordedAt);
+        var oneMinute = new SetPrescription(3, new SetTarget.Minutes(TimeInMinutes.From(1)));
+
+        // Act
+        workout.UpdateExercise(plank, Effort.MID, [oneMinute]);
+
+        // Assert
+        var updated = EntryFor(workout, plank);
+        updated.Sets.Should().Equal(oneMinute);
+        updated.SetRecords.Should().ContainSingle();
+    }
+
     private static SetRecord AStoredSetRecord(int reps, decimal weight, int minutesAfter = 0)
-        => SetRecord.Rehydrate(Id.New(), RepCount.From(reps), Weight.From(weight), RecordedAt.AddMinutes(minutesAfter));
+        => SetRecord.Rehydrate(Id.New(), Reps(reps), Weight.From(weight), RecordedAt.AddMinutes(minutesAfter));
 
     private static Workout AWorkoutWithSetRecords(WorkoutStatus status, Id exerciseId, params SetRecord[] setRecords)
         => Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, status,
@@ -2023,14 +2308,64 @@ public class WorkoutTests
         var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, first, second, third);
 
         // Act
-        workout.UpdateSetRecord(bench, second.Id, RepCount.From(10), Weight.From(62.5m), RecordedAt);
+        workout.UpdateSetRecord(bench, second.Id, Reps(10), Weight.From(62.5m), RecordedAt);
 
         // Assert
         var setRecords = EntryFor(workout, bench).SetRecords;
         setRecords.Select(record => record.Id).Should().Equal(first.Id, second.Id, third.Id);
-        setRecords[1].Reps.Value.Should().Be(10);
-        setRecords[1].Weight.Value.Should().Be(62.5m);
+        setRecords[1].Result.Should().Be(Reps(10));
+        setRecords[1].Weight.Should().Be(Weight.From(62.5m));
         setRecords[1].RegisteredAtUtc.Should().Be(RecordedAt.AddMinutes(2));
+    }
+
+    [Fact]
+    public void UpdateSetRecord_ShouldClearTheWeightWhenNoneIsGiven()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
+
+        // Act
+        workout.UpdateSetRecord(bench, stored.Id, Reps(8), null, RecordedAt);
+
+        // Assert
+        stored.Result.Should().Be(Reps(8));
+        stored.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public void UpdateSetRecord_ShouldCorrectADurationOnATimeBasedExercise()
+    {
+        // Arrange
+        var plank = Id.New();
+        var stored = SetRecord.Rehydrate(Id.New(), Seconds(45), Weight.From(10), RecordedAt);
+        var entry = WorkoutExercise.Rehydrate(Id.New(), plank, Effort.MID, [new SetPrescription(3, new SetTarget.Duration(45))], setRecords: [stored]);
+        var workout = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED, [entry]);
+
+        // Act
+        workout.UpdateSetRecord(plank, stored.Id, Seconds(40), null, RecordedAt);
+
+        // Assert
+        stored.Result.Should().Be(Seconds(40));
+        stored.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public void UpdateSetRecord_ShouldRejectAResultOfTheOtherKindAndChangeNothing()
+    {
+        // Arrange
+        var bench = Id.New();
+        var stored = AStoredSetRecord(8, 60);
+        var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
+
+        // Act
+        var act = () => workout.UpdateSetRecord(bench, stored.Id, Seconds(40), null, RecordedAt);
+
+        // Assert
+        act.Should().Throw<SetRecordNotAllowedForTargetException>();
+        stored.Result.Should().Be(Reps(8));
+        stored.Weight.Should().Be(Weight.From(60));
     }
 
     [Theory]
@@ -2045,12 +2380,12 @@ public class WorkoutTests
         var workout = AWorkoutWithSetRecords(status, bench, stored);
 
         // Act
-        var act = () => workout.UpdateSetRecord(bench, stored.Id, RepCount.From(10), Weight.From(70), RecordedAt);
+        var act = () => workout.UpdateSetRecord(bench, stored.Id, Reps(10), Weight.From(70), RecordedAt);
 
         // Assert
         act.Should().Throw<WorkoutResultsLockedException>();
-        stored.Reps.Value.Should().Be(8);
-        stored.Weight.Value.Should().Be(60);
+        stored.Result.Should().Be(Reps(8));
+        stored.Weight.Should().Be(Weight.From(60));
     }
 
     [Fact]
@@ -2062,11 +2397,11 @@ public class WorkoutTests
         var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
 
         // Act
-        var act = () => workout.UpdateSetRecord(Id.New(), stored.Id, RepCount.From(10), Weight.From(70), RecordedAt);
+        var act = () => workout.UpdateSetRecord(Id.New(), stored.Id, Reps(10), Weight.From(70), RecordedAt);
 
         // Assert
         act.Should().Throw<ExerciseNotInWorkoutException>();
-        stored.Reps.Value.Should().Be(8);
+        stored.Result.Should().Be(Reps(8));
     }
 
     [Fact]
@@ -2078,12 +2413,12 @@ public class WorkoutTests
         var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
 
         // Act
-        var act = () => workout.UpdateSetRecord(bench, Id.New(), RepCount.From(10), Weight.From(70), RecordedAt);
+        var act = () => workout.UpdateSetRecord(bench, Id.New(), Reps(10), Weight.From(70), RecordedAt);
 
         // Assert
         act.Should().Throw<SetRecordNotFoundException>();
-        stored.Reps.Value.Should().Be(8);
-        stored.Weight.Value.Should().Be(60);
+        stored.Result.Should().Be(Reps(8));
+        stored.Weight.Should().Be(Weight.From(60));
     }
 
     [Fact]
@@ -2170,8 +2505,8 @@ public class WorkoutTests
         // Assert
         var setRecords = EntryFor(workout, bench).SetRecords;
         setRecords.Should().Equal(third, second, first);
-        setRecords.Select(record => record.Reps.Value).Should().Equal(7, 8, 10);
-        setRecords.Select(record => record.Weight.Value).Should().Equal(65, 62.5m, 60);
+        setRecords.Select(record => record.Result).Should().Equal(Reps(7), Reps(8), Reps(10));
+        setRecords.Select(record => record.Weight).Should().Equal(Weight.From(65), Weight.From(62.5m), Weight.From(60));
     }
 
     [Fact]
@@ -2441,7 +2776,7 @@ public class WorkoutTests
         var workout = AWorkoutWith(WorkoutStatus.COMPLETED, (bench, [FourByTen]));
 
         // Act
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt);
 
         // Assert
         EntryFor(workout, bench).SetRecords.Should().ContainSingle();
@@ -2452,14 +2787,14 @@ public class WorkoutTests
     {
         // Arrange
         var bench = Id.New();
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), RecordedAt);
         var workout = AWorkoutWithSetRecords(WorkoutStatus.COMPLETED, bench, stored);
 
         // Act
-        workout.UpdateSetRecord(bench, stored.Id, RepCount.From(10), Weight.From(60), RecordedAt.AddMinutes(30));
+        workout.UpdateSetRecord(bench, stored.Id, Reps(10), Weight.From(60), RecordedAt.AddMinutes(30));
 
         // Assert
-        EntryFor(workout, bench).SetRecords.Single().Reps.Value.Should().Be(10);
+        EntryFor(workout, bench).SetRecords.Single().Result.Should().Be(Reps(10));
     }
 
     [Fact]
@@ -2470,7 +2805,7 @@ public class WorkoutTests
         var workout = AWorkoutWith(WorkoutStatus.STARTED, (bench, [FourByTen]));
 
         // Act
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt);
+        workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt);
 
         // Assert
         workout.ResultsUpdatedAt.Should().Be(RecordedAt);
@@ -2481,12 +2816,12 @@ public class WorkoutTests
     {
         // Arrange
         var bench = Id.New();
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), RecordedAt);
         var workout = AWorkoutWithSetRecords(WorkoutStatus.COMPLETED, bench, stored);
         var correctedAt = RecordedAt.AddMinutes(30);
 
         // Act
-        workout.UpdateSetRecord(bench, stored.Id, RepCount.From(10), Weight.From(60), correctedAt);
+        workout.UpdateSetRecord(bench, stored.Id, Reps(10), Weight.From(60), correctedAt);
 
         // Assert
         workout.ResultsUpdatedAt.Should().Be(correctedAt);
@@ -2497,7 +2832,7 @@ public class WorkoutTests
     {
         // Arrange
         var bench = Id.New();
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), RecordedAt);
         var workout = AWorkoutWithSetRecords(WorkoutStatus.COMPLETED, bench, stored);
         var removedAt = RecordedAt.AddMinutes(30);
 
@@ -2513,8 +2848,8 @@ public class WorkoutTests
     {
         // Arrange
         var bench = Id.New();
-        var first = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
-        var second = SetRecord.Rehydrate(Id.New(), RepCount.From(6), Weight.From(65), RecordedAt.AddMinutes(2));
+        var first = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), RecordedAt);
+        var second = SetRecord.Rehydrate(Id.New(), Reps(6), Weight.From(65), RecordedAt.AddMinutes(2));
         var workout = AWorkoutWithSetRecords(WorkoutStatus.COMPLETED, bench, first, second);
         var reorderedAt = RecordedAt.AddMinutes(30);
 
@@ -2533,7 +2868,7 @@ public class WorkoutTests
         var workout = AWorkoutWith(WorkoutStatus.STARTED, (bench, [FourByTen]));
 
         // Act
-        workout.AddSetRecord(bench, RepCount.From(8), Weight.From(60), RecordedAt.AddTicks(7));
+        workout.AddSetRecord(bench, Reps(8), Weight.From(60), RecordedAt.AddTicks(7));
 
         // Assert
         workout.ResultsUpdatedAt.Should().Be(RecordedAt);
@@ -2544,13 +2879,13 @@ public class WorkoutTests
     {
         // Arrange
         var bench = Id.New();
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), RecordedAt);
         var workout = Workout.Rehydrate(Id.New(), Id.New(), Id.New(), Name, null, WorkoutDate, WorkoutStatus.REVIEWED,
             [WorkoutExercise.Rehydrate(Id.New(), bench, Effort.MID, [FourByTen], setRecords: [stored])],
             reviewedAt: ReviewedAt, reviewedBy: Id.New(), resultsUpdatedAt: RecordedAt);
 
         // Act
-        var act = () => workout.UpdateSetRecord(bench, stored.Id, RepCount.From(10), Weight.From(60), RecordedAt.AddMinutes(30));
+        var act = () => workout.UpdateSetRecord(bench, stored.Id, Reps(10), Weight.From(60), RecordedAt.AddMinutes(30));
 
         // Assert
         act.Should().Throw<WorkoutResultsLockedException>();
@@ -2562,7 +2897,7 @@ public class WorkoutTests
     {
         // Arrange
         var bench = Id.New();
-        var stored = SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(60), RecordedAt);
+        var stored = SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(60), RecordedAt);
         var workout = AWorkoutWithSetRecords(WorkoutStatus.STARTED, bench, stored);
 
         // Act

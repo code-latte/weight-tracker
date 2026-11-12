@@ -547,6 +547,8 @@ public class ExceptionMapperTests
     {
         { new InvalidRepCountException("reps must be at least 1, got 0"), StatusCodes.Status400BadRequest },
         { new InvalidWeightException("weight cannot be negative, got -5"), StatusCodes.Status400BadRequest },
+        { new InvalidDurationInSecondsException("seconds must be at least 1, got 0"), StatusCodes.Status400BadRequest },
+        { new SetResultRequiredException(Id.New(), "every prescribed set is already recorded"), StatusCodes.Status400BadRequest },
         { new WorkoutResultsLockedException(Id.New(), WorkoutStatus.PUBLISHED), StatusCodes.Status409Conflict },
         { new SetRecordNotAllowedForTargetException(Id.New()), StatusCodes.Status409Conflict },
         { new SetRecordNotFoundException(Id.New(), Id.New()), StatusCodes.Status404NotFound },

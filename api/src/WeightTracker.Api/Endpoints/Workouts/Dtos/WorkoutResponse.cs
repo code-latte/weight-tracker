@@ -123,13 +123,20 @@ public sealed record WorkoutExerciseDetailResponse(
 }
 
 /// <param name="Id">Identifier of the set record, used to edit, remove or reorder it.</param>
-/// <param name="Reps">Reps actually performed.</param>
-/// <param name="Weight">Weight lifted, in kilograms.</param>
+/// <param name="Type">What the set measured: <c>Reps</c> or <c>Duration</c>. It follows how the exercise is prescribed.</param>
+/// <param name="Reps">Reps actually performed. Set when <c>Type</c> is <c>Reps</c>, null otherwise.</param>
+/// <param name="DurationSeconds">Seconds actually held. Set when <c>Type</c> is <c>Duration</c>, null otherwise.</param>
+/// <param name="Weight">Weight lifted, in kilograms. Null when the weight is not tracked.</param>
 /// <param name="RegisteredAtUtc">When the set was registered, in UTC.</param>
-public sealed record SetRecordResponse(Guid Id, int Reps, decimal Weight, DateTime RegisteredAtUtc)
+public sealed record SetRecordResponse(Guid Id, string Type, int? Reps, int? DurationSeconds, decimal? Weight, DateTime RegisteredAtUtc)
 {
     public static SetRecordResponse From(SetRecord setRecord)
-        => new(setRecord.Id.Value, setRecord.Reps.Value, setRecord.Weight.Value, setRecord.RegisteredAtUtc);
+        => setRecord.Result switch
+        {
+            SetResult.Reps reps => new(setRecord.Id.Value, SetResultTypes.Reps, reps.Count.Value, null, setRecord.Weight?.Value, setRecord.RegisteredAtUtc),
+            SetResult.Duration duration => new(setRecord.Id.Value, SetResultTypes.Duration, null, duration.Value.Value, setRecord.Weight?.Value, setRecord.RegisteredAtUtc),
+            _ => throw new ArgumentOutOfRangeException(nameof(setRecord), setRecord.Result, "Unknown set result kind"),
+        };
 }
 
 /// <param name="Id">Identifier of this entry of the workout, used to address it (for example to group it in a superseries).</param>

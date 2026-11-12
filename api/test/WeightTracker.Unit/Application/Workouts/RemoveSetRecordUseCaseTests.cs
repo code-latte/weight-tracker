@@ -15,6 +15,8 @@ namespace WeightTracker.Unit.Application.Workouts;
 
 public class RemoveSetRecordUseCaseTests
 {
+    private static SetResult Reps(int value) => new SetResult.Reps(RepCount.From(value));
+
     private static readonly DateTime WorkoutDate = new(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly WorkoutName Name = WorkoutName.From("Leg day");
     private static readonly DateTime RecordedAt = new(2026, 11, 7, 10, 0, 0, DateTimeKind.Utc);
@@ -40,9 +42,9 @@ public class RemoveSetRecordUseCaseTests
     {
         setRecords =
         [
-            SetRecord.Rehydrate(Id.New(), RepCount.From(10), Weight.From(60), RecordedAt),
-            SetRecord.Rehydrate(Id.New(), RepCount.From(8), Weight.From(62.5m), RecordedAt.AddMinutes(2)),
-            SetRecord.Rehydrate(Id.New(), RepCount.From(7), Weight.From(65), RecordedAt.AddMinutes(4)),
+            SetRecord.Rehydrate(Id.New(), Reps(10), Weight.From(60), RecordedAt),
+            SetRecord.Rehydrate(Id.New(), Reps(8), Weight.From(62.5m), RecordedAt.AddMinutes(2)),
+            SetRecord.Rehydrate(Id.New(), Reps(7), Weight.From(65), RecordedAt.AddMinutes(4)),
         ];
 
         return Workout.Rehydrate(Id.New(), ownerId ?? OwnerId, prescribed ? TrainerId : null, Name, null, WorkoutDate, status,

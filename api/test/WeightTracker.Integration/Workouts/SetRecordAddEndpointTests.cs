@@ -195,32 +195,191 @@ public class SetRecordAddEndpointTests : SetRecordEndpointTest
     }
 
     [Fact]
-    public async Task Post_ShouldConflictOnAnExerciseThatIsNotRepBased()
+    public async Task Post_ShouldConflictOnRepsForATimeBasedExercise()
     {
         // Arrange
-        await GivenWorkoutStatus(SeedData.SelfCreatedPairWorkoutId, "STARTED");
+        await GivenWorkoutStatus(TimedWorkoutId, "STARTED");
         var client = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act
-        var response = await client.PostAsJsonAsync(SetRecordsRoute(SeedData.SelfCreatedPairWorkoutId, SeedData.PlanchaId), SetRecordBody(1, 0));
+        var response = await client.PostAsJsonAsync(SetRecordsRoute(TimedWorkoutId, TimedExerciseId), SetRecordBody(1, 0));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await SetRecordsOf(SeedData.SelfCreatedPairWorkoutId, SeedData.PlanchaId)).Should().BeEmpty();
+        (await SetRecordsOf(TimedWorkoutId, TimedExerciseId)).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Post_ShouldRejectAMissingWeight()
+    public async Task Post_ShouldConflictOnADurationForARepBasedExercise()
     {
         // Arrange
         var client = await AuthenticatedClientFor(SeedCredentials.User);
 
         // Act
-        var response = await client.PostAsJsonAsync(Route, new { reps = 8 });
+        var response = await client.PostAsJsonAsync(Route, DurationBody(40));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Post_ShouldRecordASetWithoutWeight()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(Route, SetRecordBody(8));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stored = (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Should().ContainSingle().Subject;
+        stored.Type.Should().Be("Reps");
+        stored.Reps.Should().Be(8);
+        stored.DurationSeconds.Should().BeNull();
+        stored.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Post_ShouldRecordADurationForATimeBasedExercise()
+    {
+        // Arrange
+        await GivenWorkoutStatus(TimedWorkoutId, "STARTED");
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(SetRecordsRoute(TimedWorkoutId, TimedExerciseId), DurationBody(30));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        SetRecordsIn(body, TimedExerciseId).Should().ContainSingle().Which.DurationSeconds.Should().Be(30);
+        var stored = (await SetRecordsOf(TimedWorkoutId, TimedExerciseId)).Should().ContainSingle().Subject;
+        stored.Type.Should().Be("Duration");
+        stored.DurationSeconds.Should().Be(30);
+        stored.Reps.Should().BeNull();
+        stored.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Post_ShouldRecordAWeightedDurationForATimeBasedExercise()
+    {
+        // Arrange
+        await GivenWorkoutStatus(TimedWorkoutId, "STARTED");
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(SetRecordsRoute(TimedWorkoutId, TimedExerciseId), DurationBody(45, 10m));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stored = (await SetRecordsOf(TimedWorkoutId, TimedExerciseId)).Should().ContainSingle().Subject;
+        stored.DurationSeconds.Should().Be(45);
+        stored.Weight.Should().Be(10m);
+    }
+
+    [Fact]
+    public async Task Post_ShouldRecordThePrescribedRepsForAnEmptyBody()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(Route, new { });
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stored = (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Should().ContainSingle().Subject;
+        stored.Type.Should().Be("Reps");
+        stored.Reps.Should().Be(10);
+        stored.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Post_ShouldRecordThePrescribedSecondsForAnEmptyBody()
+    {
+        // Arrange
+        await GivenWorkoutStatus(TimedWorkoutId, "STARTED");
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(SetRecordsRoute(TimedWorkoutId, TimedExerciseId), new { });
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stored = (await SetRecordsOf(TimedWorkoutId, TimedExerciseId)).Should().ContainSingle().Subject;
+        stored.Type.Should().Be("Duration");
+        stored.DurationSeconds.Should().Be(TimedExercisePrescribedSeconds);
+        stored.Reps.Should().BeNull();
+        stored.Weight.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Post_ShouldRejectAnEmptyBodyForARepsRangeExercise()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+        var toRange = new
+        {
+            exerciseId = StartedExerciseId,
+            effort = "MID",
+            sets = new[] { new { count = 3, targetType = "RepsRange", target = 8, maxTarget = 12 } },
+        };
+        (await admin.PutAsJsonAsync($"/workouts/{StartedWorkoutId}/exercises/{StartedExerciseId}", toRange)).StatusCode
+            .Should().Be(HttpStatusCode.OK, "the exercise must be prescribed as a range first");
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(Route, new { });
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Post_ShouldRejectAnEmptyBodyBeyondThePrescribedSets()
+    {
+        // Arrange
+        await GivenRecordedSets((10, 60), (10, 60), (10, 60));
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(Route, new { });
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task Post_ShouldRejectBothRepsAndDuration()
+    {
+        // Arrange
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(Route, new { reps = 8, durationSeconds = 40 });
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await SetRecordsOf(StartedWorkoutId, StartedExerciseId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Post_ShouldRejectAnInvalidDuration()
+    {
+        // Arrange
+        await GivenWorkoutStatus(TimedWorkoutId, "STARTED");
+        var client = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await client.PostAsJsonAsync(SetRecordsRoute(TimedWorkoutId, TimedExerciseId), DurationBody(0));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await SetRecordsOf(TimedWorkoutId, TimedExerciseId)).Should().BeEmpty();
     }
 
     [Theory]

@@ -50,6 +50,8 @@ public class ExceptionMapper
             or InvalidSetPrescriptionException
             or InvalidTimeInMinutesException
             or InvalidRepCountException
+            or InvalidDurationInSecondsException
+            or SetResultRequiredException
             or InvalidWeightException
             or WorkoutExerciseRequiresSetsException
             or ExerciseIdMismatchException

@@ -556,6 +556,8 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         setRecords.Should().AllSatisfy(record =>
         {
             record.GetProperty("id").GetGuid().Should().NotBeEmpty();
+            record.GetProperty("type").GetString().Should().Be("Reps");
+            record.GetProperty("durationSeconds").ValueKind.Should().Be(JsonValueKind.Null);
             record.GetProperty("registeredAtUtc").GetDateTime().Kind.Should().Be(DateTimeKind.Utc);
         });
         var plancha = exercises.Single(entry => entry.GetProperty("exerciseId").GetGuid() == SeedData.PlanchaId);

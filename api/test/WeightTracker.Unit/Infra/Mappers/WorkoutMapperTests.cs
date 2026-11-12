@@ -9,6 +9,8 @@ namespace WeightTracker.Unit.Infra.Mappers;
 
 public class WorkoutMapperTests
 {
+    private static SetResult Reps(int value) => new SetResult.Reps(RepCount.From(value));
+
     private static readonly DateTime WorkoutDate = new(2026, 10, 3, 0, 0, 0, DateTimeKind.Utc);
     private static readonly WorkoutName Name = WorkoutName.From("Leg day");
 
@@ -572,9 +574,9 @@ public class WorkoutMapperTests
                 WorkoutExercise.Rehydrate(Id.New(), SentadillaId, Effort.MIDHIGH, [new SetPrescription(3, new SetTarget.RepsRange(8, 12))]),
                 WorkoutExercise.Rehydrate(Id.New(), PlanchaId, Effort.LOW, [new SetPrescription(2, new SetTarget.MaxReps())]),
             ]);
-        workout.AddSetRecord(SentadillaId, RepCount.From(8), Weight.From(80), RecordedAt.AddMinutes(4));
-        workout.AddSetRecord(SentadillaId, RepCount.From(12), Weight.From(72.5m), RecordedAt);
-        workout.AddSetRecord(PlanchaId, RepCount.From(15), Weight.From(0), RecordedAt.AddMinutes(9));
+        workout.AddSetRecord(SentadillaId, Reps(8), Weight.From(80), RecordedAt.AddMinutes(4));
+        workout.AddSetRecord(SentadillaId, Reps(12), Weight.From(72.5m), RecordedAt);
+        workout.AddSetRecord(PlanchaId, Reps(15), Weight.From(0), RecordedAt.AddMinutes(9));
 
         return workout;
     }
@@ -593,7 +595,7 @@ public class WorkoutMapperTests
         {
             var (copy, source) = pair;
             copy.SetRecords.Select(setRecord => setRecord.Id).Should().Equal(source.SetRecords.Select(setRecord => setRecord.Id));
-            copy.SetRecords.Select(setRecord => setRecord.Reps).Should().Equal(source.SetRecords.Select(setRecord => setRecord.Reps));
+            copy.SetRecords.Select(setRecord => setRecord.Result).Should().Equal(source.SetRecords.Select(setRecord => setRecord.Result));
             copy.SetRecords.Select(setRecord => setRecord.Weight).Should().Equal(source.SetRecords.Select(setRecord => setRecord.Weight));
             copy.SetRecords.Select(setRecord => setRecord.RegisteredAtUtc).Should().Equal(source.SetRecords.Select(setRecord => setRecord.RegisteredAtUtc));
             copy.SetRecords.Should().AllSatisfy(setRecord => setRecord.IsNew.Should().BeFalse());
@@ -657,13 +659,13 @@ public class WorkoutMapperTests
             Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED,
             [WorkoutExercise.Rehydrate(Id.New(), SentadillaId, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))])]);
         foreach (var reps in new[] { 10, 9, 8, 7, 6 })
-            workout.AddSetRecord(SentadillaId, RepCount.From(reps), Weight.From(60), RecordedAt);
+            workout.AddSetRecord(SentadillaId, Reps(reps), Weight.From(60), RecordedAt);
 
         // Act
         var restored = RoundTrip(workout);
 
         // Assert
-        restored.Exercises[0].SetRecords.Select(setRecord => setRecord.Reps.Value).Should().Equal(10, 9, 8, 7, 6);
+        restored.Exercises[0].SetRecords.Select(setRecord => setRecord.Result).Should().Equal(Reps(10), Reps(9), Reps(8), Reps(7), Reps(6));
     }
 
     [Fact]
@@ -673,7 +675,7 @@ public class WorkoutMapperTests
         var workout = AStartedWorkoutWithSetRecords();
         var setRecordIds = workout.Exercises[0].SetRecords.Select(setRecord => setRecord.Id).ToList();
         workout.ReorderSetRecords(SentadillaId, [setRecordIds[1], setRecordIds[0]], RecordedAt);
-        workout.UpdateSetRecord(SentadillaId, setRecordIds[0], RepCount.From(9), Weight.From(82.5m), RecordedAt);
+        workout.UpdateSetRecord(SentadillaId, setRecordIds[0], Reps(9), Weight.From(82.5m), RecordedAt);
 
         // Act
         var restored = RoundTrip(workout);
@@ -681,8 +683,8 @@ public class WorkoutMapperTests
         // Assert
         var setRecords = restored.Exercises[0].SetRecords;
         setRecords.Select(setRecord => setRecord.Id).Should().Equal(setRecordIds[1], setRecordIds[0]);
-        setRecords[1].Reps.Value.Should().Be(9);
-        setRecords[1].Weight.Value.Should().Be(82.5m);
+        setRecords[1].Result.Should().Be(Reps(9));
+        setRecords[1].Weight.Should().Be(Weight.From(82.5m));
         setRecords[1].RegisteredAtUtc.Should().Be(RecordedAt.AddMinutes(4));
     }
 
@@ -789,5 +791,100 @@ public class WorkoutMapperTests
         // Assert
         restored.Status.Should().Be(WorkoutStatus.COMPLETED);
         restored.CompletedAt.Should().BeNull();
+    }
+
+    private static SetResult Seconds(int value) => new SetResult.Duration(DurationInSeconds.From(value));
+
+    /// <summary>Reps without weight on one exercise; a weighted and an unweighted duration on a time-based one.</summary>
+    private static Workout AStartedWorkoutWithEveryKindOfSetRecord()
+    {
+        var workout = Workout.Rehydrate(
+            Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED,
+            [
+                WorkoutExercise.Rehydrate(Id.New(), SentadillaId, Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))]),
+                WorkoutExercise.Rehydrate(Id.New(), PlanchaId, Effort.LOW, [new SetPrescription(3, new SetTarget.Duration(40))]),
+            ]);
+        workout.AddSetRecord(SentadillaId, Reps(10), null, RecordedAt);
+        workout.AddSetRecord(PlanchaId, Seconds(40), Weight.From(10), RecordedAt.AddMinutes(2));
+        workout.AddSetRecord(PlanchaId, Seconds(35), null, RecordedAt.AddMinutes(4));
+
+        return workout;
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveDurationsAndMissingWeights()
+    {
+        // Arrange
+        var original = AStartedWorkoutWithEveryKindOfSetRecord();
+
+        // Act
+        var copy = WorkoutMapper.MapToDomain(WorkoutMapper.MapToEntity(original));
+
+        // Assert
+        var reps = copy.Exercises[0].SetRecords.Should().ContainSingle().Subject;
+        reps.Result.Should().Be(Reps(10));
+        reps.Weight.Should().BeNull();
+        var durations = copy.Exercises[1].SetRecords;
+        durations.Select(setRecord => setRecord.Result).Should().Equal(Seconds(40), Seconds(35));
+        durations.Select(setRecord => setRecord.Weight).Should().Equal(Weight.From(10), null);
+    }
+
+    [Fact]
+    public void MapToEntity_ShouldStoreADurationInItsOwnColumnAndLeaveRepsAndWeightEmpty()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWithEveryKindOfSetRecord();
+
+        // Act
+        var entity = WorkoutMapper.MapToEntity(workout);
+
+        // Assert
+        var row = entity.WorkoutExercises[1].SetRecords[1];
+        row.DurationSeconds.Should().Be(35);
+        row.Reps.Should().BeNull();
+        row.Weight.Should().BeNull();
+        entity.WorkoutExercises[0].SetRecords.Single().DurationSeconds.Should().BeNull();
+    }
+
+    [Fact]
+    public void MapToDomain_ShouldRejectAStoredSetRecordWithBothRepsAndDuration()
+    {
+        // Arrange
+        var entity = WorkoutMapper.MapToEntity(AStartedWorkoutWithEveryKindOfSetRecord());
+        entity.WorkoutExercises[0].SetRecords[0].DurationSeconds = 30;
+
+        // Act
+        var act = () => WorkoutMapper.MapToDomain(entity);
+
+        // Assert
+        act.Should().Throw<PersistenceMappingException>();
+    }
+
+    [Fact]
+    public void MapToDomain_ShouldRejectAStoredSetRecordWithNeitherRepsNorDuration()
+    {
+        // Arrange
+        var entity = WorkoutMapper.MapToEntity(AStartedWorkoutWithEveryKindOfSetRecord());
+        entity.WorkoutExercises[0].SetRecords[0].Reps = null;
+
+        // Act
+        var act = () => WorkoutMapper.MapToDomain(entity);
+
+        // Assert
+        act.Should().Throw<PersistenceMappingException>();
+    }
+
+    [Fact]
+    public void MapToDomain_ShouldRejectAnInvalidStoredDuration()
+    {
+        // Arrange
+        var entity = WorkoutMapper.MapToEntity(AStartedWorkoutWithEveryKindOfSetRecord());
+        entity.WorkoutExercises[1].SetRecords[0].DurationSeconds = 0;
+
+        // Act
+        var act = () => WorkoutMapper.MapToDomain(entity);
+
+        // Assert
+        act.Should().Throw<PersistenceMappingException>();
     }
 }

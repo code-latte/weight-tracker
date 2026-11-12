@@ -179,6 +179,7 @@ public class WorkoutRepository : IWorkoutRepository
             {
                 existing.Position = setRecord.Position;
                 existing.Reps = setRecord.Reps;
+                existing.DurationSeconds = setRecord.DurationSeconds;
                 existing.Weight = setRecord.Weight;
                 continue;
             }

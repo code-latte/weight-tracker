@@ -420,8 +420,10 @@ public class WorkoutsController : AuthorizedController
 
     /// <summary>
     /// Records a set actually performed for an exercise of a started workout. It goes after the existing set records
-    /// of that exercise and is registered at the time of the request. Only the workout's athlete or an admin may record.
-    /// <c>exerciseId</c> is the catalog exercise, not the workout entry id.
+    /// of that exercise and is registered at the time of the request. The body carries <c>reps</c> or <c>durationSeconds</c>
+    /// according to how the exercise is prescribed, and an optional <c>weight</c>. An empty body means the set was done
+    /// as prescribed. Only the workout's athlete or an admin may record. <c>exerciseId</c> is the catalog exercise, not
+    /// the workout entry id.
     /// </summary>
     [HttpPost("{workoutId:guid}/exercises/{exerciseId:guid}/set-records")]
     [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
@@ -440,8 +442,9 @@ public class WorkoutsController : AuthorizedController
                 CurrentUser.Role,
                 Id.From(workoutId),
                 Id.From(exerciseId),
-                request.Reps!.Value,
-                request.Weight!.Value,
+                request.Reps,
+                request.DurationSeconds,
+                request.Weight,
                 cancellationToken);
 
             return Ok(WorkoutDetailResponse.From(workout));
@@ -453,8 +456,9 @@ public class WorkoutsController : AuthorizedController
     }
 
     /// <summary>
-    /// Corrects the reps and weight of a set already recorded in a started workout. Its id, registration time and
-    /// position are kept. Only the workout's athlete or an admin may change it.
+    /// Corrects the result and weight of a set already recorded in a started workout. The body must carry <c>reps</c> or
+    /// <c>durationSeconds</c>, matching how the exercise is prescribed; omitting <c>weight</c> clears it. Its id,
+    /// registration time and position are kept. Only the workout's athlete or an admin may change it.
     /// </summary>
     [HttpPut("{workoutId:guid}/exercises/{exerciseId:guid}/set-records/{setRecordId:guid}")]
     [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
@@ -474,8 +478,9 @@ public class WorkoutsController : AuthorizedController
                 Id.From(workoutId),
                 Id.From(exerciseId),
                 Id.From(setRecordId),
-                request.Reps!.Value,
-                request.Weight!.Value,
+                request.Reps,
+                request.DurationSeconds,
+                request.Weight,
                 cancellationToken);
 
             return Ok(WorkoutDetailResponse.From(workout));

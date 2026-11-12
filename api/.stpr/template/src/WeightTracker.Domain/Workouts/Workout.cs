@@ -386,7 +386,7 @@ public sealed class Workout : AggregateRoot
     /// <exception cref="SuperSeriesSetCountMismatchException">When the entry is in a superseries and the new total of sets differs from the other members.</exception>
     /// <exception cref="InvalidEffortException">When the effort is not a defined value.</exception>
     /// <exception cref="WorkoutExerciseRequiresSetsException">When no set prescription is given.</exception>
-    /// <exception cref="SetRecordNotAllowedForTargetException">When the entry has set records and a new prescription is not rep-based.</exception>
+    /// <exception cref="SetRecordNotAllowedForTargetException">When the entry has set records and the new prescriptions are not of the same kind as the current ones.</exception>
     public void UpdateExercise(Id exerciseId, Effort effort, IEnumerable<SetPrescription> sets, bool perSide = false, TimeInMinutes? rest = null)
     {
         var entry = _exercises.FirstOrDefault(item => item.ExerciseId == exerciseId)
@@ -425,37 +425,40 @@ public sealed class Workout : AggregateRoot
     }
 
     /// <summary>
-    /// Records the reps and weight actually performed in one set of an exercise. Recording is not a content edit,
-    /// so it is not affected by <see cref="IsLocked"/>; it is only allowed while the workout is started or completed.
+    /// Records one set actually performed for an exercise: the reps done or the seconds held, and the weight when it is tracked.
+    /// Without a result the set counts as done as prescribed, and its value is copied from the next prescribed set. Recording is
+    /// not a content edit, so it is not affected by <see cref="IsLocked"/>; it is only allowed while the workout is started or completed.
     /// </summary>
     /// <param name="exerciseId">Catalog exercise of this workout the set was performed for</param>
-    /// <param name="reps">Reps performed, which may differ from the prescription</param>
-    /// <param name="weight">Weight lifted, in kilograms</param>
+    /// <param name="result">Reps or seconds performed, which may differ from the prescription. Null means done as prescribed</param>
+    /// <param name="weight">Weight lifted, in kilograms. Null when it is not tracked</param>
     /// <param name="registeredAtUtc">When the set was registered, in UTC</param>
     /// <exception cref="WorkoutResultsLockedException">When the workout is not started or completed.</exception>
     /// <exception cref="ExerciseNotInWorkoutException">When the exercise is not in the workout.</exception>
-    /// <exception cref="SetRecordNotAllowedForTargetException">When any prescription of the exercise is not rep-based.</exception>
-    public void AddSetRecord(Id exerciseId, RepCount reps, Weight weight, DateTime registeredAtUtc)
+    /// <exception cref="SetRecordNotAllowedForTargetException">When the exercise mixes rep-based and time-based prescriptions, or the result is not of the exercise's kind.</exception>
+    /// <exception cref="SetResultRequiredException">When no result is given and the next prescribed set is a range or max reps, or there is none left.</exception>
+    public void AddSetRecord(Id exerciseId, SetResult? result, Weight? weight, DateTime registeredAtUtc)
     {
-        RecordingEntry(exerciseId).AddSetRecord(SetRecord.Create(reps, weight, registeredAtUtc));
+        RecordingEntry(exerciseId).AddSetRecord(result, weight, registeredAtUtc);
         TouchResults(registeredAtUtc);
     }
 
     /// <summary>
-    /// Corrects the reps and weight of a set already recorded. Its identity, registration time and position are kept.
+    /// Corrects the result and weight of a set already recorded. Its identity, registration time and position are kept.
     /// Like recording, it is not a content edit and is only allowed while the workout is started or completed.
     /// </summary>
     /// <param name="exerciseId">Catalog exercise of this workout the set was recorded for</param>
     /// <param name="setRecordId">Set record to correct</param>
-    /// <param name="reps">Reps performed</param>
-    /// <param name="weight">Weight lifted, in kilograms</param>
+    /// <param name="result">Reps or seconds performed</param>
+    /// <param name="weight">Weight lifted, in kilograms. Null clears it</param>
     /// <param name="updatedAtUtc">When the correction happens, in UTC</param>
     /// <exception cref="WorkoutResultsLockedException">When the workout is not started or completed.</exception>
     /// <exception cref="ExerciseNotInWorkoutException">When the exercise is not in the workout.</exception>
     /// <exception cref="SetRecordNotFoundException">When the set record is not recorded for that exercise.</exception>
-    public void UpdateSetRecord(Id exerciseId, Id setRecordId, RepCount reps, Weight weight, DateTime updatedAtUtc)
+    /// <exception cref="SetRecordNotAllowedForTargetException">When the exercise mixes rep-based and time-based prescriptions, or the result is not of the exercise's kind.</exception>
+    public void UpdateSetRecord(Id exerciseId, Id setRecordId, SetResult result, Weight? weight, DateTime updatedAtUtc)
     {
-        RecordingEntry(exerciseId).UpdateSetRecord(setRecordId, reps, weight);
+        RecordingEntry(exerciseId).UpdateSetRecord(setRecordId, result, weight);
         TouchResults(updatedAtUtc);
     }
 
@@ -474,7 +477,7 @@ public sealed class Workout : AggregateRoot
     }
 
     /// <summary>
-    /// Puts the set records of one exercise in the given order. Ids, reps, weight and registration times are kept.
+    /// Puts the set records of one exercise in the given order. Ids, results, weights and registration times are kept.
     /// Like recording, it is not a content edit and is only allowed while the workout is started or completed.
     /// </summary>
     /// <param name="exerciseId">Catalog exercise of this workout whose set records are reordered</param>

@@ -211,6 +211,7 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(setRecord => setRecord.WorkoutExerciseId).HasColumnName("WorkoutExerciseId");
             entity.Property(setRecord => setRecord.Position).HasColumnName("Position");
             entity.Property(setRecord => setRecord.Reps).HasColumnName("Reps");
+            entity.Property(setRecord => setRecord.DurationSeconds).HasColumnName("DurationSeconds");
             entity.Property(setRecord => setRecord.Weight).HasColumnName("Weight").HasPrecision(6, 2);
             entity.Property(setRecord => setRecord.RegisterDatetimeUtc).HasColumnName("RegisterDatetimeUtc").HasColumnType("timestamptz");
             entity.HasIndex(setRecord => setRecord.WorkoutExerciseId);

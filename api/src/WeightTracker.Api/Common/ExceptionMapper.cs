@@ -65,6 +65,7 @@ public class ExceptionMapper
             or WorkoutWithoutTrainerException
             or IncompleteMesocyclePlacementException
             or MissingWorkoutDateException
+            or InvalidHistoryLimitException
             or PasswordNotStrongEnoughException => Problem(
                 StatusCodes.Status400BadRequest,
                 exception.Message

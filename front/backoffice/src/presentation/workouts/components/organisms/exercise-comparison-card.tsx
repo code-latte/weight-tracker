@@ -58,12 +58,19 @@ export default function ExerciseComparisonCard({ weighted }: ExerciseComparisonC
           <Table size="small">
             <TableHead sx={{ bgcolor: "action.hover" }}>
               <TableRow>
-                <TableCell>{t("review.metrics.comparison.exercise")}</TableCell>
+                <TableCell rowSpan={2}>{t("review.metrics.comparison.exercise")}</TableCell>
+                <TableCell colSpan={3} align="center">
+                  {t("review.metrics.comparison.bestSet")}
+                </TableCell>
+                <TableCell rowSpan={2} align="center" sx={{ pl: 5 }}>
+                  {t("review.metrics.comparison.volume")}
+                </TableCell>
+                <TableCell rowSpan={2}>{t("review.metrics.comparison.compliance")}</TableCell>
+              </TableRow>
+              <TableRow>
                 <TableCell>{t("review.metrics.comparison.previous")}</TableCell>
                 <TableCell>{t("review.metrics.comparison.current")}</TableCell>
                 <TableCell>{t("review.metrics.comparison.change")}</TableCell>
-                <TableCell>{t("review.metrics.comparison.volume")}</TableCell>
-                <TableCell>{t("review.metrics.comparison.compliance")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -101,7 +108,7 @@ export default function ExerciseComparisonCard({ weighted }: ExerciseComparisonC
                       )}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell align="center" sx={{ pl: 5 }}>
                     {t("review.volumeValue", { value: kg.format(Number(summary.volume)) })}
                   </TableCell>
                   <TableCell>

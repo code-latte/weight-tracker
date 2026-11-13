@@ -36,9 +36,10 @@ export default function LineChart({
   ariaLabel,
 }: LineChartProps) {
   const theme = useTheme();
-  const last = values.length - 1;
-  // The x axis works on positions, so two sessions with the same label stay apart.
-  const positions = values.map((_, index) => index);
+  // The x axis works on positions, so two sessions with the same label stay apart. An empty slot at each end keeps
+  // the first and last points off the borders of the plot.
+  const positions = Array.from({ length: values.length + 2 }, (_, index) => index);
+  const last = values.length;
 
   return (
     <ChartsDataProvider
@@ -47,7 +48,7 @@ export default function LineChart({
       series={[
         {
           type: "line",
-          data: [...values],
+          data: [null, ...values, null],
           area: true,
           showMark: true,
           color: theme.palette.primary.main,
@@ -59,7 +60,7 @@ export default function LineChart({
           id: "sessions",
           scaleType: "point",
           data: positions,
-          valueFormatter: (position: number) => labels[position] ?? "",
+          valueFormatter: (position: number) => labels[position - 1] ?? "",
           tickLabelInterval: () => true,
         },
       ]}
@@ -83,7 +84,7 @@ export default function LineChart({
           <MarkPlot />
           <ChartsReferenceLine
             x={last}
-            label={valueFormatter(values[last])}
+            label={valueFormatter(values[last - 1])}
             labelAlign="start"
             lineStyle={{ stroke: alpha(theme.palette.primary.main, 0.4), strokeDasharray: "4 4" }}
             labelStyle={{ fill: theme.palette.primary.main, fontWeight: 700 }}

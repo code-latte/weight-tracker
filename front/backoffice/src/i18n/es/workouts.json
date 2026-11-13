@@ -297,6 +297,7 @@
         "title": "Comparativa por ejercicio",
         "subtitle": "Resultados de esta sesión frente a la ejecución anterior",
         "exercise": "Ejercicio",
+        "bestSet": "Mejor serie",
         "previous": "Anterior",
         "current": "Actual",
         "change": "Cambio",

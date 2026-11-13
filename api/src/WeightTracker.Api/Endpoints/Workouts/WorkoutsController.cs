@@ -19,6 +19,7 @@ public class WorkoutsController : AuthorizedController
 {
     private readonly GetAllWorkoutsUseCase _getAllWorkouts;
     private readonly GetWorkoutByIdUseCase _getWorkoutById;
+    private readonly GetWorkoutSummaryUseCase _getWorkoutSummary;
     private readonly CreateWorkoutUseCase _createWorkout;
     private readonly UpdateWorkoutUseCase _updateWorkout;
     private readonly DeleteWorkoutUseCase _deleteWorkout;
@@ -39,6 +40,7 @@ public class WorkoutsController : AuthorizedController
     public WorkoutsController(
         GetAllWorkoutsUseCase getAllWorkouts,
         GetWorkoutByIdUseCase getWorkoutById,
+        GetWorkoutSummaryUseCase getWorkoutSummary,
         CreateWorkoutUseCase createWorkout,
         UpdateWorkoutUseCase updateWorkout,
         DeleteWorkoutUseCase deleteWorkout,
@@ -60,6 +62,7 @@ public class WorkoutsController : AuthorizedController
     {
         _getAllWorkouts = getAllWorkouts;
         _getWorkoutById = getWorkoutById;
+        _getWorkoutSummary = getWorkoutSummary;
         _createWorkout = createWorkout;
         _updateWorkout = updateWorkout;
         _deleteWorkout = deleteWorkout;
@@ -117,6 +120,32 @@ public class WorkoutsController : AuthorizedController
             var view = await _getWorkoutById.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(id), cancellationToken);
 
             return Ok(WorkoutByIdResponse.From(view));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Reads the stats of one workout the caller is entitled to see: the sets that met their target and the volume
+    /// (reps × kg) for the workout and for each exercise, and for each exercise its top set (the heaviest) against the
+    /// top set of its previous execution. The previous execution is the owner's latest earlier <c>COMPLETED</c> or
+    /// <c>REVIEWED</c> workout with set records for the exercise that the caller may see; a trainer only gets the ones
+    /// they prescribed. Any workout status is accepted, so a workout in progress gets a partial summary.
+    /// </summary>
+    [HttpGet("{workoutId:guid}/summary")]
+    [ProducesResponseType<WorkoutSummaryResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSummary(Guid workoutId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var view = await _getWorkoutSummary.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(workoutId), cancellationToken);
+
+            return Ok(WorkoutSummaryResponse.From(view));
         }
         catch (Exception exception)
         {

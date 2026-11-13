@@ -5259,7 +5259,7 @@ describe("WorkoutView", () => {
       const tableRows = (card: HTMLElement) =>
         within(card)
           .getAllByRole("row")
-          .slice(1)
+          .slice(2)
           .map((row) =>
             within(row)
               .getAllByRole("cell")

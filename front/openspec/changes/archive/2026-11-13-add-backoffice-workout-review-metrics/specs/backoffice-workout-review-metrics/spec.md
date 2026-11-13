@@ -158,9 +158,7 @@ The tab SHALL show a card "Comparativa por ejercicio", subtitled "Resultados de 
 anterior". It SHALL hold a table with one row per weighted exercise, in workout order, and these columns:
 
 - "Ejercicio": its position in the workout and its name in the active language;
-- "Anterior";
-- "Actual";
-- "Cambio";
+- "Anterior", "Actual" and "Cambio", grouped under a shared header "Mejor serie";
 - "Volumen (actual)";
 - "Cumplimiento".
 

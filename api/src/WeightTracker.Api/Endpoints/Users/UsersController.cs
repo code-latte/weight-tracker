@@ -17,7 +17,8 @@ namespace WeightTracker.Api.Endpoints.Users;
 /// switch another account on and off. <c>GET /users/{userId}/mesocycles</c> lets a trainer or an administrator
 /// list the mesocycles planned for one athlete, and <c>GET /users/{userId}/trainer</c> lets a user read their own
 /// current trainer, or an administrator anyone's. <c>GET /users/me/exercises/{exerciseId}/last-performance</c> lets
-/// any caller read what they did the last time they finished a workout with an exercise.
+/// any caller read what they did the last time they finished a workout with an exercise, and
+/// <c>GET /users/{userId}/exercises/{exerciseId}/history</c> lets a caller read how a user's sessions of an exercise evolve.
 /// </summary>
 [ApiController]
 [Route("users")]
@@ -31,6 +32,7 @@ public class UsersController : AuthorizedController
     private readonly GetUserMesocyclesUseCase _getUserMesocycles;
     private readonly GetUserTrainerUseCase _getUserTrainer;
     private readonly GetMyExerciseLastPerformanceUseCase _getMyExerciseLastPerformance;
+    private readonly GetUserExerciseHistoryUseCase _getUserExerciseHistory;
 
     public UsersController(
         UpdateMyProfileUseCase updateMyProfile,
@@ -41,6 +43,7 @@ public class UsersController : AuthorizedController
         GetUserMesocyclesUseCase getUserMesocycles,
         GetUserTrainerUseCase getUserTrainer,
         GetMyExerciseLastPerformanceUseCase getMyExerciseLastPerformance,
+        GetUserExerciseHistoryUseCase getUserExerciseHistory,
         GetAuthenticatedUserUseCase getAuthenticatedUser,
         ExceptionMapper exceptionMapper) : base(getAuthenticatedUser, exceptionMapper)
     {
@@ -52,6 +55,7 @@ public class UsersController : AuthorizedController
         _getUserMesocycles = getUserMesocycles;
         _getUserTrainer = getUserTrainer;
         _getMyExerciseLastPerformance = getMyExerciseLastPerformance;
+        _getUserExerciseHistory = getUserExerciseHistory;
     }
 
     /// <summary>
@@ -261,6 +265,38 @@ public class UsersController : AuthorizedController
             var performance = await _getMyExerciseLastPerformance.Execute(Id.From(exerciseId), CurrentUser!, cancellationToken);
 
             return performance is null ? NoContent() : Ok(ExerciseLastPerformanceResponse.From(performance));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Reads the latest finished sessions in which a user did an exercise, newest first, each with its max weight, volume
+    /// (reps × kg) and estimated one-rep max (Epley). Only <c>COMPLETED</c> and <c>REVIEWED</c> workouts count. A user
+    /// may only read their own history; a trainer reads their own, or for anyone else only the sessions they prescribed;
+    /// an administrator reads everyone's. Answers an empty list when the user never did the exercise, <c>400</c> when
+    /// <c>limit</c> is outside 1 to 50, and <c>404</c> when the user or the exercise does not exist or the caller may not
+    /// see the exercise.
+    /// </summary>
+    /// <param name="userId">User whose sessions are read.</param>
+    /// <param name="exerciseId">Exercise whose sessions are read.</param>
+    /// <param name="limit">Number of sessions to return, from 1 to 50. Defaults to 10.</param>
+    [HttpGet("{userId:guid}/exercises/{exerciseId:guid}/history")]
+    [ProducesResponseType<IReadOnlyList<ExerciseHistorySessionResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetExerciseHistory(Guid userId, Guid exerciseId, [FromQuery] int? limit, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var sessions = await _getUserExerciseHistory.Execute(
+                CurrentUser!.Id, CurrentUser.Role, Id.From(userId), Id.From(exerciseId), limit, cancellationToken);
+
+            return Ok(sessions.Select(ExerciseHistorySessionResponse.From).ToList());
         }
         catch (Exception exception)
         {

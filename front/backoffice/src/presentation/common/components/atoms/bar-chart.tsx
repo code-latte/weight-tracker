@@ -14,6 +14,10 @@ interface BarChartProps {
   ariaLabel: string;
 }
 
+const MIN_BARS = 5;
+// The y axis ends above the tallest bar so its value label fits inside the plot.
+const HEADROOM = 1.2;
+
 /** The project's bar chart: one bar per value, the last one in full colour and labelled with its value. */
 export default function BarChart({
   labels,
@@ -24,7 +28,10 @@ export default function BarChart({
 }: BarChartProps) {
   const theme = useTheme();
   const last = values.length - 1;
-  const positions = values.map((_, index) => index);
+  const colored = values.map((_, index) => index);
+  // Always at least MIN_BARS slots: with fewer values the bars sit on the left and the rest stay empty.
+  const slots = Array.from({ length: Math.max(values.length, MIN_BARS) }, (_, index) => index);
+  const data = slots.map((slot) => values[slot] ?? null);
 
   return (
     <MuiBarChart
@@ -33,7 +40,7 @@ export default function BarChart({
       aria-label={ariaLabel}
       series={[
         {
-          data: [...values],
+          data,
           valueFormatter: (value) => (value === null ? "" : valueFormatter(value)),
           barLabel: (item) => (item.dataIndex === last ? valueFormatter(values[last]) : null),
           barLabelPlacement: "outside",
@@ -42,13 +49,13 @@ export default function BarChart({
       xAxis={[
         {
           scaleType: "band",
-          data: positions,
+          data: slots,
           valueFormatter: (position: number) => labels[position] ?? "",
           tickLabelInterval: () => true,
           colorMap: {
             type: "ordinal",
-            values: positions,
-            colors: positions.map((position) =>
+            values: colored,
+            colors: colored.map((position) =>
               position === last
                 ? theme.palette.primary.main
                 : alpha(theme.palette.primary.main, 0.55),
@@ -56,7 +63,13 @@ export default function BarChart({
           },
         },
       ]}
-      yAxis={[{ width: 72, valueFormatter: (value: number) => valueFormatter(value) }]}
+      yAxis={[
+        {
+          width: 72,
+          max: Math.max(...values, 0) * HEADROOM,
+          valueFormatter: (value: number) => valueFormatter(value),
+        },
+      ]}
     />
   );
 }

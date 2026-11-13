@@ -40,14 +40,14 @@ SHALL sit inside the properties card, after its fields; for any other status it 
 
 #### Scenario: Back to the mesocycle
 
-- **WHEN** a workout placed in mesocycle `m-1` is loaded
+- **WHEN** a `DRAFT` workout placed in mesocycle `m-1` is loaded
 - **THEN** the "Volver" link leads to `/mesocycle?id=m-1`
 
 #### Scenario: Started workout has no Guardar
 
 - **WHEN** a `STARTED` workout is loaded
-- **THEN** the page heading and the "Volver" link are shown
-- **AND** the properties card does not show "Guardar"
+- **THEN** the review is shown instead of the editor
+- **AND** neither "Editar entrenamiento" nor "Guardar" is shown
 
 ### Requirement: Guardar checks the workout's data and sends nothing when invalid
 
@@ -423,9 +423,10 @@ When the exercise's video is a YouTube watch link, the configuration dialog SHAL
 
 ### Requirement: The screen shows loading, not found and failure states
 
-While the workout or the catalog loads, the screen SHALL show a loading placeholder. A missing `id`, or a workout the
-API does not find, SHALL show "No hemos encontrado este entrenamiento." with a "Volver a entrenamientos" link
-to `/assigned-workouts`. Any other failure SHALL show the error for its code with a retry that reads again what failed.
+While the workout loads, and for an editor workout while the catalog loads, the screen SHALL show a loading
+placeholder. A missing `id`, or a workout the API does not find, SHALL show "No hemos encontrado este entrenamiento."
+with a "Volver a entrenamientos" link to `/assigned-workouts`. Any other failure SHALL show the error for its code with
+a retry that reads again what failed. A catalog failure SHALL NOT block the review of a started workout.
 
 #### Scenario: Missing id
 
@@ -440,8 +441,13 @@ to `/assigned-workouts`. Any other failure SHALL show the error for its code wit
 
 #### Scenario: Catalog fails and the user retries
 
-- **WHEN** the catalog read fails with no response and the user clicks "Reintentar"
+- **WHEN** the workout is `DRAFT`, the catalog read fails with no response and the user clicks "Reintentar"
 - **THEN** the catalog is read again and shown when it succeeds
+
+#### Scenario: Catalog failure does not block the review
+
+- **WHEN** the workout is `STARTED` and the catalog read fails
+- **THEN** the review is shown and no catalog error is shown
 
 ### Requirement: The workout screen is translated
 
@@ -1248,3 +1254,24 @@ The button, its hint and its outcome SHALL be available in Spanish and English a
 
 - **WHEN** the active language is English
 - **THEN** the button reads "Save as template" and the confirmation "Template created."
+
+### Requirement: The editor is shown only for draft and published workouts
+
+Once the workout is loaded, the workout screen SHALL show the editor when the workout is `DRAFT` or `PUBLISHED`, or
+has a status the backoffice does not know. For `STARTED`, `COMPLETED` and `REVIEWED`, it SHALL show the workout review
+instead of the editor.
+
+#### Scenario: Draft and published open the editor
+
+- **WHEN** the loaded workout is `DRAFT`, or it is `PUBLISHED`
+- **THEN** the page heading reads "Editar entrenamiento"
+
+#### Scenario: Started opens the review
+
+- **WHEN** the loaded workout is `STARTED`
+- **THEN** "Editar entrenamiento" is not shown and "Revisión del entrenamiento" is shown
+
+#### Scenario: Unknown status opens the editor
+
+- **WHEN** the loaded workout's status is `ARCHIVED`
+- **THEN** the page heading reads "Editar entrenamiento"

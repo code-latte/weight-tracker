@@ -211,6 +211,57 @@
     "savedAsTemplate": "Template created.",
     "viewTemplate": "View template"
   },
+  "review": {
+    "title": "Workout review",
+    "startedAt": "Start: {{time}}",
+    "notAvailable": "—",
+    "lastUpdate": "Last update: {{when}}",
+    "stats": {
+      "elapsed": "Time elapsed",
+      "setsDone": "Sets completed",
+      "exercisesDone": "Exercises finished",
+      "volume": "Volume recorded"
+    },
+    "progress": {
+      "title": "Session progress",
+      "done": "{{count}} sets done",
+      "pending": "{{count}} pending"
+    },
+    "tabs": {
+      "label": "Review sections",
+      "exercises": "Exercises",
+      "metrics": "Summary and metrics",
+      "feedback": "Feedback"
+    },
+    "exercise": {
+      "completed": "Completed",
+      "inProgress": "In progress",
+      "pending": "Pending"
+    },
+    "table": {
+      "set": "Set",
+      "target": "Target (plan)",
+      "done": "Done",
+      "rest": "Rest",
+      "pending": "Pending"
+    },
+    "target": {
+      "Reps": "{{value}} reps",
+      "RepsRange": "{{value}}–{{max}} reps",
+      "MaxReps": "Max reps",
+      "Duration": "{{value}} s",
+      "Minutes": "{{value}} min",
+      "other": "{{value}}"
+    },
+    "done": {
+      "weighted": "{{reps}} × {{weight}} kg",
+      "reps": "{{reps}} reps",
+      "seconds": "{{seconds}} s"
+    },
+    "volumeValue": "{{value}} kg",
+    "expand": "Expand {{name}}",
+    "collapse": "Collapse {{name}}"
+  },
   "muscles": {
     "ABDOMINALS": "Abdominals",
     "ABDUCTORS": "Abductors",

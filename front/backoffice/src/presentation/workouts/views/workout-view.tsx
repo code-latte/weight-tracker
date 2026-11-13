@@ -23,9 +23,6 @@ import Button from "@/presentation/common/components/atoms/button";
 import Tooltip from "@/presentation/common/components/atoms/tooltip";
 import Link from "@/presentation/common/components/atoms/link";
 import Typography from "@/presentation/common/components/atoms/typography";
-import { fullNameOf } from "@/presentation/common/full-name";
-import { initialsOf } from "@/presentation/common/initials";
-import type { PersonCardProps } from "@/presentation/common/components/molecules/person-card";
 import HomeSkeleton from "@/presentation/common/components/molecules/home-skeleton";
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import AppShell from "@/presentation/common/components/organisms/app-shell";
@@ -45,6 +42,9 @@ import useExercisesEditor from "@/presentation/workouts/hooks/use-exercises-edit
 import useSaveWorkoutAsTemplate from "@/presentation/workouts/hooks/use-save-workout-as-template";
 import useUpdateWorkout from "@/presentation/workouts/hooks/use-update-workout";
 import useWorkout from "@/presentation/workouts/hooks/use-workout";
+import WorkoutReview from "@/presentation/workouts/views/workout-review-view";
+import { backHrefOf, personCardOf } from "@/presentation/workouts/workout-context";
+import { isReviewStatus } from "@/presentation/workouts/workout-review";
 import { weekMiddleOf, weekStartOf } from "@/presentation/workouts/week";
 
 function WorkoutNotFound() {
@@ -58,13 +58,6 @@ function WorkoutNotFound() {
       </Link>
     </Box>
   );
-}
-
-/** Where "Volver" leads: the mesocycle of a placed workout, or the list of workouts outside any mesocycle. */
-function backHrefOf(workout: WorkoutById): string {
-  return workout.mesocycleId
-    ? `/mesocycle?id=${encodeURIComponent(workout.mesocycleId)}`
-    : "/assigned-workouts";
 }
 
 /** The page heading and the way back to where the workout lives. */
@@ -87,16 +80,6 @@ function WorkoutHeader({ backHref }: { backHref: string }) {
       </Link>
     </Box>
   );
-}
-
-/** The person's full name, or their email when they have no name. */
-function displayNameOf(person: WorkoutById["athlete"]): string {
-  return fullNameOf(person) ?? person.email;
-}
-
-/** The person as their card in the strip shows them. */
-function personCardOf(person: WorkoutById["athlete"], role: string): PersonCardProps {
-  return { name: displayNameOf(person), initials: initialsOf(person), role };
 }
 
 /** The mesocycle entry of the strip, from the mesocycle the workout carries: left out for a standalone workout. */
@@ -354,6 +337,14 @@ function WorkoutEditor({ id }: { id: string | null }) {
   }
   if (workout.status === "failed" && workout.errorCode) {
     return <LoadError code={workout.errorCode} onRetry={workout.reload} />;
+  }
+  // A started workout opens the review, which needs no catalog: it is shown before the catalog is checked.
+  if (
+    workout.status === "loaded" &&
+    workout.workout !== null &&
+    isReviewStatus(workout.workout.status)
+  ) {
+    return <WorkoutReview workout={workout.workout} />;
   }
   if (catalog.status === "failed" && catalog.errorCode) {
     return <LoadError code={catalog.errorCode} onRetry={catalog.reload} />;

@@ -4413,68 +4413,586 @@ describe("WorkoutView", () => {
       // Assert
       expect(screen.queryByText("Entrenamiento publicado.")).not.toBeInTheDocument();
     });
+  });
+
+  describe("review", () => {
+    const luis = {
+      id: "6a2d3f1e-0e6c-4b64-9d8f-1e7a8d2b3c4d",
+      email: "luis@example.com",
+      name: "Luis",
+      surname: "Pérez",
+      role: "TRAINER",
+    };
+    const admin: UserProfile = { ...completeProfile, id: "admin-1", role: "ADMIN" };
+    const trainerProfile: UserProfile = { ...completeProfile, id: luis.id, role: "TRAINER" };
+    const heading = () => screen.findByRole("heading", { name: "Revisión del entrenamiento" });
+
+    function setRecord(
+      id: string,
+      values: Partial<WorkoutByIdExercise["setRecords"][number]> = {},
+    ): WorkoutByIdExercise["setRecords"][number] {
+      return {
+        id,
+        type: "Reps",
+        reps: null,
+        durationSeconds: null,
+        weight: null,
+        registeredAtUtc: "2026-11-10T10:00:00Z",
+        ...values,
+      };
+    }
+
+    function exerciseWithRecords(
+      id: string,
+      exerciseId: string,
+      effort: string,
+      sets: WorkoutExerciseDetail["sets"],
+      setRecords: WorkoutByIdExercise["setRecords"],
+      extra: Partial<WorkoutExerciseDetail> = {},
+    ): WorkoutByIdExercise {
+      return { ...workoutExercise(id, exerciseId, effort, sets, extra), setRecords };
+    }
+
+    /** Completed: 3 planned, 4 recorded (one discarded). */
+    const squatDone = exerciseWithRecords(
+      "we-1",
+      squat.id,
+      "MID",
+      [{ count: 3, target: { type: "Reps", value: 10, maxValue: null } }],
+      [
+        setRecord("r1", { reps: 8, weight: 80 }),
+        setRecord("r2", { reps: 8, weight: 85 }),
+        setRecord("r3", { reps: 7, weight: 85 }),
+        setRecord("r4", { reps: 5, weight: 100 }),
+      ],
+      { restMinutes: 2 },
+    );
+    /** In progress: 4 planned, 1 recorded without weight; no rest. */
+    const benchStarted = exerciseWithRecords(
+      "we-2",
+      bench.id,
+      "HIGH",
+      [
+        { count: 2, target: { type: "RepsRange", value: 8, maxValue: 12 } },
+        { count: 2, target: { type: "MaxReps", value: null, maxValue: null } },
+      ],
+      [setRecord("r5", { reps: 10 })],
+    );
+    /** Pending, without effort. */
+    const pressPending = exerciseWithRecords(
+      "we-3",
+      legPress.id,
+      "",
+      [{ count: 3, target: { type: "Reps", value: 12, maxValue: null } }],
+      [],
+    );
+    /** In progress: a duration and a minutes target, one timed record. */
+    const bikeStarted = exerciseWithRecords(
+      "we-4",
+      bike.id,
+      "LOW",
+      [
+        { count: 1, target: { type: "Duration", value: 30, maxValue: null } },
+        { count: 1, target: { type: "Minutes", value: null, maxValue: null, minutes: 1.5 } },
+      ],
+      [setRecord("r6", { type: "Duration", durationSeconds: 45 })],
+    );
+    const started: WorkoutById = {
+      ...workout,
+      status: "STARTED",
+      trainerId: luis.id,
+      trainer: luis,
+      mesocycleId: "m-1",
+      mesocycleWeekNumber: 2,
+      mesocycle: {
+        id: "m-1",
+        name: "Hipertrofia",
+        objective: "Ganar masa",
+        startDate: "2026-10-26",
+        durationInWeeks: 4,
+        weeks: [],
+      },
+      resultsUpdatedAt: "2026-11-13T10:00:00Z",
+      exercises: [squatDone, benchStarted, pressPending, bikeStarted],
+    };
+    const exercisesCatalog = async () => ok([...catalog, bike]);
+    const withReview =
+      (overrides: Partial<WorkoutById> = {}) =>
+      async () =>
+        ok({ ...started, ...overrides });
+    const cardOf = (name: string) => screen.getByRole("heading", { name, level: 3 }).closest("li")!;
+    const statValue = (label: string) => screen.getByText(label).nextElementSibling!.textContent;
 
     it.each(["STARTED", "COMPLETED", "REVIEWED"])(
-      "locks the details of a %s workout but keeps Guardar como plantilla",
+      "opens the review of a %s workout",
       async (status) => {
         // Arrange & Act
-        await renderWorkout({ getWorkout: withStatus(status) }).rendered;
-        await loaded();
+        await renderWorkout({ getWorkout: withReview({ status }), getExercises: exercisesCatalog })
+          .rendered;
 
         // Assert
-        const properties = propertiesSection();
-        expect(within(properties).getByText(lockNotice)).toBeInTheDocument();
+        expect(await heading()).toBeInTheDocument();
         expect(
-          within(properties).queryByRole("button", { name: "Guardar" }),
+          screen.queryByRole("heading", { name: "Editar entrenamiento" }),
         ).not.toBeInTheDocument();
-        expect(statusButton("Publicar")).not.toBeInTheDocument();
-        expect(statusButton("Volver a borrador")).not.toBeInTheDocument();
-        expect(within(properties).getByRole("textbox", { name: "Nombre" })).toBeDisabled();
-        expect(within(properties).getByRole("textbox", { name: "Descripción" })).toBeDisabled();
-        expect(
-          within(properties).getByRole("button", { name: "Guardar como plantilla" }),
-        ).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Guardar" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Añadir ejercicio" })).not.toBeInTheDocument();
       },
     );
 
-    it("locks a reviewed workout for an admin too", async () => {
+    it.each(["DRAFT", "PUBLISHED", "ARCHIVED"])(
+      "opens the editor of a %s workout",
+      async (status) => {
+        // Arrange & Act
+        await renderWorkout({ getWorkout: async () => ok({ ...workout, status }) }).rendered;
+
+        // Assert
+        expect(
+          await screen.findByRole("heading", { name: "Editar entrenamiento" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("heading", { name: "Revisión del entrenamiento" }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it("shows the review although the catalog fails", async () => {
       // Arrange & Act
       await renderWorkout({
-        getWorkout: withStatus("REVIEWED"),
-        profile: { ...completeProfile, id: "admin-1", role: "ADMIN" },
+        getWorkout: withReview(),
+        getExercises: async () => fail(new DomainError("NETWORK", "")),
       }).rendered;
-      await loaded();
 
       // Assert
-      expect(within(propertiesSection()).getByText(lockNotice)).toBeInTheDocument();
+      expect(await heading()).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("reads the workout once", async () => {
+      // Arrange
+      const { readWorkout, rendered } = renderWorkout({ getWorkout: withReview() });
+
+      // Act
+      await rendered;
+      await heading();
+
+      // Assert
+      expect(readWorkout).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the title, the subtitle and the status of a placed workout", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getByText("Pierna · Hipertrofia · Semana 2")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute(
+        "href",
+        "/mesocycle?id=m-1",
+      );
+      expect(screen.getByText("En curso")).toBeInTheDocument();
+    });
+
+    it("shows only the name of a standalone workout", async () => {
+      // Arrange & Act
+      await renderWorkout({
+        getWorkout: withReview({
+          status: "COMPLETED",
+          exercises: [pressPending],
+          mesocycleId: null,
+          mesocycleWeekNumber: null,
+          mesocycle: null,
+        }),
+      }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getByText("Pierna")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute(
+        "href",
+        "/assigned-workouts",
+      );
+      expect(screen.getByText("Completado", { selector: ".MuiChip-label" })).toBeInTheDocument();
+    });
+
+    it("shows a started workout as an outlined red chip with the live icon", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      const chip = screen.getByText("En curso").closest(".MuiChip-root")!;
+      expect(chip).toHaveClass("MuiChip-outlined", "MuiChip-colorError");
+      expect(within(chip as HTMLElement).getByTestId("SensorsOutlinedIcon")).toBeInTheDocument();
+      expect(screen.queryByText("En directo")).not.toBeInTheDocument();
+    });
+
+    it("shows a completed workout as a plain status chip", async () => {
+      // Arrange & Act
+      await renderWorkout({
+        getWorkout: withReview({ status: "COMPLETED", exercises: [pressPending] }),
+      }).rendered;
+
+      // Assert
+      await heading();
+      const chip = screen
+        .getByText("Completado", { selector: ".MuiChip-label" })
+        .closest(".MuiChip-root")!;
+      expect(chip).not.toHaveClass("MuiChip-colorError");
       expect(
-        within(propertiesSection()).queryByRole("button", { name: "Guardar" }),
+        within(chip as HTMLElement).queryByTestId("SensorsOutlinedIcon"),
       ).not.toBeInTheDocument();
     });
 
-    it("keeps the exercises editor of a started workout as it is", async () => {
+    it("shows the athlete and the start placeholder", async () => {
       // Arrange & Act
-      await renderWorkout({ getWorkout: withStatus("STARTED") }).rendered;
-      await loaded();
+      await renderWorkout({ getWorkout: withReview() }).rendered;
 
       // Assert
+      await heading();
+      const strip = screen.getByRole("region", { name: "Datos del entrenamiento" });
+      expect(within(strip).getByText("AG")).toBeInTheDocument();
+      expect(within(strip).getByText("Ana García")).toBeInTheDocument();
+      expect(within(strip).getByText("Atleta")).toBeInTheDocument();
+      expect(within(strip).getByText("Inicio: —")).toBeInTheDocument();
+    });
+
+    it("shows when the results last changed", async () => {
+      // Arrange
+      vi.setSystemTime(new Date("2026-11-13T10:00:30Z"));
+
+      // Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getByText("Última actualización: hace 30 segundos")).toBeInTheDocument();
+    });
+
+    it("shows no last update before any result", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview({ resultsUpdatedAt: null }) }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.queryByText(/Última actualización/)).not.toBeInTheDocument();
+    });
+
+    it("shows the trainer to an admin", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview(), profile: admin }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getByText("Luis Pérez")).toBeInTheDocument();
+    });
+
+    it("hides the trainer from a trainer", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview(), profile: trainerProfile }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.queryByText("Luis Pérez")).not.toBeInTheDocument();
+    });
+
+    it("shows the session figures, counting only the planned sets", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      expect(statValue("Tiempo transcurrido")).toBe("—");
+      expect(statValue("Series completadas")).toBe("5 / 12");
+      expect(statValue("Ejercicios terminados")).toBe("1 / 4");
+      expect(statValue("Volumen registrado")).toBe("1.915 kg");
+    });
+
+    it("shows the progress of the session", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getByText("42%")).toBeInTheDocument();
+      expect(screen.getByText("5 series realizadas")).toBeInTheDocument();
+      expect(screen.getByText("7 pendientes")).toBeInTheDocument();
+      expect(screen.getByRole("progressbar", { name: "Progreso de la sesión" })).toHaveAttribute(
+        "aria-valuenow",
+        "42",
+      );
+    });
+
+    it("shows 0% when nothing is planned", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview({ exercises: [] }) }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getByText("0%")).toBeInTheDocument();
+    });
+
+    it("selects the exercises tab first, without an expand-all button", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getByRole("tab", { name: "Ejercicios" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.getByRole("heading", { name: "Sentadilla", level: 3 })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Expandir todo" })).not.toBeInTheDocument();
+    });
+
+    it.each(["Resumen y métricas", "Feedback"])("shows an empty panel in %s", async (name) => {
+      // Arrange
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("tab", { name }));
+
+      // Assert
+      expect(screen.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
       expect(
-        within(exercisesSection()).getByRole("button", { name: "Añadir ejercicio" }),
-      ).toBeEnabled();
+        screen.queryByRole("heading", { name: "Sentadilla", level: 3 }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("tabpanel")).toBeEmptyDOMElement();
+    });
+
+    it("lists a card per exercise in workout order, with its labels and state", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      const names = screen.getAllByRole("heading", { level: 3 }).map((item) => item.textContent);
+      expect(names).toEqual(["Sentadilla", "Press de banca", "Prensa de piernas", "Bicicleta"]);
+      expect(within(cardOf("Sentadilla")).getByText("Piernas")).toBeInTheDocument();
+      expect(within(cardOf("Sentadilla")).getByText("Cuádriceps")).toBeInTheDocument();
+      expect(within(cardOf("Sentadilla")).getByText("Completado")).toBeInTheDocument();
+      expect(within(cardOf("Press de banca")).getByText("En progreso")).toBeInTheDocument();
+      expect(within(cardOf("Prensa de piernas")).getByText("Pendiente")).toBeInTheDocument();
+    });
+
+    it("expands the first exercise in progress and collapses the rest", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getAllByRole("table")).toHaveLength(1);
+      expect(within(cardOf("Press de banca")).getByRole("table")).toBeInTheDocument();
+    });
+
+    it("expands the first exercise not completed when none is in progress", async () => {
+      // Arrange & Act
+      await renderWorkout({
+        getWorkout: withReview({
+          exercises: [squatDone, pressPending, { ...pressPending, id: "we-5" }],
+        }),
+      }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getAllByRole("table")).toHaveLength(1);
+    });
+
+    it("collapses every card when all exercises are completed", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview({ exercises: [squatDone] }) }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    });
+
+    it("expands and collapses a card from its button", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Expandir Sentadilla" }));
+
+      // Assert
+      expect(within(cardOf("Sentadilla")).getByRole("table")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Contraer Sentadilla" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+    });
+
+    it("shows the effort of the exercise above its table", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Expandir Sentadilla" }));
+
+      // Assert
+      expect(within(cardOf("Sentadilla")).getByText("Esfuerzo: RIR 3")).toBeInTheDocument();
+    });
+
+    it("shows no effort line when the exercise has none", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Expandir Prensa de piernas" }));
+
+      // Assert
+      expect(within(cardOf("Prensa de piernas")).getByRole("table")).toBeInTheDocument();
+      expect(within(cardOf("Prensa de piernas")).queryByText(/Esfuerzo/)).not.toBeInTheDocument();
+    });
+
+    it("pairs each planned set with its record and drops the discarded one", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Expandir Sentadilla" }));
+
+      // Assert
+      const table = within(cardOf("Sentadilla")).getByRole("table");
+      expect(within(table).getAllByRole("row")).toHaveLength(4);
+      expect(within(table).getAllByText("10 reps")).toHaveLength(3);
+      expect(within(table).getByText("8 × 80 kg")).toBeInTheDocument();
+      expect(within(table).getByText("8 × 85 kg")).toBeInTheDocument();
+      expect(within(table).getByText("7 × 85 kg")).toBeInTheDocument();
+      expect(within(table).queryByText("5 × 100 kg")).not.toBeInTheDocument();
+    });
+
+    it("shows the targets without weight, the records without weight and the pending sets", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+
+      // Assert
+      await heading();
+      const table = within(cardOf("Press de banca")).getByRole("table");
+      expect(within(table).getAllByText("8–12 reps")).toHaveLength(2);
+      expect(within(table).getAllByText("Máx. reps")).toHaveLength(2);
+      expect(within(table).getByText("10 reps")).toBeInTheDocument();
+      expect(within(table).getAllByText("Pendiente")).toHaveLength(3);
+    });
+
+    it("shows duration and minutes targets and a timed record", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withReview(), getExercises: exercisesCatalog }).rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Expandir Bicicleta" }));
+
+      // Assert
+      const table = within(cardOf("Bicicleta")).getByRole("table");
+      expect(within(table).getByText("30 s")).toBeInTheDocument();
+      expect(within(table).getByText("1:30 min")).toBeInTheDocument();
+      expect(within(table).getByText("45 s")).toBeInTheDocument();
+    });
+
+    it("shows the rest of the exercise on every row", async () => {
+      // Arrange
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Expandir Sentadilla" }));
+
+      // Assert
+      expect(within(cardOf("Sentadilla")).getAllByText("2:00")).toHaveLength(3);
+      expect(within(cardOf("Press de banca")).getAllByText("—")).toHaveLength(4);
+    });
+
+    it("offers no action that changes the workout", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview({ status: "COMPLETED" }) }).rendered;
+
+      // Assert
+      await heading();
+      for (const name of ["Guardar", "Publicar", "Volver a borrador", "Añadir ejercicio"]) {
+        expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+      }
+    });
+
+    it("shows Guardar como plantilla enabled", async () => {
+      // Arrange & Act
+      await renderWorkout({ getWorkout: withReview({ status: "COMPLETED" }) }).rendered;
+
+      // Assert
+      await heading();
+      expect(screen.getByRole("button", { name: "Guardar como plantilla" })).toBeEnabled();
+    });
+
+    it("creates one template from the workout without updating it", async () => {
+      // Arrange
+      const { mutations, rendered } = renderWorkout({ getWorkout: withReview() });
+      await rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Guardar como plantilla" }));
+
+      // Assert
+      expect(await screen.findByText("Plantilla creada.")).toBeInTheDocument();
+      expect(mutations.saveAsTemplate).toHaveBeenCalledTimes(1);
+      expect(mutations.saveAsTemplate).toHaveBeenCalledWith({ workoutId: "w-1" });
+      expect(mutations.update).not.toHaveBeenCalled();
+      expect(screen.getByRole("link", { name: "Ver plantilla" })).toHaveAttribute(
+        "href",
+        "/workout-template?id=wt-9",
+      );
+    });
+
+    it("shows the error when the template is refused", async () => {
+      // Arrange
+      const { rendered } = renderWorkout({
+        getWorkout: withReview(),
+        saveAsTemplate: async () => fail(new DomainError("VALIDATION", "")),
+      });
+      await rendered;
+      await heading();
+      const user = userEvent.setup();
+
+      // Act
+      await user.click(screen.getByRole("button", { name: "Guardar como plantilla" }));
+
+      // Assert
+      expect(await screen.findByText("Revisa los datos introducidos.")).toBeInTheDocument();
+      expect(screen.queryByText("Plantilla creada.")).not.toBeInTheDocument();
     });
 
     it("reads in English", async () => {
       // Arrange
-      await renderWorkout({ getWorkout: withStatus("STARTED") }).rendered;
-      await loaded();
+      await renderWorkout({ getWorkout: withReview() }).rendered;
+      await heading();
 
       // Act
       await act(() => i18n.changeLanguage("en"));
 
       // Assert
-      expect(
-        screen.getByText("The athlete started this workout and you cannot edit it"),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Workout review" })).toBeInTheDocument();
+      expect(screen.getByText("Sets completed")).toBeInTheDocument();
+      expect(screen.getByText("Exercises finished")).toBeInTheDocument();
+      expect(screen.getByText("Volume recorded")).toBeInTheDocument();
+      expect(screen.getByText("Session progress")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Exercises" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Summary and metrics" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Feedback" })).toBeInTheDocument();
     });
   });
 });

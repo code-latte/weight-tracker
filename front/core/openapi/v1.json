@@ -2173,6 +2173,111 @@
         ]
       }
     },
+    "/workouts/{workoutId}/observations": {
+      "get": {
+        "tags": [
+          "Workouts"
+        ],
+        "parameters": [
+          {
+            "name": "workoutId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkoutObservationsResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkoutObservationsResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkoutObservationsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/workouts/{workoutId}": {
       "delete": {
         "tags": [
@@ -4054,6 +4159,26 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11222,6 +11347,31 @@
           }
         }
       },
+      "WorkoutHighlightResponse": {
+        "required": [
+          "observationId",
+          "rank",
+          "priority"
+        ],
+        "type": "object",
+        "properties": {
+          "observationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rank": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "priority": {
+            "type": "string"
+          }
+        }
+      },
       "WorkoutListItemResponse": {
         "required": [
           "id",
@@ -11384,6 +11534,66 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MesocycleWeekResponse"
+            }
+          }
+        }
+      },
+      "WorkoutObservationResponse": {
+        "required": [
+          "id",
+          "code",
+          "severity",
+          "exerciseId",
+          "priority",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "exerciseId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "priority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "WorkoutObservationsResponse": {
+        "required": [
+          "observations",
+          "highlights"
+        ],
+        "type": "object",
+        "properties": {
+          "observations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkoutObservationResponse"
+            }
+          },
+          "highlights": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkoutHighlightResponse"
             }
           }
         }

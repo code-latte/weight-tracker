@@ -1,4 +1,5 @@
 using WeightTracker.Application.Common;
+using WeightTracker.Application.Common.Dispatcher;
 using WeightTracker.Application.Exceptions;
 using WeightTracker.Application.Interfaces;
 using WeightTracker.Application.Services;
@@ -19,22 +20,27 @@ public class ChangeWorkoutStatusUseCase
 
     private IClock _clock;
 
+    private IEventDispatcher _dispatcher;
+
     public ChangeWorkoutStatusUseCase(
         IWorkoutRepository workouts,
         WorkoutStatusAuthorizer authorizer,
         IUnitOfWork unitOfWork,
-        IClock clock
+        IClock clock,
+        IEventDispatcher dispatcher
     )
     {
         _workouts = workouts;
         _authorizer = authorizer;
         _unitOfWork = unitOfWork;
         _clock = clock;
+        _dispatcher = dispatcher;
     }
 
     /// <summary>
     /// Moves an existing workout to another status. An admin may set any status; everybody else only
     /// follows the lifecycle of the workout. Completing records the server time as the completion time.
+    /// The events the workout raised are dispatched once the change is committed, so a failing handler cannot undo it.
     /// </summary>
     /// <returns>The updated workout.</returns>
     /// <exception cref="WorkoutNotFoundException">When no workout has the given id.</exception>
@@ -60,6 +66,7 @@ public class ChangeWorkoutStatusUseCase
 
         await _workouts.Save(workout, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _dispatcher.DispatchAsync(workout.PullDomainEvents(), cancellationToken);
 
         return workout;
     }

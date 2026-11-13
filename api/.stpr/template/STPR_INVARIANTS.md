@@ -135,18 +135,31 @@ Rules that follow from the classification:
   outside these two factories.
 - Constructors stay private so an aggregate cannot be built in an invalid state.
 
-### Domain events: dispatcher without producers
+### Domain events: raised by aggregates, dispatched after the commit
 
-`AggregateRoot` exposes `AddDomainEvent`, `DomainEvents` and `ClearDomainEvents`, and `IDomainEvent` is defined.
+`AggregateRoot` exposes `AddDomainEvent`, `DomainEvents` and `PullDomainEvents`, and `IDomainEvent` is defined.
 A dispatcher exists in `WeightTracker.Application/Common/Dispatcher`: `IEventDispatcher` delivers events, and a handler
 is declared by implementing `IEventHandler<TEvent>`. `AddEventHandlers` (`WeightTracker.Api/Common`) scans the Application
-and Infra assemblies, so handlers live in one of those two and are **never registered by hand**.
+and Infra assemblies, so handlers live in one of those two and are **never registered by hand**. Application handlers
+live in `WeightTracker.Application/EventHandlers`.
 
-No aggregate raises events and no use case dispatches them yet.
+The one producer today is `Workout`, which raises `WorkoutCompletedEvent` every time it reaches `COMPLETED`.
+`ChangeWorkoutStatusUseCase` dispatches it.
 
-- Do not call `AddDomainEvent` until a change wires dispatch into use cases and the plan approves it.
-- A change that wires dispatch must also decide when the aggregate's events are cleared; the dispatcher does not clear them.
+- Call `AddDomainEvent` only when the plan approves the event and names the use case that dispatches it.
+- Events are dispatched **after** the change that raised them is committed: `Save`, `SaveChangesAsync`, then
+  `DispatchAsync(aggregate.PullDomainEvents())`. A change that fails to save dispatches nothing, and a handler only
+  ever reacts to something that really happened.
+- Always hand events over with `PullDomainEvents()`, which returns them and clears them in one call. Never dispatch
+  `DomainEvents` and clear later.
+- A handler failure reaches the caller after the change is already committed, so the request ends in an error although
+  the change stands. A plan that adds a handler states what a failure leaves behind and how it is recovered. There is no
+  retry, outbox or background delivery yet.
+- A handler that writes is the entry point of its own operation: it delegates to an application service that commits
+  its own unit of work, once, when everything it stages is ready. This is the one exception to the rule that the use
+  case that started the request commits exactly once.
 - Handlers of the same event must not depend on each other: only the order of events is guaranteed.
+- Handlers stay thin: they delegate to an application service, so the work can be unit-tested and reused without the dispatcher.
 
 - Domain in DDD
   - Should define Rehydrate, that requires Id
@@ -375,6 +388,10 @@ stay intact: a repository still returns domain types only and never a fragment.
   declared next to the use case that consumes it. It never returns EF entities or domain types.
 - It is read-only: it never stages writes, and no use case uses it to decide a mutation. Writes always load the
   aggregate through its repository.
+- The one allowed use before a write is feeding the **generation of a new aggregate** that is derived from history, never
+  a change to the aggregate the projection reads. `IExerciseExecutionHistoryQuery` feeds the generation of
+  `WorkoutObservations`; hydrating every earlier `Workout` of the athlete to read a few values is not acceptable. Any other
+  such use needs the plan to say so.
 - Authorization stays in the use case, which checks the caller and scopes the query (for example by the caller's
   `Id`) before reading.
 - The plan names each projection and states why loading the aggregate is not acceptable.
@@ -389,6 +406,8 @@ stay intact: a repository still returns domain types only and never a fragment.
   Controllers and repositories never call it.
 - A use case that throws before committing leaves nothing persisted; the scoped `DbContext` is discarded.
 - Several repositories writing in one use case commit together through that single call.
+- The exception is a handler of a domain event: it runs after the use case committed, so it commits its own unit of work
+  once (see "Domain events").
 
 ### Asynchrony and cancellation
 

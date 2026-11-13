@@ -22,6 +22,7 @@ import type {
   GetMesocycleWorkoutsInput,
   GetUserExerciseHistoryInput,
   GetWorkoutByIdInput,
+  GetWorkoutObservationsInput,
   GetWorkoutSummaryInput,
   GetWorkoutsInput,
   InvitationResponseInput,
@@ -55,6 +56,7 @@ import type {
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
+  WorkoutObservations,
   WorkoutSummary,
   AddExerciseToWorkoutTemplateInput,
   BreakWorkoutTemplateSuperSeriesInput,
@@ -127,6 +129,7 @@ export default interface Dependencies {
   getWorkoutsUseCase: UseCaseInterface<GetWorkoutsInput, WorkoutListItem[]>;
   getWorkoutByIdUseCase: UseCaseInterface<GetWorkoutByIdInput, WorkoutById>;
   getWorkoutSummaryUseCase: UseCaseInterface<GetWorkoutSummaryInput, WorkoutSummary>;
+  getWorkoutObservationsUseCase: UseCaseInterface<GetWorkoutObservationsInput, WorkoutObservations>;
   createWorkoutUseCase: UseCaseInterface<CreateWorkoutRequest, Workout>;
   updateWorkoutUseCase: UseCaseInterface<UpdateWorkoutInput, Workout>;
   deleteWorkoutUseCase: UseCaseInterface<DeleteWorkoutInput, void>;

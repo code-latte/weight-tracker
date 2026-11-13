@@ -315,18 +315,90 @@
       "observations": {
         "title": "Session observations",
         "subtitle": "Key points and recommendations",
-        "preview": "Preview",
-        "LOAD_PROGRESSION": {
-          "title": "Notable progression",
-          "text": "Load increase in Romanian deadlift (+8.3%) and Hack squat (+12.5%)."
+        "viewAll": "View all observations ({{count}})",
+        "highlighted": "Highlighted",
+        "none": "No observations for this session",
+        "noHighlights": "Nothing stands out in this session",
+        "workoutGroup": "Workout",
+        "unknownExercise": "Exercise",
+        "setDetail": "set {{position}}: {{reps}}/{{target}}",
+        "unknown": {
+          "title": "Observation"
         },
-        "GOOD_COMPLIANCE": {
-          "title": "Good compliance",
-          "text": "27 of 29 sets within the target rep range (93%)."
+        "baseline": {
+          "weight": "Earlier reference: {{value}}.",
+          "volume": "Earlier reference: {{value}}.",
+          "reps": "Earlier reference: {{value}}."
         },
-        "SET_BELOW_TARGET": {
-          "title": "Review",
-          "text": "The third set of Romanian deadlift fell below target (7/8 reps). Consider keeping the load or adjusting the RIR next session."
+        "codes": {
+          "WORKOUT_INCOMPLETE": {
+            "title": "Incomplete workout",
+            "text": "{{recordedSets}} of {{prescribedSets}} sets recorded ({{completionPercent}})."
+          },
+          "EXERCISE_SKIPPED": {
+            "title": "Exercise skipped",
+            "text": "{{exercise}}: none of the {{prescribedSets}} sets recorded."
+          },
+          "REPS_BELOW_TARGET": {
+            "title": "Below target",
+            "text": "{{exercise}}: {{detail}}."
+          },
+          "REPS_ABOVE_TARGET": {
+            "title": "Above range",
+            "text": "{{exercise}}: {{detail}}."
+          },
+          "ALL_TARGETS_MET": {
+            "title": "All targets met",
+            "text": "All {{prescribedSets}} sets within target."
+          },
+          "WEIGHT_INCREASE": {
+            "title": "Load increase",
+            "text": "{{exercise}}: from {{previousMaxKg}} to {{currentMaxKg}} ({{changePercent}})."
+          },
+          "WEIGHT_DECREASE": {
+            "title": "Load decrease",
+            "text": "{{exercise}}: from {{previousMaxKg}} to {{currentMaxKg}} ({{changePercent}})."
+          },
+          "WEIGHT_PERSONAL_RECORD": {
+            "title": "Weight record",
+            "text": "{{exercise}}: {{currentMaxKg}}, previously {{previousMaxKg}} ({{changePercent}})."
+          },
+          "REPS_PERSONAL_RECORD": {
+            "title": "Rep record",
+            "text": "{{exercise}}: {{currentReps}} reps at {{weightKg}}, previously {{previousBestReps}}."
+          },
+          "VOLUME_INCREASE": {
+            "title": "More volume",
+            "text": "{{exercise}}: from {{previousVolumeKg}} to {{currentVolumeKg}} ({{changePercent}})."
+          },
+          "VOLUME_DECREASE": {
+            "title": "Less volume",
+            "text": "{{exercise}}: from {{previousVolumeKg}} to {{currentVolumeKg}} ({{changePercent}})."
+          },
+          "REPS_INCREASE": {
+            "title": "More reps",
+            "text": "{{exercise}}: from {{previousTotalReps}} to {{currentTotalReps}} reps in {{sets}} sets ({{changePercent}})."
+          },
+          "REPS_DECREASE": {
+            "title": "Fewer reps",
+            "text": "{{exercise}}: from {{previousTotalReps}} to {{currentTotalReps}} reps in {{sets}} sets ({{changePercent}})."
+          },
+          "REPEATED_TARGET_MISS": {
+            "title": "Repeated target miss",
+            "text": "{{exercise}}: {{consecutiveMisses}} sessions in a row below target."
+          },
+          "WEIGHT_PLATEAU": {
+            "title": "Load plateau",
+            "text": "{{exercise}}: {{executions}} sessions without passing {{baselineMaxKg}}."
+          },
+          "WEIGHT_UPTREND": {
+            "title": "Upward trend",
+            "text": "{{exercise}}: {{consecutiveIncreases}} increases in a row, up to {{currentWeightKg}}."
+          },
+          "WEIGHT_DOWNTREND": {
+            "title": "Downward trend",
+            "text": "{{exercise}}: {{consecutiveDecreases}} decreases in a row, down to {{currentWeightKg}}."
+          }
         }
       }
     }

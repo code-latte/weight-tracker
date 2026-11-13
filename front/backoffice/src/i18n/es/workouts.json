@@ -315,18 +315,90 @@
       "observations": {
         "title": "Observaciones de la sesión",
         "subtitle": "Puntos clave y recomendaciones",
-        "preview": "Vista previa",
-        "LOAD_PROGRESSION": {
-          "title": "Progresión destacada",
-          "text": "Aumento de carga en Peso muerto rumano (+8,3 %) y Sentadilla hack (+12,5 %)."
+        "viewAll": "Ver todas las observaciones ({{count}})",
+        "highlighted": "Destacada",
+        "none": "No hay observaciones para esta sesión",
+        "noHighlights": "Nada destacable en esta sesión",
+        "workoutGroup": "Entrenamiento",
+        "unknownExercise": "Ejercicio",
+        "setDetail": "serie {{position}}: {{reps}}/{{target}}",
+        "unknown": {
+          "title": "Observación"
         },
-        "GOOD_COMPLIANCE": {
-          "title": "Buen cumplimiento",
-          "text": "27 de 29 series dentro del rango de repeticiones objetivo (93 %)."
+        "baseline": {
+          "weight": "Referencia previa: {{value}}.",
+          "volume": "Referencia previa: {{value}}.",
+          "reps": "Referencia previa: {{value}}."
         },
-        "SET_BELOW_TARGET": {
-          "title": "Revisar",
-          "text": "La tercera serie de Peso muerto rumano quedó por debajo del objetivo (7/8 reps). Valorar mantener la carga o ajustar el RIR en la próxima sesión."
+        "codes": {
+          "WORKOUT_INCOMPLETE": {
+            "title": "Entrenamiento incompleto",
+            "text": "{{recordedSets}} de {{prescribedSets}} series registradas ({{completionPercent}})."
+          },
+          "EXERCISE_SKIPPED": {
+            "title": "Ejercicio no realizado",
+            "text": "{{exercise}}: ninguna de las {{prescribedSets}} series registrada."
+          },
+          "REPS_BELOW_TARGET": {
+            "title": "Por debajo del objetivo",
+            "text": "{{exercise}}: {{detail}}."
+          },
+          "REPS_ABOVE_TARGET": {
+            "title": "Por encima del rango",
+            "text": "{{exercise}}: {{detail}}."
+          },
+          "ALL_TARGETS_MET": {
+            "title": "Todos los objetivos cumplidos",
+            "text": "Las {{prescribedSets}} series dentro del objetivo."
+          },
+          "WEIGHT_INCREASE": {
+            "title": "Subida de carga",
+            "text": "{{exercise}}: de {{previousMaxKg}} a {{currentMaxKg}} ({{changePercent}})."
+          },
+          "WEIGHT_DECREASE": {
+            "title": "Bajada de carga",
+            "text": "{{exercise}}: de {{previousMaxKg}} a {{currentMaxKg}} ({{changePercent}})."
+          },
+          "WEIGHT_PERSONAL_RECORD": {
+            "title": "Récord de peso",
+            "text": "{{exercise}}: {{currentMaxKg}}, antes {{previousMaxKg}} ({{changePercent}})."
+          },
+          "REPS_PERSONAL_RECORD": {
+            "title": "Récord de repeticiones",
+            "text": "{{exercise}}: {{currentReps}} reps con {{weightKg}}, antes {{previousBestReps}}."
+          },
+          "VOLUME_INCREASE": {
+            "title": "Más volumen",
+            "text": "{{exercise}}: de {{previousVolumeKg}} a {{currentVolumeKg}} ({{changePercent}})."
+          },
+          "VOLUME_DECREASE": {
+            "title": "Menos volumen",
+            "text": "{{exercise}}: de {{previousVolumeKg}} a {{currentVolumeKg}} ({{changePercent}})."
+          },
+          "REPS_INCREASE": {
+            "title": "Más repeticiones",
+            "text": "{{exercise}}: de {{previousTotalReps}} a {{currentTotalReps}} reps en {{sets}} series ({{changePercent}})."
+          },
+          "REPS_DECREASE": {
+            "title": "Menos repeticiones",
+            "text": "{{exercise}}: de {{previousTotalReps}} a {{currentTotalReps}} reps en {{sets}} series ({{changePercent}})."
+          },
+          "REPEATED_TARGET_MISS": {
+            "title": "Objetivo fallado repetidamente",
+            "text": "{{exercise}}: {{consecutiveMisses}} sesiones seguidas por debajo del objetivo."
+          },
+          "WEIGHT_PLATEAU": {
+            "title": "Carga estancada",
+            "text": "{{exercise}}: {{executions}} sesiones sin superar {{baselineMaxKg}}."
+          },
+          "WEIGHT_UPTREND": {
+            "title": "Tendencia al alza",
+            "text": "{{exercise}}: {{consecutiveIncreases}} subidas seguidas, hasta {{currentWeightKg}}."
+          },
+          "WEIGHT_DOWNTREND": {
+            "title": "Tendencia a la baja",
+            "text": "{{exercise}}: {{consecutiveDecreases}} bajadas seguidas, hasta {{currentWeightKg}}."
+          }
         }
       }
     }

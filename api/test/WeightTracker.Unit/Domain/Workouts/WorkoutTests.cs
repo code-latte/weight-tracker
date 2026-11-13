@@ -880,6 +880,90 @@ public class WorkoutTests
         workout.Status.Should().Be(WorkoutStatus.PUBLISHED);
     }
 
+    [Fact]
+    public void ChangeStatus_ShouldRaiseTheCompletedEventOnCompletion()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.STARTED);
+
+        // Act
+        workout.ChangeStatus(WorkoutStatus.COMPLETED, ChangedAt);
+
+        // Assert
+        workout.DomainEvents.Should().ContainSingle()
+            .Which.Should().Be(new WorkoutCompletedEvent(workout.Id, ChangedAt));
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.COMPLETED)]
+    [InlineData(WorkoutStatus.COMPLETED, WorkoutStatus.COMPLETED)]
+    public void OverrideStatus_ShouldRaiseTheCompletedEventEveryTimeItCompletes(WorkoutStatus from, WorkoutStatus to)
+    {
+        // Arrange
+        var workout = AWorkoutIn(from);
+
+        // Act
+        workout.OverrideStatus(to, ChangedAt);
+
+        // Assert
+        workout.DomainEvents.Should().ContainSingle()
+            .Which.Should().Be(new WorkoutCompletedEvent(workout.Id, ChangedAt));
+    }
+
+    [Theory]
+    [InlineData(WorkoutStatus.DRAFT, WorkoutStatus.PUBLISHED)]
+    [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.DRAFT)]
+    [InlineData(WorkoutStatus.PUBLISHED, WorkoutStatus.STARTED)]
+    public void ChangeStatus_ShouldNotRaiseTheCompletedEventForOtherTargets(WorkoutStatus from, WorkoutStatus to)
+    {
+        // Arrange
+        var workout = AWorkoutIn(from);
+
+        // Act
+        workout.ChangeStatus(to, ChangedAt);
+
+        // Assert
+        workout.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void OverrideStatus_ShouldNotRaiseTheCompletedEventWhenReopening()
+    {
+        // Arrange
+        var workout = AWorkoutIn(WorkoutStatus.COMPLETED);
+
+        // Act
+        workout.OverrideStatus(WorkoutStatus.STARTED, ChangedAt);
+
+        // Assert
+        workout.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkReviewed_ShouldNotRaiseTheCompletedEvent()
+    {
+        // Arrange
+        var trainerId = Id.New();
+        var workout = ACompletedWorkout(trainerId);
+
+        // Act
+        workout.MarkReviewed(trainerId, ReviewedAt, null);
+
+        // Assert
+        workout.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldNotRaiseTheCompletedEventForACompletedWorkout()
+    {
+        // Arrange
+        // Act
+        var workout = AWorkoutIn(WorkoutStatus.COMPLETED);
+
+        // Assert
+        workout.DomainEvents.Should().BeEmpty();
+    }
+
     private static readonly DateTime ChangedAt = new(2026, 11, 10, 7, 45, 0, DateTimeKind.Utc);
 
     [Fact]

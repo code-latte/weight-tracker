@@ -20,6 +20,7 @@ public class WorkoutsController : AuthorizedController
     private readonly GetAllWorkoutsUseCase _getAllWorkouts;
     private readonly GetWorkoutByIdUseCase _getWorkoutById;
     private readonly GetWorkoutSummaryUseCase _getWorkoutSummary;
+    private readonly GetWorkoutObservationsUseCase _getWorkoutObservations;
     private readonly CreateWorkoutUseCase _createWorkout;
     private readonly UpdateWorkoutUseCase _updateWorkout;
     private readonly DeleteWorkoutUseCase _deleteWorkout;
@@ -41,6 +42,7 @@ public class WorkoutsController : AuthorizedController
         GetAllWorkoutsUseCase getAllWorkouts,
         GetWorkoutByIdUseCase getWorkoutById,
         GetWorkoutSummaryUseCase getWorkoutSummary,
+        GetWorkoutObservationsUseCase getWorkoutObservations,
         CreateWorkoutUseCase createWorkout,
         UpdateWorkoutUseCase updateWorkout,
         DeleteWorkoutUseCase deleteWorkout,
@@ -63,6 +65,7 @@ public class WorkoutsController : AuthorizedController
         _getAllWorkouts = getAllWorkouts;
         _getWorkoutById = getWorkoutById;
         _getWorkoutSummary = getWorkoutSummary;
+        _getWorkoutObservations = getWorkoutObservations;
         _createWorkout = createWorkout;
         _updateWorkout = updateWorkout;
         _deleteWorkout = deleteWorkout;
@@ -146,6 +149,37 @@ public class WorkoutsController : AuthorizedController
             var view = await _getWorkoutSummary.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(workoutId), cancellationToken);
 
             return Ok(WorkoutSummaryResponse.From(view));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Reads the observations generated when a workout prescribed by a trainer was completed, and which of them are
+    /// highlighted. Observations are measurable facts about what the athlete did against the prescription and against their
+    /// earlier sessions with the same trainer; they never diagnose or recommend. Highlights are the at most 3 that deserve
+    /// attention, so a normal variation is listed in <c>observations</c> but never in <c>highlights</c>. Both lists are
+    /// empty for a workout that is not completed, has no trainer, or was completed before observations existed.
+    /// </summary>
+    /// <remarks>
+    /// Observations are generated once, when the workout is completed, and are not recomputed when set records are
+    /// corrected afterwards. If generating them fails, completing the workout answers <c>500</c> although the workout stays
+    /// completed; an admin completing it again regenerates them.
+    /// </remarks>
+    [HttpGet("{workoutId:guid}/observations")]
+    [ProducesResponseType<WorkoutObservationsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetObservations(Guid workoutId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var view = await _getWorkoutObservations.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(workoutId), cancellationToken);
+
+            return Ok(WorkoutObservationsResponse.From(view));
         }
         catch (Exception exception)
         {
@@ -589,6 +623,11 @@ public class WorkoutsController : AuthorizedController
     /// lifecycle (draft, published, started, completed) within what their role allows. Nobody reaches or
     /// leaves reviewed through this route.
     /// </summary>
+    /// <remarks>
+    /// Completing a workout prescribed by a trainer also generates its observations, after the completion is saved. If
+    /// generating them fails the answer is <c>500</c> although the workout stays completed, so repeating the request gets
+    /// <c>409</c>; an admin completing it again regenerates them.
+    /// </remarks>
     [HttpPut("{workoutId:guid}/status")]
     [ProducesResponseType<WorkoutDetailResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -596,6 +635,7 @@ public class WorkoutsController : AuthorizedController
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ChangeStatus(
         Guid workoutId, [FromBody] ChangeWorkoutStatusRequest request, CancellationToken cancellationToken)
     {

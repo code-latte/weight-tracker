@@ -23,6 +23,7 @@ using WeightTracker.Application.UseCases.WorkoutTemplates;
 using WeightTracker.Application.UseCases.TrainerAthletes;
 using WeightTracker.Application.UseCases.Users;
 using WeightTracker.Application.UseCases.Workouts;
+using WeightTracker.Domain.Workouts.Observations;
 using WeightTracker.Infra.Persistence;
 using WeightTracker.Infra.Queries;
 using WeightTracker.Infra.Repositories;
@@ -67,6 +68,15 @@ if (trainerInvitationOptions.ExpirationDays < TrainerInvitationOptions.MinimumEx
             + "Supply it through configuration or the TrainerInvitations__ExpirationDays environment variable."
     );
 
+// Fail fast: every observation threshold must be supplied and in range, or the rules would silently misjudge workouts
+var observationThresholds = (
+    builder.Configuration.GetSection(WorkoutObservationsOptions.SectionName).Get<WorkoutObservationsOptions>()
+    ?? new WorkoutObservationsOptions()
+).ToThresholds();
+
+builder.Services.AddSingleton(observationThresholds);
+builder.Services.AddSingleton<WorkoutObservationGenerator>();
+
 // Bound through options rather than read here, so the limiter sees the host's final configuration.
 // Fail fast on start: a zero limit or window would reject every lead or never reset.
 builder.Services.AddOptions<CustomerLeadsRateLimitOptions>()
@@ -93,10 +103,12 @@ builder.Services.AddScoped<ITrainerAthleteRepository, TrainerAthleteRepository>(
 builder.Services.AddScoped<ITrainerInvitationRepository, TrainerInvitationRepository>();
 builder.Services.AddScoped<IMesocycleRepository, MesocycleRepository>();
 builder.Services.AddScoped<IWorkoutTemplateRepository, WorkoutTemplateRepository>();
+builder.Services.AddScoped<IWorkoutObservationsRepository, WorkoutObservationsRepository>();
 builder.Services.AddScoped<ICustomerLeadRepository, CustomerLeadRepository>();
 builder.Services.AddScoped<IExerciseLastPerformanceQuery, ExerciseLastPerformanceQuery>();
 builder.Services.AddScoped<IExercisePreviousExecutionQuery, ExercisePreviousExecutionQuery>();
 builder.Services.AddScoped<IExerciseHistoryQuery, ExerciseHistoryQuery>();
+builder.Services.AddScoped<IExerciseExecutionHistoryQuery, ExerciseExecutionHistoryQuery>();
 
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
@@ -109,6 +121,7 @@ builder.Services.AddScoped<WorkoutListLoader>();
 builder.Services.AddScoped<ExerciseVisibility>();
 builder.Services.AddScoped<ExerciseEditAuthorizer>();
 builder.Services.AddScoped<WorkoutStatusAuthorizer>();
+builder.Services.AddScoped<WorkoutObservationService>();
 builder.Services.AddScoped<WorkoutAssignmentValidator>();
 builder.Services.AddScoped<InvitationViewLoader>();
 builder.Services.AddScoped<TrainerAthleteViewLoader>();
@@ -171,6 +184,7 @@ builder.Services.AddScoped<GetUserMesocyclesUseCase>();
 builder.Services.AddScoped<GetUserTrainerUseCase>();
 builder.Services.AddScoped<GetMyExerciseLastPerformanceUseCase>();
 builder.Services.AddScoped<GetWorkoutSummaryUseCase>();
+builder.Services.AddScoped<GetWorkoutObservationsUseCase>();
 builder.Services.AddScoped<GetUserExerciseHistoryUseCase>();
 builder.Services.AddScoped<CreateMesocycleUseCase>();
 builder.Services.AddScoped<UpdateMesocycleUseCase>();

@@ -6,6 +6,7 @@ export { default as CreateSuperSeriesUseCase } from "./create-super-series-use-c
 export { default as CreateWorkoutUseCase } from "./create-workout-use-case";
 export { default as DeleteWorkoutUseCase } from "./delete-workout-use-case";
 export { default as GetWorkoutByIdUseCase } from "./get-workout-by-id-use-case";
+export { default as GetWorkoutObservationsUseCase } from "./get-workout-observations-use-case";
 export { default as GetWorkoutSummaryUseCase } from "./get-workout-summary-use-case";
 export { default as GetWorkoutsUseCase } from "./get-workouts-use-case";
 export { default as RemoveExerciseFromWorkoutUseCase } from "./remove-exercise-from-workout-use-case";

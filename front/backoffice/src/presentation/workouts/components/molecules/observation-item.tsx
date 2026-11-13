@@ -8,26 +8,32 @@ import { alpha } from "@mui/material/styles";
 import type { ReactNode } from "react";
 import Card from "@/presentation/common/components/atoms/card";
 import Typography from "@/presentation/common/components/atoms/typography";
-import type { ObservationSeverity } from "@/presentation/workouts/session-observations.mock";
 
-const SEVERITIES: Record<
-  ObservationSeverity,
-  { color: "success" | "info" | "warning"; icon: ReactNode }
-> = {
-  positive: { color: "success", icon: <TrendingUpOutlined /> },
-  info: { color: "info", icon: <InfoOutlined /> },
-  warning: { color: "warning", icon: <WarningAmberOutlined /> },
+type SeverityLook = { color: "success" | "info" | "warning"; icon: ReactNode };
+
+/** What each severity the API sends looks like. */
+const SEVERITIES: Record<string, SeverityLook> = {
+  SUCCESS: { color: "success", icon: <TrendingUpOutlined /> },
+  INFO: { color: "info", icon: <InfoOutlined /> },
+  WARNING: { color: "warning", icon: <WarningAmberOutlined /> },
 };
 
+/** A severity the front does not know reads as plain information. */
+const FALLBACK_SEVERITY = SEVERITIES.INFO;
+
 interface ObservationItemProps {
-  severity: ObservationSeverity;
+  /** The API's severity: `SUCCESS`, `INFO` or `WARNING`. */
+  severity: string;
   title: string;
-  text: string;
+  /** Left out when there is nothing to say beyond the title. */
+  text?: string | null;
+  /** Something after the title, such as the "Destacada" chip. */
+  mark?: ReactNode;
 }
 
 /** One observation of the session: an icon tinted with its severity, a title in that colour and its text. */
-export default function ObservationItem({ severity, title, text }: ObservationItemProps) {
-  const { color, icon } = SEVERITIES[severity];
+export default function ObservationItem({ severity, title, text, mark }: ObservationItemProps) {
+  const { color, icon } = SEVERITIES[severity] ?? FALLBACK_SEVERITY;
 
   return (
     <Card variant="outlined" sx={{ display: "flex", gap: 1.5, p: 1.5 }}>
@@ -47,16 +53,21 @@ export default function ObservationItem({ severity, title, text }: ObservationIt
         {icon}
       </Box>
       <Box sx={{ minWidth: 0 }}>
-        <Typography
-          variant="subtitle2"
-          component="h3"
-          sx={{ color: `${color}.main`, fontWeight: 700 }}
-        >
-          {title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {text}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+          <Typography
+            variant="subtitle2"
+            component="h3"
+            sx={{ color: `${color}.main`, fontWeight: 700 }}
+          >
+            {title}
+          </Typography>
+          {mark}
+        </Box>
+        {text ? (
+          <Typography variant="body2" color="text.secondary">
+            {text}
+          </Typography>
+        ) : null}
       </Box>
     </Card>
   );

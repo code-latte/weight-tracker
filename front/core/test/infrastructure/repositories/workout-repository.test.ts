@@ -17,6 +17,8 @@ import {
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
+  type WorkoutObservation,
+  type WorkoutObservations,
   type WorkoutSummary,
 } from "../../../src/domain";
 import { HttpError, WorkoutRepository } from "../../../src/infrastructure";
@@ -75,6 +77,25 @@ const workoutDetail: WorkoutDetail = {
   ...workout,
   exercises: [workoutExercise],
 };
+
+/** The contract types `data` as `Record<string, never>`, so the numbers a fixture holds need this cast. */
+const dataOf = (values: Record<string, number | number[]>) => values as WorkoutObservation["data"];
+
+const workoutObservations: WorkoutObservations = {
+  observations: [
+    {
+      id: "a1b2c3d4-0000-4000-8000-000000000001",
+      code: "WORKOUT_INCOMPLETE",
+      severity: "WARNING",
+      exerciseId: null,
+      priority: null,
+      data: dataOf({ recordedSets: 9, prescribedSets: 15, completionPercent: 60 }),
+    },
+  ],
+  highlights: [],
+};
+
+const emptyObservations: WorkoutObservations = { observations: [], highlights: [] };
 
 const workoutSummary: WorkoutSummary = {
   workoutId: workout.id,
@@ -423,6 +444,71 @@ describe("WorkoutRepository", () => {
 
       // Act
       const result = await repository.getSummary(workout.id);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("getObservations", () => {
+    it("gets /workouts/{workoutId}/observations without a body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutObservations);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.getObservations(workout.id);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "GET", path: `/workouts/${workout.id}/observations` },
+      ]);
+    });
+
+    it("returns the observations on success, keeping every null", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutObservations));
+
+      // Act
+      const result = await repository.getObservations(workout.id);
+
+      // Assert
+      expect(result).toEqual(ok(workoutObservations));
+    });
+
+    it("returns both lists empty when the workout has none", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => emptyObservations));
+
+      // Act
+      const result = await repository.getObservations(workout.id);
+
+      // Assert
+      expect(result).toEqual(ok(emptyObservations));
+    });
+
+    it.each([
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.getObservations(workout.id);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.getObservations(workout.id);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

@@ -33,6 +33,8 @@ public class WeightTrackerDbContext : DbContext
 
     public DbSet<SetRecordEntity> SetRecords => Set<SetRecordEntity>();
 
+    public DbSet<WorkoutObservationEntity> WorkoutObservations => Set<WorkoutObservationEntity>();
+
     public DbSet<WorkoutTemplateEntity> WorkoutTemplates => Set<WorkoutTemplateEntity>();
 
     public DbSet<WorkoutTemplateExerciseEntity> WorkoutTemplateExercises => Set<WorkoutTemplateExerciseEntity>();
@@ -225,6 +227,45 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(setRecord => setRecord.Weight).HasColumnName("Weight").HasPrecision(6, 2);
             entity.Property(setRecord => setRecord.RegisterDatetimeUtc).HasColumnName("RegisterDatetimeUtc").HasColumnType("timestamptz");
             entity.HasIndex(setRecord => setRecord.WorkoutExerciseId);
+        });
+
+        modelBuilder.Entity<WorkoutObservationEntity>(entity =>
+        {
+            entity.ToTable("WorkoutObservations");
+            entity.HasKey(observation => observation.Id);
+            entity.Property(observation => observation.Id).HasColumnName("Id").ValueGeneratedNever();
+            entity.Property(observation => observation.WorkoutId).HasColumnName("WorkoutId");
+            entity.Property(observation => observation.ExerciseId).HasColumnName("ExerciseId");
+            entity.Property(observation => observation.Code).HasColumnName("Code").HasMaxLength(64).IsRequired();
+            entity.Property(observation => observation.Severity).HasColumnName("Severity").HasColumnType("smallint");
+            entity.Property(observation => observation.Priority).HasColumnName("Priority").HasColumnType("smallint");
+            entity.Property(observation => observation.HighlightRank).HasColumnName("HighlightRank").HasColumnType("smallint");
+            entity.Property(observation => observation.Data).HasColumnName("Data").HasColumnType("jsonb").IsRequired();
+            entity.Property(observation => observation.CreatedAt).HasColumnName("CreatedAt").HasColumnType("timestamptz");
+
+            // The Workout aggregate is referenced by identifier only: foreign key, no navigation
+            entity.HasOne<WorkoutEntity>()
+                .WithMany()
+                .HasForeignKey(observation => observation.WorkoutId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<ExerciseEntity>()
+                .WithMany()
+                .HasForeignKey(observation => observation.ExerciseId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(observation => new { observation.WorkoutId, observation.Code, observation.ExerciseId })
+                .IsUnique()
+                .AreNullsDistinct(false);
+
+            entity.HasIndex(observation => new { observation.WorkoutId, observation.HighlightRank })
+                .IsUnique()
+                .HasFilter("\"HighlightRank\" IS NOT NULL");
+
+            entity.HasIndex(observation => observation.ExerciseId);
+
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_WorkoutObservations_HighlightRank", "\"HighlightRank\" IS NULL OR \"HighlightRank\" BETWEEN 1 AND 3"));
         });
 
         modelBuilder.Entity<WorkoutTemplateEntity>(entity =>

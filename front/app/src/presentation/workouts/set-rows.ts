@@ -1,4 +1,3 @@
-import { minutesToText } from "@weight-tracker/core/application";
 import type {
   AddOrUpdateSetRecordRequest,
   SetRecord,
@@ -132,9 +131,17 @@ export function isRecordable(status: string | null | undefined): boolean {
   return status === "STARTED" || status === "COMPLETED";
 }
 
+/** The rest in whole seconds, rounded like `minutesToText` does, so `1.5` is `90`. */
+export function restSecondsOf(minutes: number | string): number {
+  return Math.round(Number(minutes) * 60);
+}
+
+/** Seconds as `M:SS`, so `90` reads `1:30` and `0` reads `0:00`. */
+export function countdownTextOf(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 /** The rest as `M:SS`, always with the seconds, so `1.5` reads `1:30` and `2` reads `2:00`. */
 export function restTimeOf(minutes: number | string): string {
-  const text = minutesToText(minutes);
-
-  return text.includes(":") ? text : `${text}:00`;
+  return countdownTextOf(restSecondsOf(minutes));
 }

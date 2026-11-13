@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
-import { Linking } from "react-native";
+import { AppState, Linking } from "react-native";
 import { DomainError, fail, ok } from "@weight-tracker/core/domain";
 import type {
   AddSetRecordInput,
@@ -19,10 +19,36 @@ import renderWithProviders from "../../../support/render-with-providers";
 const mockBack = jest.fn();
 const mockSetParams = jest.fn();
 let mockParams = { id: "wk1", exerciseId: "we1" };
+let mockUpdateRoute: ((params: Partial<typeof mockParams>) => void) | null = null;
+let mockSetKeyboardVisible: ((visible: boolean) => void) | null = null;
 
+// The route keeps its own copy of the params, so `setParams` switches the exercise the view shows.
 jest.mock("expo-router", () => ({
-  router: { back: () => mockBack(), setParams: (params: unknown) => mockSetParams(params) },
-  useLocalSearchParams: () => mockParams,
+  router: {
+    back: () => mockBack(),
+    setParams: (params: Partial<typeof mockParams>) => {
+      mockSetParams(params);
+      mockUpdateRoute?.(params);
+    },
+  },
+  useLocalSearchParams: () => {
+    const [params, setParams] = jest.requireActual("react").useState(mockParams);
+    mockUpdateRoute = (next) =>
+      setParams((current: typeof mockParams) => ({ ...current, ...next }));
+
+    return params;
+  },
+}));
+
+// The keyboard is not on screen under Jest: a test shows and hides it through `mockSetKeyboardVisible`.
+jest.mock("@/presentation/common/hooks/use-keyboard-visible", () => ({
+  __esModule: true,
+  default: () => {
+    const [visible, setVisible] = jest.requireActual("react").useState(false);
+    mockSetKeyboardVisible = setVisible;
+
+    return visible;
+  },
 }));
 
 // Paper's icons load their font through expo-font, which has no assets under Jest.
@@ -673,5 +699,323 @@ describe("WorkoutExerciseView", () => {
     expect(screen.getByText("Rest: 1:00")).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Back" })).toBeOnTheScreen();
     expect(within(screen.getByLabelText("Exercises")).getByText("Squat")).toBeOnTheScreen();
+  });
+});
+
+describe("WorkoutExerciseView rest countdown", () => {
+  // Only the interval is faked, so the screen is read and pressed with real timers. The clock is the test's own,
+  // moved by `elapse` / `lateTick` / `returnFromBackground` alongside the interval.
+  let clock = 0;
+  let nowSpy: jest.SpyInstance;
+  let appStateHandler: ((state: string) => void) | null = null;
+  let appStateSpy: jest.SpyInstance;
+
+  const oneMinute = () => workoutOf([exerciseOf("we1", { restMinutes: 1 })]);
+
+  async function renderRest(options: SetupOptions = {}) {
+    const fakes = await renderExercise({ workout: oneMinute(), ...options });
+    await screen.findByTestId("exercise-sets");
+    jest.useFakeTimers({
+      doNotFake: [
+        "Date",
+        "hrtime",
+        "nextTick",
+        "performance",
+        "queueMicrotask",
+        "requestAnimationFrame",
+        "cancelAnimationFrame",
+        "requestIdleCallback",
+        "cancelIdleCallback",
+        "setImmediate",
+        "clearImmediate",
+        "setTimeout",
+        "clearTimeout",
+      ],
+    });
+    clock = new Date(2026, 10, 9, 10, 0).getTime();
+    nowSpy = jest.spyOn(Date, "now").mockImplementation(() => clock);
+
+    return fakes;
+  }
+
+  const elapse = async (ms: number) => {
+    clock += ms;
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+  };
+
+  async function pressAndElapse(name: string, ms: number) {
+    await fireEvent.press(screen.getByRole("button", { name }));
+    await elapse(ms);
+  }
+
+  /** The clock moves on while the interval is held back, then one tick runs. */
+  const lateTick = async (ms: number) => {
+    clock += ms;
+    await act(async () => {
+      jest.advanceTimersByTime(250);
+    });
+  };
+
+  /** The clock moves on while the app is in the background, then the app becomes active. */
+  const returnFromBackground = async (ms: number) => {
+    clock += ms;
+    await act(async () => {
+      appStateHandler?.("active");
+    });
+  };
+
+  beforeEach(() => {
+    mockBack.mockClear();
+    mockSetParams.mockClear();
+    mockParams = { id: "wk1", exerciseId: "we1" };
+    appStateHandler = null;
+    appStateSpy = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, handler) => {
+      appStateHandler = handler as (state: string) => void;
+
+      return { remove: () => {} } as never;
+    });
+  });
+
+  afterEach(async () => {
+    jest.useRealTimers();
+    nowSpy?.mockRestore();
+    appStateSpy.mockRestore();
+    await act(async () => {
+      await i18n.changeLanguage("es");
+    });
+  });
+
+  it("offers play and a disabled reset when the exercise has rest", async () => {
+    // Arrange & Act
+    await renderRest();
+
+    // Assert
+    expect(screen.getByText("Descanso: 1:00")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Iniciar descanso" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reiniciar descanso" })).toBeDisabled();
+  });
+
+  it("offers no controls when the exercise has no rest", async () => {
+    // Arrange & Act
+    await renderRest({ workout: workoutOf([exerciseOf("we1", { restMinutes: null })]) });
+
+    // Assert
+    expect(screen.getByText("Sin descanso")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Iniciar descanso" })).not.toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Pausar descanso" })).not.toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Reiniciar descanso" })).not.toBeOnTheScreen();
+  });
+
+  it("offers play on a workout that is read-only", async () => {
+    // Arrange & Act
+    await renderRest({
+      workout: workoutOf([exerciseOf("we1", { restMinutes: 1 })], { status: "PUBLISHED" } as never),
+    });
+
+    // Assert
+    expect(screen.getByRole("button", { name: "Iniciar descanso" })).toBeEnabled();
+  });
+
+  it("counts down from the full rest once started and offers pause and reset", async () => {
+    // Arrange
+    await renderRest();
+
+    // Act
+    await pressAndElapse("Iniciar descanso", 5000);
+
+    // Assert
+    expect(screen.getByText("Descanso: 0:55")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Pausar descanso" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reiniciar descanso" })).toBeEnabled();
+  });
+
+  it("shows the remaining time in the band", async () => {
+    // Arrange
+    await renderRest({ workout: workoutOf([exerciseOf("we1", { restMinutes: 1.5 })]) });
+
+    // Act
+    await pressAndElapse("Iniciar descanso", 3000);
+
+    // Assert
+    expect(screen.getByText("Descanso: 1:27")).toBeOnTheScreen();
+  });
+
+  it("freezes the remaining time on pause", async () => {
+    // Arrange
+    await renderRest();
+    await pressAndElapse("Iniciar descanso", 5000);
+
+    // Act
+    await pressAndElapse("Pausar descanso", 10000);
+
+    // Assert
+    expect(screen.getByText("Descanso: 0:55")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Iniciar descanso" })).toBeEnabled();
+  });
+
+  it("resumes from the remaining time", async () => {
+    // Arrange
+    await renderRest();
+    await pressAndElapse("Iniciar descanso", 5000);
+    await pressAndElapse("Pausar descanso", 10000);
+
+    // Act
+    await pressAndElapse("Iniciar descanso", 5000);
+
+    // Assert
+    expect(screen.getByText("Descanso: 0:50")).toBeOnTheScreen();
+  });
+
+  it("restores the full rest when reset while running", async () => {
+    // Arrange
+    await renderRest();
+    await pressAndElapse("Iniciar descanso", 20000);
+
+    // Act
+    await pressAndElapse("Reiniciar descanso", 0);
+
+    // Assert
+    expect(screen.getByText("Descanso: 1:00")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Iniciar descanso" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reiniciar descanso" })).toBeDisabled();
+  });
+
+  it("restores the full rest when reset while paused, and stays there", async () => {
+    // Arrange
+    await renderRest();
+    await pressAndElapse("Iniciar descanso", 20000);
+    await pressAndElapse("Pausar descanso", 0);
+
+    // Act
+    await pressAndElapse("Reiniciar descanso", 10000);
+
+    // Assert
+    expect(screen.getByText("Descanso: 1:00")).toBeOnTheScreen();
+  });
+
+  it("stops at zero and says the rest finished", async () => {
+    // Arrange
+    await renderRest();
+    await fireEvent.press(screen.getByRole("button", { name: "Iniciar descanso" }));
+
+    // Act
+    await elapse(60000);
+
+    // Assert
+    expect(screen.getByText("Descanso terminado")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Iniciar descanso" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reiniciar descanso" })).toBeEnabled();
+  });
+
+  it("restores the full rest when reset after finishing", async () => {
+    // Arrange
+    await renderRest();
+    await pressAndElapse("Iniciar descanso", 60000);
+
+    // Act
+    await pressAndElapse("Reiniciar descanso", 0);
+
+    // Assert
+    expect(screen.getByText("Descanso: 1:00")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Iniciar descanso" })).toBeEnabled();
+  });
+
+  it("shows the right time after a late tick", async () => {
+    // Arrange
+    await renderRest();
+    await fireEvent.press(screen.getByRole("button", { name: "Iniciar descanso" }));
+
+    // Act
+    await lateTick(20000);
+
+    // Assert
+    expect(screen.getByText("Descanso: 0:40")).toBeOnTheScreen();
+  });
+
+  it("shows the right time when the app comes back from the background", async () => {
+    // Arrange
+    await renderRest();
+    await fireEvent.press(screen.getByRole("button", { name: "Iniciar descanso" }));
+
+    // Act
+    await returnFromBackground(30000);
+
+    // Assert
+    expect(screen.getByText("Descanso: 0:30")).toBeOnTheScreen();
+  });
+
+  it("says the rest finished when it ended in the background", async () => {
+    // Arrange
+    await renderRest();
+    await fireEvent.press(screen.getByRole("button", { name: "Iniciar descanso" }));
+
+    // Act
+    await returnFromBackground(90000);
+
+    // Assert
+    expect(screen.getByText("Descanso terminado")).toBeOnTheScreen();
+  });
+
+  it("keeps counting while the keyboard hides the card", async () => {
+    // Arrange
+    await renderRest();
+    await pressAndElapse("Iniciar descanso", 0);
+    await act(async () => mockSetKeyboardVisible?.(true));
+    await elapse(10000);
+
+    // Act
+    await act(async () => mockSetKeyboardVisible?.(false));
+
+    // Assert
+    expect(screen.getByText("Descanso: 0:50")).toBeOnTheScreen();
+  });
+
+  it("keeps counting after a set is saved", async () => {
+    // Arrange
+    const { addSetRecord } = await renderRest();
+    await pressAndElapse("Iniciar descanso", 10000);
+
+    // Act
+    await fireEvent.press(screen.getAllByRole("button", { name: "Guardar" })[0]!);
+
+    // Assert
+    expect(addSetRecord).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Descanso: 0:50")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Pausar descanso" })).toBeEnabled();
+  });
+
+  it("goes back to idle with the rest of the exercise the athlete switches to", async () => {
+    // Arrange
+    const workout = workoutOf([
+      exerciseOf("we1", { restMinutes: 1 }),
+      exerciseOf("we2", { translations: [{ languageCode: "es", name: "Remo" }], restMinutes: 2 }),
+    ]);
+    await renderRest({ workout });
+    await pressAndElapse("Iniciar descanso", 5000);
+
+    // Act
+    await fireEvent.press(within(screen.getByLabelText("Ejercicios")).getByText("Remo"));
+
+    // Assert
+    expect(screen.getByText("Descanso: 2:00")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Iniciar descanso" })).toBeEnabled();
+  });
+
+  it("follows the active language", async () => {
+    // Arrange
+    await renderRest();
+
+    // Act
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    // Assert
+    expect(screen.getByRole("button", { name: "Start rest" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Reset rest" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Start rest" }));
+    expect(screen.getByRole("button", { name: "Pause rest" })).toBeOnTheScreen();
   });
 });

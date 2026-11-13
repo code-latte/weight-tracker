@@ -64,6 +64,10 @@
     "weightInvalid": "Peso no válido.",
     "rest": "Descanso: {{time}}",
     "noRest": "Sin descanso",
+    "restFinished": "Descanso terminado",
+    "restPlay": "Iniciar descanso",
+    "restPause": "Pausar descanso",
+    "restReset": "Reiniciar descanso",
     "errors": {
       "CONFLICT": "No se puede registrar esta serie."
     }

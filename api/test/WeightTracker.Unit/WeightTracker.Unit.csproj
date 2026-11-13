@@ -44,6 +44,7 @@
     <ProjectReference Include="..\..\src\WeightTracker.Domain\WeightTracker.Domain.csproj" />
     <ProjectReference Include="..\..\src\WeightTracker.Application\WeightTracker.Application.csproj" />
     <ProjectReference Include="..\..\src\WeightTracker.Infra\WeightTracker.Infra.csproj" />
+    <ProjectReference Include="..\..\src\WeightTracker.Api\WeightTracker.Api.csproj" />
   </ItemGroup>
 
 </Project>

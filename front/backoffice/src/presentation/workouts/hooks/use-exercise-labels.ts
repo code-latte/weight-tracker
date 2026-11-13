@@ -120,7 +120,7 @@ export interface ExerciseLabelValues {
 
 interface ExerciseLabels {
   /** The name in the active language, else the first translation, else the exercise id. */
-  nameOf: (exercise: Exercise) => string;
+  nameOf: (exercise: Pick<Exercise, "id" | "translations">) => string;
   /**
    * The names the catalog finder looks in, joined by a space. With English selected, only the name shown, which is the
    * English one; with any other language, the name shown and the English name, so "Sentadilla" and "Squat" both find
@@ -159,7 +159,10 @@ interface ExerciseLabels {
    * An exercise's body part, filled with its colour, then its muscle, outlined in the same colour. The muscle is left
    * out when `withMuscle` is false, such as for a body part whose exercises all work one muscle.
    */
-  exerciseLabelsOf: (exercise: Exercise, withMuscle?: boolean) => ExerciseLabelValues[];
+  exerciseLabelsOf: (
+    exercise: Pick<Exercise, "bodyPart" | "muscle">,
+    withMuscle?: boolean,
+  ) => ExerciseLabelValues[];
 }
 
 /** The single place that turns catalog codes into text. An unknown code is shown as it comes. */
@@ -168,7 +171,7 @@ export default function useExerciseLabels(): ExerciseLabels {
   const language = i18n.language;
 
   const nameOf = useCallback(
-    (exercise: Exercise) =>
+    (exercise: Pick<Exercise, "id" | "translations">) =>
       (
         exercise.translations.find((translation) => translation.languageCode === language) ??
         exercise.translations[0]
@@ -245,7 +248,7 @@ export default function useExerciseLabels(): ExerciseLabels {
         const icon = typeIcon(code);
         return icon ? createElement(icon, { sx: { color: typeIconColor(code) } }) : undefined;
       },
-      exerciseLabelsOf: (exercise: Exercise, withMuscle = true) => {
+      exerciseLabelsOf: (exercise: Pick<Exercise, "bodyPart" | "muscle">, withMuscle = true) => {
         const color = bodyPartColor(exercise.bodyPart);
         const labels: ExerciseLabelValues[] = [
           { text: labelIn("bodyParts")(exercise.bodyPart), color, variant: "filled" },

@@ -211,6 +211,57 @@
     "savedAsTemplate": "Plantilla creada.",
     "viewTemplate": "Ver plantilla"
   },
+  "review": {
+    "title": "Revisión del entrenamiento",
+    "startedAt": "Inicio: {{time}}",
+    "notAvailable": "—",
+    "lastUpdate": "Última actualización: {{when}}",
+    "stats": {
+      "elapsed": "Tiempo transcurrido",
+      "setsDone": "Series completadas",
+      "exercisesDone": "Ejercicios terminados",
+      "volume": "Volumen registrado"
+    },
+    "progress": {
+      "title": "Progreso de la sesión",
+      "done": "{{count}} series realizadas",
+      "pending": "{{count}} pendientes"
+    },
+    "tabs": {
+      "label": "Secciones de la revisión",
+      "exercises": "Ejercicios",
+      "metrics": "Resumen y métricas",
+      "feedback": "Feedback"
+    },
+    "exercise": {
+      "completed": "Completado",
+      "inProgress": "En progreso",
+      "pending": "Pendiente"
+    },
+    "table": {
+      "set": "Serie",
+      "target": "Objetivo (plan)",
+      "done": "Realizado",
+      "rest": "Descanso",
+      "pending": "Pendiente"
+    },
+    "target": {
+      "Reps": "{{value}} reps",
+      "RepsRange": "{{value}}–{{max}} reps",
+      "MaxReps": "Máx. reps",
+      "Duration": "{{value}} s",
+      "Minutes": "{{value}} min",
+      "other": "{{value}}"
+    },
+    "done": {
+      "weighted": "{{reps}} × {{weight}} kg",
+      "reps": "{{reps}} reps",
+      "seconds": "{{seconds}} s"
+    },
+    "volumeValue": "{{value}} kg",
+    "expand": "Expandir {{name}}",
+    "collapse": "Contraer {{name}}"
+  },
   "muscles": {
     "ABDOMINALS": "Abdominales",
     "ABDUCTORS": "Abductores",

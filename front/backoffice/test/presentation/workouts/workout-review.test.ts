@@ -1,0 +1,369 @@
+import { describe, expect, it } from "vitest";
+import type { SetRecord, WorkoutById, WorkoutByIdExercise } from "@weight-tracker/core/domain";
+import {
+  countedRecordsOf,
+  exerciseStateOf,
+  initiallyExpandedOf,
+  isReviewStatus,
+  plannedRowsOf,
+  plannedSetsOf,
+  restOf,
+  reviewSummaryOf,
+} from "@/presentation/workouts/workout-review";
+
+function record(
+  id: string,
+  values: Partial<Pick<SetRecord, "reps" | "weight" | "durationSeconds">> = {},
+): SetRecord {
+  return {
+    id,
+    type: "Reps",
+    reps: null,
+    durationSeconds: null,
+    weight: null,
+    registeredAtUtc: "2026-11-10T10:00:00Z",
+    ...values,
+  };
+}
+
+function exercise(
+  id: string,
+  planned: number[],
+  records: SetRecord[] = [],
+  overrides: Partial<WorkoutByIdExercise> = {},
+): WorkoutByIdExercise {
+  return {
+    id,
+    exerciseId: `catalog-${id}`,
+    translations: [{ languageCode: "es", name: id }],
+    videoUrl: null,
+    muscle: "Quadriceps",
+    bodyPart: "Legs",
+    type: "STRENGTH",
+    effort: "",
+    perSide: false,
+    restMinutes: null,
+    sets: planned.map((count) => ({ count, target: { type: "Reps", value: 8 } })),
+    superSeriesId: null,
+    setRecords: records,
+    ...overrides,
+  } as WorkoutByIdExercise;
+}
+
+function workout(exercises: WorkoutByIdExercise[]): WorkoutById {
+  return { exercises } as WorkoutById;
+}
+
+describe("isReviewStatus", () => {
+  it.each(["STARTED", "COMPLETED", "REVIEWED"])("answers true for %s", (status) => {
+    // Arrange / Act
+    const result = isReviewStatus(status);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it.each(["DRAFT", "PUBLISHED", "ARCHIVED"])("answers false for %s", (status) => {
+    // Arrange / Act
+    const result = isReviewStatus(status);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+});
+
+describe("plannedSetsOf", () => {
+  it("sums the counts of every set group", () => {
+    // Arrange
+    const target = exercise("a", [2, 3]);
+
+    // Act
+    const result = plannedSetsOf(target);
+
+    // Assert
+    expect(result).toBe(5);
+  });
+
+  it("reads counts the contract types as strings", () => {
+    // Arrange
+    const target = exercise("a", []);
+    target.sets = [{ count: "4", target: { type: "Reps", value: 8 } }] as never;
+
+    // Act
+    const result = plannedSetsOf(target);
+
+    // Assert
+    expect(result).toBe(4);
+  });
+});
+
+describe("countedRecordsOf", () => {
+  it("discards the records beyond the planned sets", () => {
+    // Arrange
+    const target = exercise("a", [3], [record("1"), record("2"), record("3"), record("4")]);
+
+    // Act
+    const result = countedRecordsOf(target);
+
+    // Assert
+    expect(result.map(({ id }) => id)).toEqual(["1", "2", "3"]);
+  });
+
+  it("keeps every record while fewer than planned", () => {
+    // Arrange
+    const target = exercise("a", [4], [record("1")]);
+
+    // Act
+    const result = countedRecordsOf(target);
+
+    // Assert
+    expect(result).toHaveLength(1);
+  });
+});
+
+describe("exerciseStateOf", () => {
+  it("is completed when the counted records reach the planned sets", () => {
+    // Arrange
+    const target = exercise("a", [2], [record("1"), record("2"), record("3")]);
+
+    // Act
+    const result = exerciseStateOf(target);
+
+    // Assert
+    expect(result).toBe("completed");
+  });
+
+  it("is in progress with some records", () => {
+    // Arrange
+    const target = exercise("a", [4], [record("1")]);
+
+    // Act
+    const result = exerciseStateOf(target);
+
+    // Assert
+    expect(result).toBe("inProgress");
+  });
+
+  it("is pending without records", () => {
+    // Arrange
+    const target = exercise("a", [3]);
+
+    // Act
+    const result = exerciseStateOf(target);
+
+    // Assert
+    expect(result).toBe("pending");
+  });
+
+  it("is pending with no planned sets, even with records", () => {
+    // Arrange
+    const target = exercise("a", [], [record("1")]);
+
+    // Act
+    const result = exerciseStateOf(target);
+
+    // Assert
+    expect(result).toBe("pending");
+  });
+});
+
+describe("reviewSummaryOf", () => {
+  it("counts sets and exercises across the workout", () => {
+    // Arrange
+    const target = workout([
+      exercise("a", [3], [record("1"), record("2"), record("3")]),
+      exercise("b", [4], [record("4")]),
+      exercise("c", [3]),
+    ]);
+
+    // Act
+    const result = reviewSummaryOf(target);
+
+    // Assert
+    expect(result).toMatchObject({
+      planned: 10,
+      counted: 4,
+      pending: 6,
+      percent: 40,
+      completedExercises: 1,
+      totalExercises: 3,
+    });
+  });
+
+  it("rounds the percentage", () => {
+    // Arrange
+    const records = Array.from({ length: 8 }, (_, index) => record(String(index)));
+    const target = workout([exercise("a", [29], records)]);
+
+    // Act
+    const result = reviewSummaryOf(target);
+
+    // Assert
+    expect(result).toMatchObject({ percent: 28, pending: 21 });
+  });
+
+  it("answers 0% when nothing is planned", () => {
+    // Arrange
+    const target = workout([exercise("a", [])]);
+
+    // Act
+    const result = reviewSummaryOf(target);
+
+    // Assert
+    expect(result).toMatchObject({ planned: 0, percent: 0, pending: 0 });
+  });
+
+  it("sums reps by weight and ignores timed and weightless records", () => {
+    // Arrange
+    const target = workout([
+      exercise(
+        "a",
+        [4],
+        [
+          record("1", { reps: 8, weight: 80 }),
+          record("2", { reps: 8, weight: 85 }),
+          record("3", { durationSeconds: 60 }),
+          record("4", { reps: 10 }),
+        ],
+      ),
+    ]);
+
+    // Act
+    const result = reviewSummaryOf(target);
+
+    // Assert
+    expect(result.volumeKg).toBe(1320);
+  });
+
+  it("leaves a discarded record out of the volume", () => {
+    // Arrange
+    const target = workout([
+      exercise(
+        "a",
+        [1],
+        [record("1", { reps: 5, weight: 100 }), record("2", { reps: 5, weight: 100 })],
+      ),
+    ]);
+
+    // Act
+    const result = reviewSummaryOf(target);
+
+    // Assert
+    expect(result.volumeKg).toBe(500);
+  });
+
+  it("does not double a per-side exercise", () => {
+    // Arrange
+    const target = workout([
+      exercise("a", [1], [record("1", { reps: 10, weight: 20 })], { perSide: true }),
+    ]);
+
+    // Act
+    const result = reviewSummaryOf(target);
+
+    // Assert
+    expect(result.volumeKg).toBe(200);
+  });
+});
+
+describe("plannedRowsOf", () => {
+  it("expands the set groups and pairs the counted records in order", () => {
+    // Arrange
+    const target = exercise("a", [2, 2], [record("1"), record("2"), record("3")]);
+
+    // Act
+    const result = plannedRowsOf(target);
+
+    // Assert
+    expect(result.map(({ number }) => number)).toEqual([1, 2, 3, 4]);
+    expect(result.map(({ record: paired }) => paired?.id ?? null)).toEqual(["1", "2", "3", null]);
+  });
+
+  it("adds no row for a discarded record", () => {
+    // Arrange
+    const target = exercise("a", [1], [record("1"), record("2")]);
+
+    // Act
+    const result = plannedRowsOf(target);
+
+    // Assert
+    expect(result).toHaveLength(1);
+  });
+
+  it("keeps each group's target on its rows", () => {
+    // Arrange
+    const target = exercise("a", [1, 1]);
+    target.sets = [
+      { count: 1, target: { type: "Reps", value: 8 } },
+      { count: 1, target: { type: "MaxReps" } },
+    ] as never;
+
+    // Act
+    const result = plannedRowsOf(target);
+
+    // Assert
+    expect(result.map(({ target: rowTarget }) => rowTarget.type)).toEqual(["Reps", "MaxReps"]);
+  });
+});
+
+describe("initiallyExpandedOf", () => {
+  it("picks the first exercise in progress", () => {
+    // Arrange
+    const exercises = [
+      exercise("a", [1], [record("1")]),
+      exercise("b", [2], [record("2")]),
+      exercise("c", [2]),
+    ];
+
+    // Act
+    const result = initiallyExpandedOf(exercises);
+
+    // Assert
+    expect(result).toBe("b");
+  });
+
+  it("picks the first not completed one when none is in progress", () => {
+    // Arrange
+    const exercises = [exercise("a", [1], [record("1")]), exercise("b", [2]), exercise("c", [2])];
+
+    // Act
+    const result = initiallyExpandedOf(exercises);
+
+    // Assert
+    expect(result).toBe("b");
+  });
+
+  it("picks none when every exercise is completed", () => {
+    // Arrange
+    const exercises = [exercise("a", [1], [record("1")])];
+
+    // Act
+    const result = initiallyExpandedOf(exercises);
+
+    // Assert
+    expect(result).toBeNull();
+  });
+});
+
+describe("restOf", () => {
+  it.each([
+    [2, "2:00"],
+    [1.5, "1:30"],
+    [0.75, "0:45"],
+    ["3", "3:00"],
+  ])("answers %s minutes as %s", (minutes, expected) => {
+    // Arrange / Act
+    const result = restOf(minutes);
+
+    // Assert
+    expect(result).toBe(expected);
+  });
+
+  it("answers null without a rest", () => {
+    // Arrange / Act
+    const result = restOf(null);
+
+    // Assert
+    expect(result).toBeNull();
+  });
+});

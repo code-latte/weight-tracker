@@ -3,6 +3,7 @@ import {
   type CreatedUserResponse,
   type CreateUserRequest,
   type DomainError,
+  type ExerciseHistorySession,
   type ExerciseLastPerformance,
   fail,
   ok,
@@ -55,6 +56,23 @@ export default class UserRepository implements UserRepositoryInterface {
 
       // The API answers 204 with no body when the user never finished a workout with the exercise.
       return ok(response ?? null);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async getExerciseHistory(
+    userId: string,
+    exerciseId: string,
+    limit: number,
+  ): Promise<Result<ExerciseHistorySession[], DomainError>> {
+    try {
+      const response = await this.httpClient.request<ExerciseHistorySession[]>({
+        method: "GET",
+        path: `/users/${userId}/exercises/${exerciseId}/history?limit=${limit}`,
+      });
+
+      return ok(response);
     } catch (error) {
       return fail(mapHttpError(error));
     }

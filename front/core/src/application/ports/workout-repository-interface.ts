@@ -18,11 +18,14 @@ import type {
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
+  WorkoutSummary,
 } from "../../domain";
 
 export default interface WorkoutRepositoryInterface {
   getAll(query?: GetWorkoutsInput): Promise<Result<WorkoutListItem[], DomainError>>;
   getById(id: string): Promise<Result<WorkoutById, DomainError>>;
+  /** The stats the API computes for a workout: sets in target, volume, and per exercise its top set and previous execution. */
+  getSummary(workoutId: string): Promise<Result<WorkoutSummary, DomainError>>;
   create(request: CreateWorkoutRequest): Promise<Result<Workout, DomainError>>;
   update(id: string, request: UpdateWorkoutRequest): Promise<Result<Workout, DomainError>>;
   delete(id: string): Promise<Result<void, DomainError>>;

@@ -49,7 +49,9 @@ import {
   GetSessionUseCase,
   GetTrainerAthletesUseCase,
   GetUsersUseCase,
+  GetUserExerciseHistoryUseCase,
   GetWorkoutByIdUseCase,
+  GetWorkoutSummaryUseCase,
   GetWorkoutsUseCase,
   InviteAthleteUseCase,
   LinkAthleteToTrainerUseCase,
@@ -125,6 +127,8 @@ const container = new Container<Dependencies>({
   getUserTrainerUseCase: (c) => new GetUserTrainerUseCase(c.resolve("userRepository")),
   getMyExerciseLastPerformanceUseCase: (c) =>
     new GetMyExerciseLastPerformanceUseCase(c.resolve("userRepository")),
+  getUserExerciseHistoryUseCase: (c) =>
+    new GetUserExerciseHistoryUseCase(c.resolve("userRepository")),
   updateMyProfileUseCase: (c) => new UpdateMyProfileUseCase(c.resolve("userRepository")),
   getUsersUseCase: (c) => new GetUsersUseCase(c.resolve("userRepository")),
   createUserUseCase: (c) => new CreateUserUseCase(c.resolve("userRepository")),
@@ -132,6 +136,7 @@ const container = new Container<Dependencies>({
   deactivateUserUseCase: (c) => new DeactivateUserUseCase(c.resolve("userRepository")),
   getWorkoutsUseCase: (c) => new GetWorkoutsUseCase(c.resolve("workoutRepository")),
   getWorkoutByIdUseCase: (c) => new GetWorkoutByIdUseCase(c.resolve("workoutRepository")),
+  getWorkoutSummaryUseCase: (c) => new GetWorkoutSummaryUseCase(c.resolve("workoutRepository")),
   createWorkoutUseCase: (c) => new CreateWorkoutUseCase(c.resolve("workoutRepository")),
   updateWorkoutUseCase: (c) => new UpdateWorkoutUseCase(c.resolve("workoutRepository")),
   deleteWorkoutUseCase: (c) => new DeleteWorkoutUseCase(c.resolve("workoutRepository")),

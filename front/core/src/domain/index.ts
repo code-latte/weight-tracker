@@ -13,7 +13,9 @@ export type {
 export type {
   CreatedUserResponse,
   CreateUserRequest,
+  ExerciseHistorySession,
   ExerciseLastPerformance,
+  GetUserExerciseHistoryInput,
   LastPerformanceSet,
   UpdateProfileRequest,
   UserActivationSummary,
@@ -32,8 +34,11 @@ export type {
   CreateSuperSeriesRequest,
   CreateWorkoutRequest,
   DeleteWorkoutInput,
+  ExerciseSummary,
   GetWorkoutByIdInput,
+  GetWorkoutSummaryInput,
   GetWorkoutsInput,
+  PreviousExecution,
   RemoveExerciseFromWorkoutInput,
   RemoveSetRecordInput,
   ReorderSetRecordsInput,
@@ -44,6 +49,7 @@ export type {
   ReviewWorkoutRequest,
   SetPrescription,
   SetRecord,
+  SetsInTarget,
   SuperSeries,
   SuperSeriesId,
   UpdateSetRecordInput,
@@ -58,6 +64,7 @@ export type {
   WorkoutListItem,
   WorkoutMesocycle,
   WorkoutStatus,
+  WorkoutSummary,
 } from "./workouts/workout";
 export type {
   AddExerciseToWorkoutTemplateInput,

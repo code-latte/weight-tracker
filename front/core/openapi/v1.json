@@ -10452,6 +10452,7 @@
           "exercises",
           "mesocycleId",
           "mesocycleWeekNumber",
+          "startedAt",
           "completedAt",
           "reviewedAt",
           "reviewedBy",
@@ -10514,6 +10515,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "completedAt": {
             "type": [
@@ -10580,6 +10588,7 @@
           "exercises",
           "mesocycleId",
           "mesocycleWeekNumber",
+          "startedAt",
           "completedAt",
           "reviewedAt",
           "reviewedBy",
@@ -10639,6 +10648,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "completedAt": {
             "type": [
@@ -10814,6 +10830,7 @@
           "trainer",
           "mesocycleId",
           "mesocycleWeekNumber",
+          "startedAt",
           "completedAt",
           "reviewedAt",
           "reviewedBy",
@@ -10886,6 +10903,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "completedAt": {
             "type": [
@@ -10970,6 +10994,7 @@
           "exercises",
           "mesocycleId",
           "mesocycleWeekNumber",
+          "startedAt",
           "completedAt",
           "reviewedAt",
           "reviewedBy",
@@ -11029,6 +11054,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "completedAt": {
             "type": [

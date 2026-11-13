@@ -883,6 +883,25 @@ public class WorkoutRepositoryTests : IntegrationTest
     }
 
     [Fact]
+    public async Task Save_ShouldPersistTheStartTimeOfAStoredAggregate()
+    {
+        // Arrange
+        var workout = AStartedWorkoutWith(PressBanca);
+        await Write(repository => repository.Save(workout, CancellationToken.None));
+
+        var reloaded = await Read(workout.Id);
+        reloaded!.OverrideStatus(WorkoutStatus.STARTED, CompletedAt);
+        await Write(repository => repository.Save(reloaded, CancellationToken.None));
+
+        // Act
+        var stored = await Read(workout.Id);
+
+        // Assert
+        stored!.Status.Should().Be(WorkoutStatus.STARTED);
+        stored.StartedAt.Should().Be(CompletedAt);
+    }
+
+    [Fact]
     public async Task Save_ShouldPersistTheReviewAndTheResultsTime()
     {
         // Arrange

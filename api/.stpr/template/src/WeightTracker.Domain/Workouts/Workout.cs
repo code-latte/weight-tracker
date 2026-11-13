@@ -45,6 +45,12 @@ public sealed class Workout : AggregateRoot
     public bool IsExecuted => Status is WorkoutStatus.STARTED or WorkoutStatus.COMPLETED or WorkoutStatus.REVIEWED;
 
     /// <summary>
+    /// Last time the workout reached started, in UTC, <c>null</c> until it is first started.
+    /// Leaving started keeps it. Workouts started before this date existed carry an estimate.
+    /// </summary>
+    public DateTime? StartedAt { get; private set; }
+
+    /// <summary>
     /// Last time the workout reached completed, in UTC, <c>null</c> until it is first completed.
     /// Leaving completed keeps it, so the status tells whether the workout is completed now.
     /// </summary>
@@ -163,7 +169,8 @@ public sealed class Workout : AggregateRoot
         DateTime? reviewedAt = null,
         Id? reviewedBy = null,
         DateTime? resultsUpdatedAt = null,
-        DateTime? completedAt = null
+        DateTime? completedAt = null,
+        DateTime? startedAt = null
     )
     {
         EnsureDefined(status);
@@ -201,6 +208,7 @@ public sealed class Workout : AggregateRoot
             ReviewedBy = reviewedBy,
             ResultsUpdatedAt = resultsUpdatedAt,
             CompletedAt = completedAt,
+            StartedAt = startedAt,
         };
     }
 
@@ -271,7 +279,7 @@ public sealed class Workout : AggregateRoot
     /// A completed workout becomes reviewed only through <see cref="MarkReviewed"/>.
     /// </summary>
     /// <param name="target">Status to move to</param>
-    /// <param name="changedAtUtc">When the change happens, in UTC. Recorded as <see cref="CompletedAt"/> when completing.</param>
+    /// <param name="changedAtUtc">When the change happens, in UTC. Recorded as <see cref="StartedAt"/> when starting and as <see cref="CompletedAt"/> when completing.</param>
     /// <exception cref="InvalidWorkoutStatusException">When the target is not a defined value.</exception>
     /// <exception cref="InvalidWorkoutStatusTransitionException">When the move is not part of the lifecycle.</exception>
     public void ChangeStatus(WorkoutStatus target, DateTime changedAtUtc)
@@ -304,7 +312,7 @@ public sealed class Workout : AggregateRoot
     /// unlocking a reviewed workout needs its own audited operation.
     /// </summary>
     /// <param name="target">Status to set</param>
-    /// <param name="changedAtUtc">When the change happens, in UTC. Recorded as <see cref="CompletedAt"/> when completing.</param>
+    /// <param name="changedAtUtc">When the change happens, in UTC. Recorded as <see cref="StartedAt"/> when starting and as <see cref="CompletedAt"/> when completing.</param>
     /// <exception cref="InvalidWorkoutStatusException">When the target is not a defined value.</exception>
     /// <exception cref="InvalidWorkoutStatusTransitionException">When the target or the current status is reviewed.</exception>
     public void OverrideStatus(WorkoutStatus target, DateTime changedAtUtc)
@@ -321,7 +329,10 @@ public sealed class Workout : AggregateRoot
     {
         Status = target;
 
-        // Every completion overwrites the date; any other status keeps the last one
+        // Every start and every completion overwrites its date; any other status keeps the last ones
+        if (target == WorkoutStatus.STARTED)
+            StartedAt = ToStoredPrecision(changedAtUtc);
+
         if (target == WorkoutStatus.COMPLETED)
             CompletedAt = ToStoredPrecision(changedAtUtc);
     }

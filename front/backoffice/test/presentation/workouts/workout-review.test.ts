@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { SetRecord, WorkoutById, WorkoutByIdExercise } from "@weight-tracker/core/domain";
 import {
   countedRecordsOf,
+  elapsedMsOf,
+  elapsedPartsOf,
   exerciseStateOf,
   initiallyExpandedOf,
   isReviewStatus,
@@ -365,5 +367,109 @@ describe("restOf", () => {
 
     // Assert
     expect(result).toBeNull();
+  });
+});
+
+describe("elapsedMsOf", () => {
+  const minute = 60_000;
+  const startedAt = "2026-11-13T10:00:00Z";
+  const now = Date.parse(startedAt) + 25 * minute;
+
+  it("counts from the start to now while the workout is started", () => {
+    // Arrange
+    const workout = { status: "STARTED", startedAt, completedAt: null };
+
+    // Act
+    const result = elapsedMsOf(workout, now);
+
+    // Assert
+    expect(result).toBe(25 * minute);
+  });
+
+  it.each(["COMPLETED", "REVIEWED"])(
+    "counts from the start to the completion when %s",
+    (status) => {
+      // Arrange
+      const workout = { status, startedAt, completedAt: "2026-11-13T11:05:00Z" };
+
+      // Act
+      const result = elapsedMsOf(workout, now);
+
+      // Assert
+      expect(result).toBe(65 * minute);
+    },
+  );
+
+  it.each(["STARTED", "COMPLETED", "REVIEWED"])(
+    "answers null without a start when %s",
+    (status) => {
+      // Arrange
+      const workout = { status, startedAt: null, completedAt: "2026-11-13T11:05:00Z" };
+
+      // Act
+      const result = elapsedMsOf(workout, now);
+
+      // Assert
+      expect(result).toBeNull();
+    },
+  );
+
+  it.each(["COMPLETED", "REVIEWED"])("answers null without a completion when %s", (status) => {
+    // Arrange
+    const workout = { status, startedAt, completedAt: null };
+
+    // Act
+    const result = elapsedMsOf(workout, now);
+
+    // Assert
+    expect(result).toBeNull();
+  });
+
+  it("answers null when the completion is before the start", () => {
+    // Arrange
+    const workout = { status: "COMPLETED", startedAt, completedAt: "2026-11-13T09:00:00Z" };
+
+    // Act
+    const result = elapsedMsOf(workout, now);
+
+    // Assert
+    expect(result).toBeNull();
+  });
+
+  it("answers null when the start is in the future while the workout is started", () => {
+    // Arrange
+    const workout = { status: "STARTED", startedAt, completedAt: null };
+
+    // Act
+    const result = elapsedMsOf(workout, Date.parse(startedAt) - minute);
+
+    // Assert
+    expect(result).toBeNull();
+  });
+
+  it.each(["DRAFT", "PUBLISHED"])("answers null when the status is %s", (status) => {
+    // Arrange
+    const workout = { status, startedAt, completedAt: "2026-11-13T11:05:00Z" };
+
+    // Act
+    const result = elapsedMsOf(workout, now);
+
+    // Assert
+    expect(result).toBeNull();
+  });
+});
+
+describe("elapsedPartsOf", () => {
+  it.each([
+    [30_000, 0, 0],
+    [12 * 60_000 + 59_000, 0, 12],
+    [60 * 60_000, 1, 0],
+    [2 * 3_600_000 + 3 * 60_000 + 59_000, 2, 3],
+  ])("splits %i ms into %i h and %i min, truncating the seconds", (ms, hours, minutes) => {
+    // Arrange / Act
+    const result = elapsedPartsOf(ms);
+
+    // Assert
+    expect(result).toEqual({ hours, minutes });
   });
 });

@@ -152,8 +152,9 @@ answers with, unchanged. It SHALL NOT filter, sort or check the caller's role.
 ### Requirement: Reading a workout by id returns it with its exercises
 
 Reading a workout SHALL send `GET /workouts/{id}` with the given workout id in the path and no body, and SHALL return a
-successful result holding the workout, its exercises with their set records, its placement, its review fields
-(`reviewedAt`, `reviewedBy`, `resultsUpdatedAt`) and its athlete and trainer profiles as the API answers them.
+successful result holding the workout, its exercises with their set records, its placement, its session dates
+(`startedAt`, `completedAt`), its review fields (`reviewedAt`, `reviewedBy`, `resultsUpdatedAt`) and its athlete and
+trainer profiles as the API answers them.
 
 #### Scenario: Workout read
 
@@ -170,6 +171,11 @@ successful result holding the workout, its exercises with their set records, its
 
 - **WHEN** the API answers with a reviewed workout whose exercise holds two set records
 - **THEN** the result's workout holds both set records in the order the API answered, and its `reviewedAt`, `reviewedBy` and `resultsUpdatedAt` unchanged
+
+#### Scenario: Workout read with its session dates
+
+- **WHEN** the API answers with a completed workout whose `startedAt` and `completedAt` are set
+- **THEN** the result's workout holds both dates unchanged
 
 #### Scenario: Unknown workout
 

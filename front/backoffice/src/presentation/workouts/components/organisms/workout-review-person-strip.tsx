@@ -14,6 +14,8 @@ interface WorkoutReviewPersonStripProps {
   athlete: PersonCardProps;
   /** `null` leaves the trainer out. */
   trainer: PersonCardProps | null;
+  /** When the athlete started the workout, or `null` when it has no start time. */
+  startedAt: string | null;
   /** When the athlete's results last changed, or `null` when they never did. */
   resultsUpdatedAt: string | null;
 }
@@ -53,6 +55,7 @@ function Fact({ icon, children }: { icon: ReactNode; children: ReactNode }) {
 export default function WorkoutReviewPersonStrip({
   athlete,
   trainer,
+  startedAt,
   resultsUpdatedAt,
 }: WorkoutReviewPersonStripProps) {
   const { t, i18n } = useTranslation("workouts");
@@ -71,7 +74,15 @@ export default function WorkoutReviewPersonStrip({
         sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 3, ml: { md: "auto" } }}
       >
         <Fact icon={<CalendarTodayOutlined fontSize="small" />}>
-          {t("review.startedAt", { time: t("review.notAvailable") })}
+          {t("review.startedAt", {
+            time:
+              startedAt === null
+                ? t("review.notAvailable")
+                : new Intl.DateTimeFormat(i18n.language, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(startedAt)),
+          })}
         </Fact>
         {resultsUpdatedAt !== null && (
           <Fact icon={<UpdateOutlined fontSize="small" />}>

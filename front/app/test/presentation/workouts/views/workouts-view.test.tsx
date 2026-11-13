@@ -65,6 +65,7 @@ function workout(
     trainer: prescribed ? trainer : null,
     mesocycleId: null,
     mesocycleWeekNumber: null,
+    startedAt: null,
     completedAt,
     reviewedAt: null,
     reviewedBy: null,

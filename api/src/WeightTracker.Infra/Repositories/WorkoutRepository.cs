@@ -83,6 +83,7 @@ public class WorkoutRepository : IWorkoutRepository
         tracked.ReviewedAtUtc = entity.ReviewedAtUtc;
         tracked.ReviewedBy = entity.ReviewedBy;
         tracked.ResultsUpdatedAtUtc = entity.ResultsUpdatedAtUtc;
+        tracked.StartedAtUtc = entity.StartedAtUtc;
         tracked.CompletedAtUtc = entity.CompletedAtUtc;
 
         // Compare against the version the caller decided on, not the one just re-read

@@ -232,6 +232,9 @@ These rules decide who may perform an operation. They are permissions, so they l
   - the athlete of a workout without trainer may make every lifecycle move;
   - anyone else is rejected with `UnauthorizedOperationException` (403). A valid move the caller's role cannot make
     is 403; a move outside the lifecycle is 409.
+  - Every move to `STARTED`, through the lifecycle or an admin override, records the server time as `StartedAt`,
+    overwriting any earlier start. Other moves keep it, so leaving `STARTED` does not clear it. Workouts started
+    before the field existed carry an estimate set by its migration.
   - Every move to `COMPLETED`, through the lifecycle or an admin override, records the server time as `CompletedAt`,
     overwriting any earlier completion. Other moves keep it, so leaving `COMPLETED` does not clear it. The caller
     passes the time in; the aggregate never reads the clock.

@@ -24,6 +24,7 @@ const workoutDetail: WorkoutById = {
   status: "DRAFT",
   mesocycleId: "8c3e4f2a-1b7d-4c75-8e9f-2f8b9e3c4d5e",
   mesocycleWeekNumber: 2,
+  startedAt: null,
   completedAt: null,
   reviewedAt: null,
   reviewedBy: null,

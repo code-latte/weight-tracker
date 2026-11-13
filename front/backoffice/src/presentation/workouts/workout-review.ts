@@ -115,3 +115,32 @@ export function restOf(restMinutes: WorkoutByIdExercise["restMinutes"]): string 
 
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
+
+/**
+ * How long the session lasted: since it started while it is in progress, between its start and its completion once
+ * it is over. `null` when a needed date is missing, when the dates are out of order or for any other status.
+ */
+export function elapsedMsOf(
+  workout: Pick<WorkoutById, "status" | "startedAt" | "completedAt">,
+  now: number,
+): number | null {
+  const startedAt = workout.startedAt ? Date.parse(workout.startedAt) : Number.NaN;
+  let end = Number.NaN;
+
+  if (workout.status === "STARTED") {
+    end = now;
+  } else if (workout.status === "COMPLETED" || workout.status === "REVIEWED") {
+    end = workout.completedAt ? Date.parse(workout.completedAt) : Number.NaN;
+  }
+
+  const elapsed = end - startedAt;
+
+  return Number.isNaN(elapsed) || elapsed < 0 ? null : elapsed;
+}
+
+/** A duration in whole hours and minutes; the seconds are truncated. */
+export function elapsedPartsOf(ms: number): { hours: number; minutes: number } {
+  const totalMinutes = Math.floor(ms / 60_000);
+
+  return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 };
+}

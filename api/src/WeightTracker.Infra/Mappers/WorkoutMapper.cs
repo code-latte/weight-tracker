@@ -28,6 +28,7 @@ public static class WorkoutMapper
             ReviewedAtUtc = workout.ReviewedAt,
             ReviewedBy = workout.ReviewedBy?.Value,
             ResultsUpdatedAtUtc = workout.ResultsUpdatedAt,
+            StartedAtUtc = workout.StartedAt,
             CompletedAtUtc = workout.CompletedAt,
         };
 
@@ -132,7 +133,8 @@ public static class WorkoutMapper
                 entity.ReviewedAtUtc,
                 entity.ReviewedBy is null ? null : Id.From(entity.ReviewedBy.Value),
                 entity.ResultsUpdatedAtUtc,
-                entity.CompletedAtUtc);
+                entity.CompletedAtUtc,
+                entity.StartedAtUtc);
         }
         catch (DomainException exception)
         {

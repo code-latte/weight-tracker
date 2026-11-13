@@ -216,6 +216,11 @@
     "startedAt": "Inicio: {{time}}",
     "notAvailable": "—",
     "lastUpdate": "Última actualización: {{when}}",
+    "elapsed": {
+      "hours": "{{hours}} h {{minutes}} min",
+      "minutes": "{{minutes}} min",
+      "lessThanOne": "< 1 min"
+    },
     "stats": {
       "elapsed": "Tiempo transcurrido",
       "setsDone": "Series completadas",

@@ -31,6 +31,7 @@ const workoutDetail: WorkoutDetail = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  startedAt: null,
   completedAt: null,
   reviewedAt: null,
   reviewedBy: null,

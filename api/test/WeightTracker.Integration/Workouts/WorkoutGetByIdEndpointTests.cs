@@ -424,6 +424,22 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
     }
 
     [Fact]
+    public async Task Get_ShouldShowTheStartDateOfAStartedWorkout()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.PrescribedDraftWorkoutId, "STARTED");
+
+        // Act
+        var response = await Get(SeedCredentials.User, SeedData.PrescribedDraftWorkoutId);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("status").GetString().Should().Be("STARTED");
+        body.GetProperty("startedAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
     public async Task Get_ShouldReturnEmptyReviewAndResultsForAWorkoutThatNeverHadThem()
     {
         // Arrange & Act
@@ -435,6 +451,7 @@ public class WorkoutGetByIdEndpointTests : WorkoutEndpointTest
         body.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.Null);
         body.GetProperty("reviewedBy").ValueKind.Should().Be(JsonValueKind.Null);
         body.GetProperty("resultsUpdatedAt").ValueKind.Should().Be(JsonValueKind.Null);
+        body.GetProperty("startedAt").ValueKind.Should().Be(JsonValueKind.Null);
         body.GetProperty("completedAt").ValueKind.Should().Be(JsonValueKind.Null);
     }
 

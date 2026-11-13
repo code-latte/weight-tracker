@@ -8615,13 +8615,18 @@
         }
       },
       "AddOrUpdateSetRecordRequest": {
-        "required": [
-          "reps",
-          "weight"
-        ],
         "type": "object",
         "properties": {
           "reps": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "durationSeconds": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
@@ -9640,7 +9645,9 @@
       "SetRecordResponse": {
         "required": [
           "id",
+          "type",
           "reps",
+          "durationSeconds",
           "weight",
           "registeredAtUtc"
         ],
@@ -9650,9 +9657,22 @@
             "type": "string",
             "format": "uuid"
           },
+          "type": {
+            "type": "string"
+          },
           "reps": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "durationSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -9661,6 +9681,7 @@
           "weight": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
+              "null",
               "number",
               "string"
             ],

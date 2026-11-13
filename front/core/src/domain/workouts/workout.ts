@@ -52,12 +52,12 @@ export type ReorderWorkoutExercisesInput = ReorderWorkoutExercisesRequest & { wo
 export type CreateSuperSeriesInput = { workoutId: string; exerciseIds: string[] };
 /** Both ids travel in the path. */
 export type BreakSuperSeriesInput = { workoutId: string; superSeriesId: SuperSeriesId };
-/** Both ids travel in the path, `reps` and `weight` in the body; `exerciseId` is the catalog exercise. */
+/** Both ids travel in the path; the body holds `reps` or `durationSeconds` and an optional `weight`. `exerciseId` is the catalog exercise. */
 export type AddSetRecordInput = AddOrUpdateSetRecordRequest & {
   workoutId: string;
   exerciseId: string;
 };
-/** The three ids travel in the path, `reps` and `weight` in the body; `exerciseId` is the catalog exercise. */
+/** The three ids travel in the path; the body holds `reps` or `durationSeconds` and an optional `weight`. `exerciseId` is the catalog exercise. */
 export type UpdateSetRecordInput = AddOrUpdateSetRecordRequest & {
   workoutId: string;
   exerciseId: string;

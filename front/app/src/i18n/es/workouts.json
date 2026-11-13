@@ -35,6 +35,65 @@
       "strength": "Fuerza",
       "cardio": "Cardio",
       "stretching": "Estiramiento"
+    },
+    "start": "Iniciar entrenamiento",
+    "finish": "Finalizar entrenamiento",
+    "finished": "Finalizado",
+    "finishDialog": {
+      "title": "¿Finalizar el entrenamiento?",
+      "message": "Se enviará a tu entrenador para su revisión. Podrás cambiar los registros hasta que lo revise.",
+      "messageNoTrainer": "Quedará completado. Podrás seguir cambiando los registros.",
+      "confirm": "Finalizar",
+      "cancel": "Cancelar"
     }
+  },
+  "exercise": {
+    "navigator": "Ejercicios",
+    "target": {
+      "reps": "{{count}} reps",
+      "range": "{{min}}–{{max}} reps",
+      "max": "máx. reps",
+      "seconds": "{{count}} s",
+      "minutes": "{{count}} min"
+    },
+    "reps": "Reps",
+    "weight": "Peso (kg)",
+    "save": "Guardar",
+    "saved": "Guardada",
+    "repsRequired": "Indica las repeticiones.",
+    "weightInvalid": "Peso no válido.",
+    "rest": "Descanso: {{time}}",
+    "noRest": "Sin descanso",
+    "errors": {
+      "CONFLICT": "No se puede registrar esta serie."
+    }
+  },
+  "muscles": {
+    "ABDOMINALS": "Abdominales",
+    "ABDUCTORS": "Abductores",
+    "ADDUCTORS": "Aductores",
+    "BICEPS": "Bíceps",
+    "CALVES": "Gemelos",
+    "CHEST": "Pecho",
+    "FOREARMS": "Antebrazos",
+    "GLUTES": "Glúteos",
+    "HAMSTRINGS": "Isquiotibiales",
+    "LATS": "Dorsales",
+    "LOWER_BACK": "Zona lumbar",
+    "MIDDLE_BACK": "Espalda media",
+    "NECK": "Cuello",
+    "QUADRICEPS": "Cuádriceps",
+    "SHOULDERS": "Hombros",
+    "TRAPS": "Trapecios",
+    "TRICEPS": "Tríceps"
+  },
+  "bodyParts": {
+    "ARMS": "Brazos",
+    "LEGS": "Piernas",
+    "CHEST": "Pecho",
+    "BACK": "Espalda",
+    "SHOULDERS": "Hombros",
+    "CORE": "Core",
+    "NECK": "Cuello"
   }
 }

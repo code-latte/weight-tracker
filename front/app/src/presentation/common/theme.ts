@@ -8,6 +8,8 @@ const brand = {
   tealBright: "#2DD4BF",
   pine: "#115E59",
   orange: "#F97316",
+  // The dark theme's orange: a pastel of the brand orange, so it does not glare on dark surfaces.
+  orangeSoft: "#F57736",
   burnt: "#C2410C",
   ink: "#0F172A",
   white: "#FFFFFF",
@@ -139,10 +141,12 @@ export function buildTheme(mode: "light" | "dark") {
       onPrimary: dark ? s.bg : brand.white,
       primaryContainer: dark ? "#134E4A" : "#CCFBF1",
       onPrimaryContainer: dark ? "#CCFBF1" : brand.pine,
-      secondary: brand.orange,
-      onSecondary: brand.ink,
-      secondaryContainer: dark ? "#78350F" : "#FFEDD5",
-      onSecondaryContainer: dark ? "#FFEDD5" : "#7C2D12",
+      secondary: dark ? brand.orangeSoft : brand.orange,
+      // White on the brand orange, in both modes, for text and icons on tonal buttons, selected chips and segments.
+      onSecondary: brand.white,
+      // Selected chips, segmented buttons and tonal buttons paint with these: the brand orange (softer in the dark theme), not a tint of it.
+      secondaryContainer: dark ? brand.orangeSoft : brand.orange,
+      onSecondaryContainer: brand.white,
       tertiary: "#6366F1",
       onTertiary: "#FFFFFF",
       background: s.bg,

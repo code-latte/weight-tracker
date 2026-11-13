@@ -129,7 +129,9 @@ const superSeriesId = 3;
 
 const setRecord: SetRecord = {
   id: "4c5d6e7f-8091-4b2c-9d3e-4f5a6b7c8d9e",
+  type: "Reps",
   reps: 8,
+  durationSeconds: null,
   weight: 60.5,
   registeredAtUtc: "2026-11-02T10:15:00Z",
 };
@@ -142,6 +144,8 @@ const workoutWithResults: WorkoutDetail = {
 };
 
 const setRecordRequest: AddOrUpdateSetRecordRequest = { reps: 8, weight: 60.5 };
+
+const timedSetRecordRequest: AddOrUpdateSetRecordRequest = { durationSeconds: 45 };
 
 const reorderSetRecordsRequest: ReorderSetRecordsRequest = {
   setRecordIds: ["5d6e7f80-91a2-4c3d-8e4f-5a6b7c8d9e0f", setRecord.id],
@@ -965,6 +969,50 @@ describe("WorkoutRepository", () => {
   });
 
   describe("addSetRecord", () => {
+    it("posts a timed set without a weight unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.addSetRecord(workout.id, workoutExercise.exerciseId, timedSetRecordRequest);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "POST",
+          path: `/workouts/${workout.id}/exercises/${workoutExercise.exerciseId}/set-records`,
+          body: { durationSeconds: 45 },
+        },
+      ]);
+    });
+
+    it("returns a timed record as the API answered it, nulls included", async () => {
+      // Arrange
+      const timed: SetRecord = {
+        ...setRecord,
+        type: "Duration",
+        reps: null,
+        durationSeconds: 45,
+        weight: null,
+      };
+      const detail = {
+        ...workoutWithResults,
+        exercises: [{ ...workoutExercise, setRecords: [timed] }],
+      };
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => detail));
+
+      // Act
+      const result = await repository.addSetRecord(
+        workout.id,
+        workoutExercise.exerciseId,
+        timedSetRecordRequest,
+      );
+
+      // Assert
+      expect(result).toEqual(ok(detail));
+    });
+
     it("posts the request to /workouts/{workoutId}/exercises/{exerciseId}/set-records unchanged", async () => {
       // Arrange
       const httpClient = new FakeHttpClient(async () => workoutWithResults);
@@ -1037,6 +1085,26 @@ describe("WorkoutRepository", () => {
   });
 
   describe("updateSetRecord", () => {
+    it("puts a corrected duration without a weight unchanged", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutWithResults);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.updateSetRecord(workout.id, workoutExercise.exerciseId, setRecord.id, {
+        durationSeconds: 60,
+      });
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        {
+          method: "PUT",
+          path: `/workouts/${workout.id}/exercises/${workoutExercise.exerciseId}/set-records/${setRecord.id}`,
+          body: { durationSeconds: 60 },
+        },
+      ]);
+    });
+
     it("puts the request to .../set-records/{setRecordId} unchanged", async () => {
       // Arrange
       const httpClient = new FakeHttpClient(async () => workoutWithResults);

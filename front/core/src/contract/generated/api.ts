@@ -5254,9 +5254,11 @@ export interface components {
         };
         AddOrUpdateSetRecordRequest: {
             /** Format: int32 */
-            reps: null | number | string;
+            reps?: null | number | string;
+            /** Format: int32 */
+            durationSeconds?: null | number | string;
             /** Format: double */
-            weight: null | number | string;
+            weight?: null | number | string;
         };
         AuthResponse: {
             accessToken: string;
@@ -5494,10 +5496,13 @@ export interface components {
         SetRecordResponse: {
             /** Format: uuid */
             id: string;
+            type: string;
             /** Format: int32 */
-            reps: number | string;
+            reps: null | number | string;
+            /** Format: int32 */
+            durationSeconds: null | number | string;
             /** Format: double */
-            weight: number | string;
+            weight: null | number | string;
             /** Format: date-time */
             registeredAtUtc: string;
         };

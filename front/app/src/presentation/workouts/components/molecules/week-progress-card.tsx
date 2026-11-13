@@ -24,7 +24,7 @@ export default function WeekProgressCard({
   const onPrimary = { color: theme.colors.onPrimary };
 
   return (
-    <SafeArea edges={["top"]} style={[styles.panel, { backgroundColor: theme.colors.primary }]}>
+    <SafeArea edges={[]} style={[styles.panel, { backgroundColor: theme.colors.primary }]}>
       <View style={styles.row}>
         <View style={styles.week}>
           <Text variant="titleLarge" role="heading" aria-level={1} style={onPrimary}>
@@ -40,8 +40,8 @@ export default function WeekProgressCard({
           </Text>
           <ProgressBar
             progress={total === 0 ? 0 : completed / total}
-            color={theme.colors.onPrimary}
-            style={{ backgroundColor: theme.colors.primaryContainer }}
+            color={theme.colors.secondary}
+            style={{ backgroundColor: "rgba(255, 255, 255, 0.3)" }}
           />
         </View>
       </View>
@@ -54,7 +54,6 @@ const styles = StyleSheet.create({
     flex: 0,
     paddingBottom: 20,
     paddingHorizontal: 24,
-    paddingTop: 16,
   },
   row: {
     flexDirection: "row",

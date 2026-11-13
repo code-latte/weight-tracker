@@ -24,6 +24,7 @@ using WeightTracker.Application.UseCases.TrainerAthletes;
 using WeightTracker.Application.UseCases.Users;
 using WeightTracker.Application.UseCases.Workouts;
 using WeightTracker.Infra.Persistence;
+using WeightTracker.Infra.Queries;
 using WeightTracker.Infra.Repositories;
 using WeightTracker.Infra.Seed;
 using WeightTracker.Infra.Services;
@@ -92,6 +93,7 @@ builder.Services.AddScoped<ITrainerInvitationRepository, TrainerInvitationReposi
 builder.Services.AddScoped<IMesocycleRepository, MesocycleRepository>();
 builder.Services.AddScoped<IWorkoutTemplateRepository, WorkoutTemplateRepository>();
 builder.Services.AddScoped<ICustomerLeadRepository, CustomerLeadRepository>();
+builder.Services.AddScoped<IExerciseLastPerformanceQuery, ExerciseLastPerformanceQuery>();
 
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
@@ -164,6 +166,7 @@ builder.Services.AddScoped<GetMesocycleByIdUseCase>();
 builder.Services.AddScoped<GetMesocycleWorkoutsUseCase>();
 builder.Services.AddScoped<GetUserMesocyclesUseCase>();
 builder.Services.AddScoped<GetUserTrainerUseCase>();
+builder.Services.AddScoped<GetMyExerciseLastPerformanceUseCase>();
 builder.Services.AddScoped<CreateMesocycleUseCase>();
 builder.Services.AddScoped<UpdateMesocycleUseCase>();
 builder.Services.AddScoped<DefineMesocycleWeekUseCase>();

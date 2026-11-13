@@ -15,6 +15,7 @@ import type {
   DeleteWorkoutInput,
   Exercise,
   ExerciseFavorite,
+  ExerciseLastPerformance,
   GetAthleteMesocyclesInput,
   GetMesocycleByIdInput,
   GetMesocycleWorkoutsInput,
@@ -109,6 +110,7 @@ export default interface Dependencies {
   setPreferredThemeModeUseCase: UseCaseInterface<string, void>;
   getMyProfileUseCase: UseCaseInterface<void, UserProfile>;
   getUserTrainerUseCase: UseCaseInterface<string, UserProfile | null>;
+  getMyExerciseLastPerformanceUseCase: UseCaseInterface<string, ExerciseLastPerformance | null>;
   updateMyProfileUseCase: UseCaseInterface<UpdateProfileRequest, UserProfile>;
   getUsersUseCase: UseCaseInterface<void, UserSummary[]>;
   createUserUseCase: UseCaseInterface<CreateUserRequest, CreatedUserResponse>;

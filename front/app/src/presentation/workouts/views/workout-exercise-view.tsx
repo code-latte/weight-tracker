@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Linking, Platform, StyleSheet } from "react-native";
+import { FlatList, KeyboardAvoidingView, Linking, Platform, StyleSheet, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 import SafeArea from "@/presentation/common/components/atoms/safe-area";
+import TextLink from "@/presentation/common/components/atoms/text-link";
 import useKeyboardVisible from "@/presentation/common/hooks/use-keyboard-visible";
 import ErrorState from "@/presentation/common/components/molecules/error-state";
 import LoadingState from "@/presentation/common/components/molecules/loading-state";
 import ExerciseHeroPanel from "@/presentation/workouts/components/molecules/exercise-hero-panel";
+import ExerciseSetsSkeleton from "@/presentation/workouts/components/molecules/exercise-sets-skeleton";
 import RestCard from "@/presentation/workouts/components/molecules/rest-card";
+import LastPerformanceDialog from "@/presentation/workouts/components/organisms/last-performance-dialog";
 import ExerciseNavigator from "@/presentation/workouts/components/organisms/exercise-navigator";
 import SetRecordRow from "@/presentation/workouts/components/organisms/set-record-row";
+import { hasWeightIn } from "@/presentation/workouts/last-performance";
+import useExerciseLastPerformance from "@/presentation/workouts/hooks/use-exercise-last-performance";
 import useSingleMuscleBodyParts from "@/presentation/workouts/hooks/use-single-muscle-body-parts";
 import useRestCountdown from "@/presentation/workouts/hooks/use-rest-countdown";
 import useSaveSetRecord from "@/presentation/workouts/hooks/use-save-set-record";
@@ -37,6 +42,29 @@ export default function WorkoutExerciseView() {
   const singleMuscleBodyParts = useSingleMuscleBodyParts();
   const list = useRef<FlatList>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const {
+    state: lastPerformanceState,
+    load: loadLastPerformance,
+    reset: resetLastPerformance,
+  } = useExerciseLastPerformance();
+  const [lastPerformanceOpen, setLastPerformanceOpen] = useState(false);
+  const catalogExerciseId = exercise?.exerciseId;
+
+  // The last session is read for each exercise shown, so the link is only offered when there is a weight to show.
+  useEffect(() => {
+    if (catalogExerciseId === undefined) {
+      return;
+    }
+    void loadLastPerformance(catalogExerciseId);
+
+    return resetLastPerformance;
+  }, [catalogExerciseId, loadLastPerformance, resetLastPerformance]);
+  const lastPerformance =
+    lastPerformanceState.status === "ready" ? lastPerformanceState.performance : null;
+  const hasPreviousSets = lastPerformance !== null && hasWeightIn(lastPerformance.sets);
+  // Until the last session is read, the link and the sets are a skeleton, so neither one jumps when it settles.
+  const lastPerformanceSettled =
+    lastPerformanceState.status === "ready" || lastPerformanceState.status === "error";
 
   // Once the keyboard is up (and the list has its extra room), the row being edited goes to the top of the list.
   useEffect(() => {
@@ -55,6 +83,7 @@ export default function WorkoutExerciseView() {
   /** Swaps the exercise on this same screen: no transition, and back still returns to the workout. */
   function openExercise(next: string) {
     if (next !== exerciseId) {
+      setLastPerformanceOpen(false);
       router.setParams({ exerciseId: next });
     }
   }
@@ -103,6 +132,17 @@ export default function WorkoutExerciseView() {
         />
       )}
 
+      {status === "ready" && exercise !== null && hasPreviousSets && (
+        <View style={styles.previousSets}>
+          <TextLink
+            icon="history"
+            label={t("exercise.lastPerformance.link")}
+            accessibilityLabel={t("exercise.lastPerformance.link")}
+            onPress={() => setLastPerformanceOpen(true)}
+          />
+        </View>
+      )}
+
       <KeyboardAvoidingView
         style={styles.list}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -113,7 +153,14 @@ export default function WorkoutExerciseView() {
           <ErrorState message={t(`errors:${errorCode}`)} retryLabel={t("retry")} onRetry={retry} />
         )}
 
-        {status === "ready" && exercise !== null && (
+        {/* In the list's place, so the rest band stays against the bottom while the skeleton is shown. */}
+        {status === "ready" && exercise !== null && !lastPerformanceSettled && (
+          <View style={styles.list}>
+            <ExerciseSetsSkeleton rows={exercise.rows.length} />
+          </View>
+        )}
+
+        {status === "ready" && exercise !== null && lastPerformanceSettled && (
           <FlatList
             ref={list}
             data={exercise.rows}
@@ -186,11 +233,25 @@ export default function WorkoutExerciseView() {
           />
         )}
       </KeyboardAvoidingView>
+
+      {hasPreviousSets && (
+        <LastPerformanceDialog
+          visible={lastPerformanceOpen}
+          performance={lastPerformance}
+          exerciseType={exercise?.type}
+          onClose={() => setLastPerformanceOpen(false)}
+        />
+      )}
     </SafeArea>
   );
 }
 
 const styles = StyleSheet.create({
+  // Aligned with the set rows below it, which have 16 px of padding.
+  previousSets: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
   list: {
     flex: 1,
   },

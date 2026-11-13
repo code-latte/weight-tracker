@@ -5,6 +5,7 @@ import {
   type CreatedUserResponse,
   type CreateUserRequest,
   DomainError,
+  type ExerciseLastPerformance,
   fail,
   ok,
   type Result,
@@ -49,6 +50,12 @@ class FakeUserRepository implements UserRepositoryInterface {
   }
 
   async getTrainer(): Promise<Result<UserProfile | null, DomainError>> {
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async getMyExerciseLastPerformance(): Promise<
+    Result<ExerciseLastPerformance | null, DomainError>
+  > {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 

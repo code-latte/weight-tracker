@@ -6,6 +6,7 @@ import type {
   Result,
   SetRecord,
   Exercise,
+  ExerciseLastPerformance,
   UpdateSetRecordInput,
   UserProfile,
   WorkoutById,
@@ -171,6 +172,7 @@ interface SetupOptions {
   workoutResult?: () => Promise<Result<WorkoutById, DomainError>>;
   addResult?: () => Promise<Result<WorkoutDetail, DomainError>>;
   updateResult?: () => Promise<Result<WorkoutDetail, DomainError>>;
+  lastPerformanceResult?: () => Promise<Result<ExerciseLastPerformance | null, DomainError>>;
 }
 
 function setup({
@@ -179,6 +181,7 @@ function setup({
   workoutResult,
   addResult,
   updateResult,
+  lastPerformanceResult,
 }: SetupOptions = {}) {
   const current = workout ?? workoutOf([exerciseOf("we1")]);
   const getWorkout = jest.fn(workoutResult ?? (async () => ok(current)));
@@ -189,14 +192,19 @@ function setup({
     Promise<Result<WorkoutDetail, DomainError>>,
     [UpdateSetRecordInput]
   >(updateResult ?? (async () => ok(current as unknown as WorkoutDetail)));
+  const getLastPerformance = jest.fn<
+    Promise<Result<ExerciseLastPerformance | null, DomainError>>,
+    [string]
+  >(lastPerformanceResult ?? (async () => ok(null)));
   const dependencies = {
+    getMyExerciseLastPerformanceUseCase: () => ({ execute: getLastPerformance }),
     getWorkoutByIdUseCase: () => ({ execute: getWorkout }),
     addSetRecordUseCase: () => ({ execute: addSetRecord }),
     updateSetRecordUseCase: () => ({ execute: updateSetRecord }),
     getExercisesUseCase: () => ({ execute: async () => ok(catalogOf) }),
   };
 
-  return { getWorkout, addSetRecord, updateSetRecord, dependencies };
+  return { getWorkout, addSetRecord, updateSetRecord, getLastPerformance, dependencies };
 }
 
 async function renderExercise(options: SetupOptions = {}) {
@@ -650,6 +658,51 @@ describe("WorkoutExerciseView", () => {
     expect(await screen.findByText("Sin descanso")).toBeOnTheScreen();
   });
 
+  it("renews the session and reads the workout again when the read is unauthorized", async () => {
+    // Arrange
+    const workout = workoutOf([exerciseOf("we1")]);
+    const workoutResult = jest
+      .fn<Promise<Result<WorkoutById, DomainError>>, []>()
+      .mockResolvedValueOnce(fail(new DomainError("UNAUTHORIZED", "")))
+      .mockResolvedValueOnce(ok(workout));
+    const refresh = jest.fn(async () => ok({} as never));
+    const { dependencies, getWorkout } = setup({ workoutResult });
+
+    // Act
+    await renderWithProviders(<WorkoutExerciseView />, {
+      ...dependencies,
+      refreshSessionUseCase: () => ({ execute: refresh }),
+    });
+
+    // Assert
+    expect(await screen.findByRole("heading", { name: "Sentadilla" })).toBeOnTheScreen();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(getWorkout).toHaveBeenCalledTimes(2);
+  });
+
+  it("renews the session and saves the set again when the save is unauthorized", async () => {
+    // Arrange
+    const refresh = jest.fn(async () => ok({} as never));
+    const current = workoutOf([exerciseOf("we1")]);
+    const addResult = jest
+      .fn<Promise<Result<WorkoutDetail, DomainError>>, []>()
+      .mockResolvedValueOnce(fail(new DomainError("UNAUTHORIZED", "")))
+      .mockResolvedValueOnce(ok(current as unknown as WorkoutDetail));
+    const { dependencies, addSetRecord } = setup({ addResult });
+    await renderWithProviders(<WorkoutExerciseView />, {
+      ...dependencies,
+      refreshSessionUseCase: () => ({ execute: refresh }),
+    });
+    await screen.findByTestId("exercise-sets");
+
+    // Act
+    await fireEvent.press(screen.getAllByRole("button", { name: "Guardar" })[0]!);
+
+    // Assert
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(addSetRecord).toHaveBeenCalledTimes(2);
+  });
+
   it("shows the error and reads the workout again on retry", async () => {
     // Arrange
     const workout = workoutOf([exerciseOf("we1")]);
@@ -1017,5 +1070,484 @@ describe("WorkoutExerciseView rest countdown", () => {
     expect(screen.getByRole("button", { name: "Reset rest" })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Start rest" }));
     expect(screen.getByRole("button", { name: "Pause rest" })).toBeOnTheScreen();
+  });
+});
+
+describe("WorkoutExerciseView last performance", () => {
+  const lastPerformanceOf = (
+    overrides: Partial<ExerciseLastPerformance> = {},
+  ): ExerciseLastPerformance => ({
+    workoutDate: "2026-11-10",
+    effort: "HIGH",
+    sets: [{ reps: 10, durationSeconds: null, weight: 20 }],
+    ...overrides,
+  });
+
+  async function renderLastPerformance(options: SetupOptions = {}) {
+    mockBack.mockClear();
+    mockSetParams.mockClear();
+    mockParams = { id: "wk1", exerciseId: "we1" };
+    const fakes = await renderExercise({
+      lastPerformanceResult: async () => ok(lastPerformanceOf()),
+      ...options,
+    });
+    await screen.findByTestId("exercise-sets");
+
+    return fakes;
+  }
+
+  async function openDialog() {
+    await fireEvent.press(await screen.findByRole("link", { name: "Marcas anteriores" }));
+    await screen.findByText("Última sesión");
+  }
+
+  it("shows the previous sets link and keeps the video link in the header", async () => {
+    // Arrange & Act
+    await renderLastPerformance({
+      workout: workoutOf([exerciseOf("we1", { videoUrl: "https://v.example/1" })]),
+    });
+
+    // Assert
+    expect(screen.getByRole("link", { name: "Ver vídeo" })).toBeOnTheScreen();
+    expect(await screen.findByRole("link", { name: "Marcas anteriores" })).toBeOnTheScreen();
+  });
+
+  it("shows the previous sets link for an exercise without a video", async () => {
+    // Arrange & Act
+    await renderLastPerformance();
+
+    // Assert
+    expect(screen.queryByRole("link", { name: "Ver vídeo" })).not.toBeOnTheScreen();
+    expect(await screen.findByRole("link", { name: "Marcas anteriores" })).toBeOnTheScreen();
+  });
+
+  it("reads the last performance of the catalog exercise when the exercise is shown", async () => {
+    // Arrange & Act
+    const { getLastPerformance } = await renderLastPerformance();
+
+    // Assert
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalledWith("ex-we1"));
+    expect(getLastPerformance).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Última sesión")).not.toBeOnTheScreen();
+  });
+
+  it("reads the last performance of another exercise when it is chosen", async () => {
+    // Arrange
+    const { getLastPerformance } = await renderLastPerformance({
+      workout: workoutOf(threeExercises()),
+    });
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalledWith("ex-we1"));
+
+    // Act
+    await fireEvent.press(within(screen.getByLabelText("Ejercicios")).getByText("Remo"));
+
+    // Assert
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalledWith("ex-we3"));
+    expect(getLastPerformance).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the link when only one of three sets has a weight", async () => {
+    // Arrange & Act
+    await renderLastPerformance({
+      lastPerformanceResult: async () =>
+        ok(
+          lastPerformanceOf({
+            sets: [
+              { reps: 12, durationSeconds: null, weight: null },
+              { reps: 12, durationSeconds: null, weight: 40 },
+              { reps: 12, durationSeconds: null, weight: null },
+            ],
+          }),
+        ),
+    });
+
+    // Assert
+    expect(await screen.findByRole("link", { name: "Marcas anteriores" })).toBeOnTheScreen();
+  });
+
+  it("hides the link when no set has a weight", async () => {
+    // Arrange
+    const { getLastPerformance } = await renderLastPerformance({
+      lastPerformanceResult: async () =>
+        ok(
+          lastPerformanceOf({
+            sets: [
+              { reps: 12, durationSeconds: null, weight: null },
+              { reps: 12, durationSeconds: null, weight: null },
+            ],
+          }),
+        ),
+    });
+
+    // Act
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalled());
+    await act(async () => {});
+
+    // Assert
+    expect(screen.queryByRole("link", { name: "Marcas anteriores" })).not.toBeOnTheScreen();
+  });
+
+  it("hides the link when the athlete never did the exercise", async () => {
+    // Arrange
+    const { getLastPerformance } = await renderLastPerformance({
+      lastPerformanceResult: async () => ok(null),
+    });
+
+    // Act
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalled());
+    await act(async () => {});
+
+    // Assert
+    expect(screen.queryByRole("link", { name: "Marcas anteriores" })).not.toBeOnTheScreen();
+  });
+
+  it("hides the link when the last performance cannot be read", async () => {
+    // Arrange
+    const { getLastPerformance } = await renderLastPerformance({
+      lastPerformanceResult: async () => fail(new DomainError("NOT_FOUND", "Missing")),
+    });
+
+    // Act
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalled());
+    await act(async () => {});
+
+    // Assert
+    expect(screen.queryByRole("link", { name: "Marcas anteriores" })).not.toBeOnTheScreen();
+  });
+
+  it("shows a skeleton instead of the sets and the link while the last performance is read", async () => {
+    // Arrange & Act
+    const { getLastPerformance } = await renderExercise({
+      lastPerformanceResult: () => new Promise(() => {}),
+    });
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalled());
+
+    // Assert
+    expect(
+      await screen.findByTestId("exercise-skeleton", { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId("exercise-sets")).not.toBeOnTheScreen();
+    expect(screen.queryByRole("link", { name: "Marcas anteriores" })).not.toBeOnTheScreen();
+    expect(screen.getByRole("heading", { name: "Sentadilla" })).toBeOnTheScreen();
+    expect(screen.getByText("Descanso: 1:30")).toBeOnTheScreen();
+  });
+
+  it("replaces the skeleton with the sets and the link together once the last performance is read", async () => {
+    // Arrange & Act
+    await renderLastPerformance();
+
+    // Assert
+    expect(await screen.findByRole("link", { name: "Marcas anteriores" })).toBeOnTheScreen();
+    expect(screen.getByTestId("exercise-sets")).toBeOnTheScreen();
+    expect(
+      screen.queryByTestId("exercise-skeleton", { includeHiddenElements: true }),
+    ).not.toBeOnTheScreen();
+  });
+
+  it("shows the sets without the link and without the skeleton when the read fails", async () => {
+    // Arrange
+    const { getLastPerformance } = await renderLastPerformance({
+      lastPerformanceResult: async () => fail(new DomainError("NETWORK", "Offline")),
+    });
+
+    // Act
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalled());
+    await act(async () => {});
+
+    // Assert
+    expect(screen.getByTestId("exercise-sets")).toBeOnTheScreen();
+    expect(
+      screen.queryByTestId("exercise-skeleton", { includeHiddenElements: true }),
+    ).not.toBeOnTheScreen();
+    expect(screen.queryByRole("link", { name: "Marcas anteriores" })).not.toBeOnTheScreen();
+  });
+
+  it("shows the skeleton again while the next exercise's last performance is read", async () => {
+    // Arrange
+    let reads = 0;
+    const { getLastPerformance } = await renderLastPerformance({
+      workout: workoutOf(threeExercises()),
+      lastPerformanceResult: () =>
+        ++reads === 1 ? Promise.resolve(ok(lastPerformanceOf())) : new Promise(() => {}),
+    });
+    await screen.findByRole("link", { name: "Marcas anteriores" });
+
+    // Act
+    await fireEvent.press(within(screen.getByLabelText("Ejercicios")).getByText("Remo"));
+
+    // Assert
+    await waitFor(() => expect(getLastPerformance).toHaveBeenCalledWith("ex-we3"));
+    expect(
+      await screen.findByTestId("exercise-skeleton", { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId("exercise-sets")).not.toBeOnTheScreen();
+    expect(screen.queryByRole("link", { name: "Marcas anteriores" })).not.toBeOnTheScreen();
+  });
+
+  it("opens the dialog with what was read, without reading again", async () => {
+    // Arrange
+    const { getLastPerformance } = await renderLastPerformance();
+
+    // Act
+    await openDialog();
+
+    // Assert
+    expect(await screen.findByTestId("last-performance-content")).toBeOnTheScreen();
+    expect(getLastPerformance).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no previous sets link while the workout is read", async () => {
+    // Arrange & Act
+    await renderExercise({ workoutResult: () => new Promise(() => {}) });
+
+    // Assert
+    expect(screen.getAllByRole("progressbar").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: "Marcas anteriores" })).not.toBeOnTheScreen();
+  });
+
+  it.each(["PUBLISHED", "STARTED", "COMPLETED", "REVIEWED"])(
+    "shows the previous sets link when the workout is %s",
+    async (status) => {
+      // Arrange & Act
+      await renderLastPerformance({ workout: workoutOf([exerciseOf("we1")], { status } as never) });
+
+      // Assert
+      expect(await screen.findByRole("link", { name: "Marcas anteriores" })).toBeOnTheScreen();
+    },
+  );
+
+  it("shows the date of the session, short, in the active language", async () => {
+    // Arrange
+    await renderLastPerformance({ lastPerformanceResult: async () => ok(lastPerformanceOf()) });
+
+    // Act
+    await openDialog();
+
+    // Assert
+    expect(await screen.findByText("10 nov 2026")).toBeOnTheScreen();
+  });
+
+  it.each([
+    ["STRENGTH", "HIGH", "RIR 0"],
+    ["CARDIO", "MID", "RPE 5-6"],
+    ["STRETCHING", "LOW", "Muy suave"],
+    ["OTHER", "MIDLOW", "Medio-bajo"],
+  ])("shows the effort of a %s exercise in its own scale", async (type, effort, expected) => {
+    // Arrange
+    await renderLastPerformance({
+      workout: workoutOf([exerciseOf("we1", { type } as never)]),
+      lastPerformanceResult: async () => ok(lastPerformanceOf({ effort })),
+    });
+
+    // Act
+    await openDialog();
+
+    // Assert
+    expect(await screen.findByLabelText(`Esfuerzo: ${expected}`)).toBeOnTheScreen();
+    expect(screen.getByText(expected)).toBeOnTheScreen();
+  });
+
+  it("shows an effort code it does not know as it comes", async () => {
+    // Arrange
+    await renderLastPerformance({
+      lastPerformanceResult: async () => ok(lastPerformanceOf({ effort: "EXTREME" })),
+    });
+
+    // Act
+    await openDialog();
+
+    // Assert
+    expect(await screen.findByLabelText("Esfuerzo: EXTREME")).toBeOnTheScreen();
+  });
+
+  it("hides the effort line when the session has no effort", async () => {
+    // Arrange
+    await renderLastPerformance({
+      lastPerformanceResult: async () => ok(lastPerformanceOf({ effort: "" })),
+    });
+
+    // Act
+    await openDialog();
+
+    // Assert
+    await screen.findByTestId("last-performance-content");
+    expect(screen.getByLabelText("Series realizadas: 1")).toBeOnTheScreen();
+    expect(screen.queryByText("Esfuerzo")).not.toBeOnTheScreen();
+  });
+
+  it("shows how many sets were done and the effort in two cards", async () => {
+    // Arrange
+    await renderLastPerformance({
+      lastPerformanceResult: async () =>
+        ok(
+          lastPerformanceOf({
+            sets: [
+              { reps: 12, durationSeconds: null, weight: 20 },
+              { reps: 12, durationSeconds: null, weight: 20 },
+              { reps: 12, durationSeconds: null, weight: 20 },
+            ],
+          }),
+        ),
+    });
+
+    // Act
+    await openDialog();
+
+    // Assert
+    expect(await screen.findByLabelText("Series realizadas: 3")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Esfuerzo: RIR 0")).toBeOnTheScreen();
+  });
+
+  it("lists the sets in order with their reps or seconds and their weight", async () => {
+    // Arrange
+    await renderLastPerformance({
+      lastPerformanceResult: async () =>
+        ok(
+          lastPerformanceOf({
+            sets: [
+              { reps: 12, durationSeconds: null, weight: 20 },
+              { reps: 14, durationSeconds: null, weight: null },
+              { reps: null, durationSeconds: 45, weight: null },
+              { reps: 9, durationSeconds: null, weight: 0 },
+              { reps: null, durationSeconds: null, weight: 62.5 },
+            ],
+          }),
+        ),
+    });
+
+    // Act
+    await openDialog();
+
+    // Assert
+    const table = within(await screen.findByTestId("last-performance-sets"));
+    expect(table.getAllByText(/^\d$/).map((cell) => cell.props.children)).toEqual([1, 2, 3, 4, 5]);
+    expect(screen.getByText("Series registradas")).toBeOnTheScreen();
+    expect(screen.getByText("12 reps")).toBeOnTheScreen();
+    expect(screen.getByText("20 kg")).toBeOnTheScreen();
+    expect(screen.getByText("14 reps")).toBeOnTheScreen();
+    expect(screen.getByText("45 s")).toBeOnTheScreen();
+    expect(screen.getAllByText("sin peso")).toHaveLength(2);
+    expect(screen.getByText("9 reps")).toBeOnTheScreen();
+    expect(screen.getByText("0 kg")).toBeOnTheScreen();
+    expect(screen.getByText("62.5 kg")).toBeOnTheScreen();
+    expect(screen.queryByText(/null/)).not.toBeOnTheScreen();
+  });
+
+  describe("highest weight", () => {
+    const setsOf = (weights: (number | null)[]) =>
+      weights.map((weight) => ({ reps: 12, durationSeconds: null, weight }));
+
+    async function openWith(weights: (number | null)[]) {
+      await renderLastPerformance({
+        lastPerformanceResult: async () => ok(lastPerformanceOf({ sets: setsOf(weights) })),
+      });
+      await openDialog();
+      await screen.findByTestId("last-performance-sets");
+    }
+
+    const starIn = (row: number) =>
+      within(screen.getByTestId(`last-performance-set-${row}`)).queryByText("Mayor carga");
+
+    it("marks the highest weight only, with a star and the text under it", async () => {
+      // Arrange & Act
+      await openWith([20, 30, 25]);
+
+      // Assert
+      expect(starIn(1)).not.toBeOnTheScreen();
+      expect(starIn(2)).toBeOnTheScreen();
+      expect(starIn(3)).not.toBeOnTheScreen();
+      expect(screen.getAllByText("Mayor carga")).toHaveLength(1);
+    });
+
+    it("marks only the last set when the highest weight is repeated", async () => {
+      // Arrange & Act
+      await openWith([30, 20, 30]);
+
+      // Assert
+      expect(starIn(1)).not.toBeOnTheScreen();
+      expect(starIn(2)).not.toBeOnTheScreen();
+      expect(starIn(3)).toBeOnTheScreen();
+    });
+
+    it("ignores sets without weight when looking for the highest", async () => {
+      // Arrange & Act
+      await openWith([null, 15, null]);
+
+      // Assert
+      expect(starIn(2)).toBeOnTheScreen();
+      expect(screen.getAllByText("Mayor carga")).toHaveLength(1);
+    });
+
+    it("marks nothing when the highest weight is 0", async () => {
+      // Arrange & Act
+      await openWith([0, null, 0]);
+
+      // Assert
+      expect(screen.queryByText("Mayor carga")).not.toBeOnTheScreen();
+    });
+  });
+
+  it("closes the dialog and keeps the screen as it was", async () => {
+    // Arrange
+    await renderLastPerformance({ lastPerformanceResult: async () => ok(lastPerformanceOf()) });
+    await openDialog();
+    await screen.findByTestId("last-performance-content");
+
+    // Act
+    await fireEvent.press(screen.getByRole("button", { name: "Cerrar" }));
+
+    // Assert
+    await waitFor(() => expect(screen.queryByText("Última sesión")).not.toBeOnTheScreen());
+    expect(screen.getByRole("heading", { name: "Sentadilla" })).toBeOnTheScreen();
+    expect(screen.getByRole("link", { name: "Marcas anteriores" })).toBeOnTheScreen();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it("closes the dialog when another exercise is chosen", async () => {
+    // Arrange
+    await renderLastPerformance({
+      workout: workoutOf(threeExercises()),
+      lastPerformanceResult: async () => ok(lastPerformanceOf()),
+    });
+    await openDialog();
+    await screen.findByTestId("last-performance-content");
+
+    // Act
+    await fireEvent.press(within(screen.getByLabelText("Ejercicios")).getByText("Remo"));
+
+    // Assert
+    await waitFor(() => expect(screen.queryByText("Última sesión")).not.toBeOnTheScreen());
+    expect(mockSetParams).toHaveBeenCalledWith({ exerciseId: "we3" });
+  });
+
+  it("follows the active language", async () => {
+    // Arrange
+    await renderLastPerformance({
+      lastPerformanceResult: async () =>
+        ok(
+          lastPerformanceOf({
+            sets: [
+              { reps: 12, durationSeconds: null, weight: 20 },
+              { reps: 14, durationSeconds: null, weight: null },
+            ],
+          }),
+        ),
+    });
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    // Act
+    await fireEvent.press(await screen.findByRole("link", { name: "Previous sets" }));
+
+    // Assert
+    expect(await screen.findByText("Last session")).toBeOnTheScreen();
+    expect(await screen.findByText("Nov 10, 2026")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Effort: RIR 0")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Sets done: 2")).toBeOnTheScreen();
+    expect(screen.getByText("Recorded sets")).toBeOnTheScreen();
+    expect(screen.getByText("12 reps")).toBeOnTheScreen();
+    expect(screen.getByText("no weight")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Close" })).toBeOnTheScreen();
   });
 });

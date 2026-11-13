@@ -72,6 +72,17 @@ export function formatShortWeekday(instant: string, language: string): string {
   return withoutDots(format.format(new Date(instant))).toLowerCase();
 }
 
+/** A day as day, short month and year, such as `10 nov 2026`; read as a local date, so it never moves a day. */
+export function formatDay(day: string, language: string): string {
+  return withoutDots(
+    new Intl.DateTimeFormat(language, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(toDate(day)),
+  );
+}
+
 /** The year of the week's Monday. */
 export function weekYear(weekStart: string): string {
   return weekStart.slice(0, 4);

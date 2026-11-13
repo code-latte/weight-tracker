@@ -16,7 +16,8 @@ namespace WeightTracker.Api.Endpoints.Users;
 /// create someone else's account. The <c>activate</c> and <c>deactivate</c> routes let an administrator
 /// switch another account on and off. <c>GET /users/{userId}/mesocycles</c> lets a trainer or an administrator
 /// list the mesocycles planned for one athlete, and <c>GET /users/{userId}/trainer</c> lets a user read their own
-/// current trainer, or an administrator anyone's.
+/// current trainer, or an administrator anyone's. <c>GET /users/me/exercises/{exerciseId}/last-performance</c> lets
+/// any caller read what they did the last time they finished a workout with an exercise.
 /// </summary>
 [ApiController]
 [Route("users")]
@@ -29,6 +30,7 @@ public class UsersController : AuthorizedController
     private readonly DeactivateUserUseCase _deactivateUser;
     private readonly GetUserMesocyclesUseCase _getUserMesocycles;
     private readonly GetUserTrainerUseCase _getUserTrainer;
+    private readonly GetMyExerciseLastPerformanceUseCase _getMyExerciseLastPerformance;
 
     public UsersController(
         UpdateMyProfileUseCase updateMyProfile,
@@ -38,6 +40,7 @@ public class UsersController : AuthorizedController
         DeactivateUserUseCase deactivateUser,
         GetUserMesocyclesUseCase getUserMesocycles,
         GetUserTrainerUseCase getUserTrainer,
+        GetMyExerciseLastPerformanceUseCase getMyExerciseLastPerformance,
         GetAuthenticatedUserUseCase getAuthenticatedUser,
         ExceptionMapper exceptionMapper) : base(getAuthenticatedUser, exceptionMapper)
     {
@@ -48,6 +51,7 @@ public class UsersController : AuthorizedController
         _deactivateUser = deactivateUser;
         _getUserMesocycles = getUserMesocycles;
         _getUserTrainer = getUserTrainer;
+        _getMyExerciseLastPerformance = getMyExerciseLastPerformance;
     }
 
     /// <summary>
@@ -233,6 +237,30 @@ public class UsersController : AuthorizedController
             var trainer = await _getUserTrainer.Execute(CurrentUser!.Id, CurrentUser.Role, Id.From(userId), cancellationToken);
 
             return trainer is null ? NoContent() : Ok(UserProfileResponse.From(trainer));
+        }
+        catch (Exception exception)
+        {
+            return ExceptionMapper.Map(exception);
+        }
+    }
+
+    /// <summary>
+    /// Reads the sets the caller recorded the last time they finished a workout with the exercise, with that workout's
+    /// date and the effort it prescribed. Only <c>COMPLETED</c> and <c>REVIEWED</c> workouts count. Answers <c>204</c>
+    /// when the caller never did it, and <c>404</c> when the exercise does not exist or the caller may not see it.
+    /// </summary>
+    [HttpGet("me/exercises/{exerciseId:guid}/last-performance")]
+    [ProducesResponseType<ExerciseLastPerformanceResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMyExerciseLastPerformance(Guid exerciseId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var performance = await _getMyExerciseLastPerformance.Execute(Id.From(exerciseId), CurrentUser!, cancellationToken);
+
+            return performance is null ? NoContent() : Ok(ExerciseLastPerformanceResponse.From(performance));
         }
         catch (Exception exception)
         {

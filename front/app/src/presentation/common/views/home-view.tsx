@@ -7,7 +7,7 @@ export default function HomeView() {
   const { t } = useTranslation("common");
 
   return (
-    <SafeArea style={styles.container}>
+    <SafeArea edges={["left", "right"]} style={styles.container}>
       <Text variant="headlineLarge" role="heading" aria-level={1}>
         {t("home.title")}
       </Text>
@@ -20,5 +20,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
+    paddingTop: 0,
   },
 });

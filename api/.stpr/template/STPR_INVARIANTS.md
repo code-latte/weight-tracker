@@ -355,6 +355,24 @@ only read the API offers is an administrator listing it. `CustomerLeads` is the 
 - The moment such a record gains a rule, a state change or a read by anyone other than an administrator, it
   stops qualifying and is modelled as an aggregate.
 
+### Read projections
+
+A read projection answers one read over an aggregate's tables without loading the aggregate, when hydrating
+whole aggregates would read far more than the answer needs. It is not a repository, so the repository rules above
+stay intact: a repository still returns domain types only and never a fragment.
+
+- The contract is its own interface in `Application/Interfaces`, named `I<Projection>Query`, with one read method.
+  Never add a projection to an aggregate's repository.
+- The implementation lives in `Infra/Queries`, reads with `AsNoTracking`, and maps rows to an Application view record
+  declared next to the use case that consumes it. It never returns EF entities or domain types.
+- It is read-only: it never stages writes, and no use case uses it to decide a mutation. Writes always load the
+  aggregate through its repository.
+- Authorization stays in the use case, which checks the caller and scopes the query (for example by the caller's
+  `Id`) before reading.
+- The plan names each projection and states why loading the aggregate is not acceptable.
+- Every other rule still applies: `CancellationToken` last and passed to EF, registration in `Program.cs`, and
+  integration tests against the real database.
+
 ### Unit of work
 
 - `IUnitOfWork` is the transaction boundary. It is scoped per request, sharing one `DbContext`
@@ -382,7 +400,7 @@ only read the API offers is an administrator listing it. `CustomerLeads` is the 
   Without it EF treats an already-populated key as an existing row and silently turns inserts into updates.
 - A foreign key that crosses an aggregate boundary is declared with `HasOne<T>().WithMany()` and no navigation property,
   so EF orders writes to satisfy the real constraints while the aggregate boundary stays intact.
-- Direct `DbContext` access outside a repository is allowed only in `WeightTracker.Infra/Seed` and in the integration test bootstrap.
+- Direct `DbContext` access outside a repository is allowed only in `WeightTracker.Infra/Seed`, in read projections under `WeightTracker.Infra/Queries`, and in the integration test bootstrap.
 
 ### Errors
 

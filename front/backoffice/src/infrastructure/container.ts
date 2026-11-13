@@ -41,6 +41,7 @@ import {
   GetMesocycleWorkoutsUseCase,
   GetMesocyclesUseCase,
   GetMyAthletesUseCase,
+  GetMyExerciseLastPerformanceUseCase,
   GetMyProfileUseCase,
   GetUserTrainerUseCase,
   GetPreferredLanguageUseCase,
@@ -122,6 +123,8 @@ const container = new Container<Dependencies>({
   setPreferredThemeModeUseCase: (c) => new SetPreferredThemeModeUseCase(c.resolve("keyValueStore")),
   getMyProfileUseCase: (c) => new GetMyProfileUseCase(c.resolve("userRepository")),
   getUserTrainerUseCase: (c) => new GetUserTrainerUseCase(c.resolve("userRepository")),
+  getMyExerciseLastPerformanceUseCase: (c) =>
+    new GetMyExerciseLastPerformanceUseCase(c.resolve("userRepository")),
   updateMyProfileUseCase: (c) => new UpdateMyProfileUseCase(c.resolve("userRepository")),
   getUsersUseCase: (c) => new GetUsersUseCase(c.resolve("userRepository")),
   createUserUseCase: (c) => new CreateUserUseCase(c.resolve("userRepository")),

@@ -13,6 +13,8 @@ export type {
 export type {
   CreatedUserResponse,
   CreateUserRequest,
+  ExerciseLastPerformance,
+  LastPerformanceSet,
   UpdateProfileRequest,
   UserActivationSummary,
   UserProfile,

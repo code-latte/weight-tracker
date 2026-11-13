@@ -11,9 +11,15 @@ import RestCard from "@/presentation/workouts/components/molecules/rest-card";
 import ExerciseNavigator from "@/presentation/workouts/components/organisms/exercise-navigator";
 import SetRecordRow from "@/presentation/workouts/components/organisms/set-record-row";
 import useSingleMuscleBodyParts from "@/presentation/workouts/hooks/use-single-muscle-body-parts";
+import useRestCountdown from "@/presentation/workouts/hooks/use-rest-countdown";
 import useSaveSetRecord from "@/presentation/workouts/hooks/use-save-set-record";
 import useWorkoutExercise from "@/presentation/workouts/hooks/use-workout-exercise";
-import { isRecordable, restTimeOf, setTargetLabel } from "@/presentation/workouts/set-rows";
+import {
+  countdownTextOf,
+  isRecordable,
+  restSecondsOf,
+  setTargetLabel,
+} from "@/presentation/workouts/set-rows";
 
 export default function WorkoutExerciseView() {
   const { t } = useTranslation("workouts");
@@ -22,6 +28,11 @@ export default function WorkoutExerciseView() {
     useWorkoutExercise(id, exerciseId);
   const { save, savingNumber, errors } = useSaveSetRecord(id, exercise?.exerciseId ?? "");
   const readOnly = !isRecordable(workoutStatus);
+  const restMinutes = exercise?.restMinutes ?? null;
+  const countdown = useRestCountdown(
+    exerciseId,
+    restMinutes === null ? null : restSecondsOf(restMinutes),
+  );
   const keyboardVisible = useKeyboardVisible();
   const singleMuscleBodyParts = useSingleMuscleBodyParts();
   const list = useRef<FlatList>(null);
@@ -150,9 +161,27 @@ export default function WorkoutExerciseView() {
         {status === "ready" && exercise !== null && !keyboardVisible && (
           <RestCard
             label={
-              exercise.restMinutes === null
+              restMinutes === null
                 ? t("exercise.noRest")
-                : t("exercise.rest", { time: restTimeOf(exercise.restMinutes) })
+                : countdown.status === "finished"
+                  ? t("exercise.restFinished")
+                  : t("exercise.rest", { time: countdownTextOf(countdown.remainingSeconds) })
+            }
+            finished={countdown.status === "finished"}
+            controls={
+              restMinutes === null
+                ? undefined
+                : {
+                    running: countdown.status === "running",
+                    canPlay: countdown.status !== "finished",
+                    canReset: countdown.status !== "idle",
+                    onPlay: countdown.play,
+                    onPause: countdown.pause,
+                    onReset: countdown.reset,
+                    playLabel: t("exercise.restPlay"),
+                    pauseLabel: t("exercise.restPause"),
+                    resetLabel: t("exercise.restReset"),
+                  }
             }
           />
         )}

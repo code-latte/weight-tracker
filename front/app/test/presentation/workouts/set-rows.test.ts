@@ -1,9 +1,11 @@
 import type { SetRecord, WorkoutByIdExercise } from "@weight-tracker/core/domain";
 import {
+  countdownTextOf,
   englishSubtitleOf,
   expandSets,
   isRecordable,
   nameOf,
+  restSecondsOf,
   restTimeOf,
   setKindOf,
   setRecordBodyOf,
@@ -316,6 +318,37 @@ describe("restTimeOf", () => {
   ])("reads %s minutes as %s", (minutes, expected) => {
     // Arrange & Act
     const text = restTimeOf(minutes);
+
+    // Assert
+    expect(text).toBe(expected);
+  });
+});
+
+describe("restSecondsOf", () => {
+  it.each([
+    [2, 120],
+    [1.5, 90],
+    ["0.75", 45],
+    ["1.33", 80],
+  ])("reads %s minutes as %s seconds", (minutes, expected) => {
+    // Arrange & Act
+    const seconds = restSecondsOf(minutes);
+
+    // Assert
+    expect(seconds).toBe(expected);
+  });
+});
+
+describe("countdownTextOf", () => {
+  it.each([
+    [0, "0:00"],
+    [9, "0:09"],
+    [60, "1:00"],
+    [90, "1:30"],
+    [600, "10:00"],
+  ])("reads %s seconds as %s", (seconds, expected) => {
+    // Arrange & Act
+    const text = countdownTextOf(seconds);
 
     // Assert
     expect(text).toBe(expected);

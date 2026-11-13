@@ -64,6 +64,10 @@
     "weightInvalid": "Invalid weight.",
     "rest": "Rest: {{time}}",
     "noRest": "No rest",
+    "restFinished": "Rest finished",
+    "restPlay": "Start rest",
+    "restPause": "Pause rest",
+    "restReset": "Reset rest",
     "errors": {
       "CONFLICT": "This set cannot be recorded."
     }

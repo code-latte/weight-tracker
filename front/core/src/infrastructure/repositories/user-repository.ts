@@ -3,6 +3,7 @@ import {
   type CreatedUserResponse,
   type CreateUserRequest,
   type DomainError,
+  type ExerciseLastPerformance,
   fail,
   ok,
   type Result,
@@ -37,6 +38,22 @@ export default class UserRepository implements UserRepositoryInterface {
       });
 
       // The API answers 204 with no body when the user has no active trainer.
+      return ok(response ?? null);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async getMyExerciseLastPerformance(
+    exerciseId: string,
+  ): Promise<Result<ExerciseLastPerformance | null, DomainError>> {
+    try {
+      const response = await this.httpClient.request<ExerciseLastPerformance | undefined>({
+        method: "GET",
+        path: `/users/me/exercises/${exerciseId}/last-performance`,
+      });
+
+      // The API answers 204 with no body when the user never finished a workout with the exercise.
       return ok(response ?? null);
     } catch (error) {
       return fail(mapHttpError(error));

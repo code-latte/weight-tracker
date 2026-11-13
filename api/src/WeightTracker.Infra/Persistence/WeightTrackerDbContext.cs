@@ -151,6 +151,11 @@ public class WeightTrackerDbContext : DbContext
 
             entity.HasIndex(workout => new { workout.MesocycleId, workout.MesocycleWeekNumber });
 
+            // Serves the last-performance read: the caller's workouts newest first, ties broken by the newest id
+            entity.HasIndex(workout => new { workout.UserId, workout.WorkoutDate, workout.Id })
+                .IsDescending(false, true, true)
+                .HasDatabaseName("IX_Workouts_UserId_WorkoutDate_Id");
+
             entity.HasMany(workout => workout.WorkoutExercises)
                 .WithOne()
                 .HasForeignKey(workoutExercise => workoutExercise.WorkoutId)

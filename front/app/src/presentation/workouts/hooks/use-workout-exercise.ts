@@ -23,6 +23,8 @@ export interface WorkoutExerciseData {
   exerciseId: string;
   name: string | null;
   subtitle: string | null;
+  /** The exercise type, which picks the scale an effort is shown in. */
+  type: string;
   bodyPart: string;
   muscle: string;
   videoUrl: string | null;
@@ -59,6 +61,7 @@ export default function useWorkoutExercise(workoutId: string, workoutExerciseId:
       exerciseId: current.exerciseId,
       name,
       subtitle: englishSubtitleOf(current, language, name),
+      type: current.type,
       bodyPart: current.bodyPart,
       muscle: current.muscle,
       videoUrl: current.videoUrl,

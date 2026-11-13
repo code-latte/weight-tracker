@@ -1,5 +1,6 @@
 import {
   addWeeks,
+  formatDay,
   formatShortWeekday,
   formatWeekRange,
   isInWeek,
@@ -142,5 +143,32 @@ describe("weekYear", () => {
 
     // Assert
     expect(year).toBe("2025");
+  });
+});
+
+describe("formatDay", () => {
+  it.each([
+    ["es", "10 nov 2026"],
+    ["en", "Nov 10, 2026"],
+  ])("formats the day in %s", (language, expected) => {
+    // Arrange
+    const day = "2026-11-10";
+
+    // Act
+    const formatted = formatDay(day, language);
+
+    // Assert
+    expect(formatted).toBe(expected);
+  });
+
+  it("keeps the first day of a year in the same day", () => {
+    // Arrange
+    const day = "2026-01-01";
+
+    // Act
+    const formatted = formatDay(day, "es");
+
+    // Assert
+    expect(formatted).toBe("1 ene 2026");
   });
 });

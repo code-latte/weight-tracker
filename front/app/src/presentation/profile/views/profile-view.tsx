@@ -38,7 +38,7 @@ export default function ProfileView() {
   ];
 
   return (
-    <SafeArea>
+    <SafeArea edges={["left", "right"]}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.titleRow}>
           <Text variant="headlineMedium" role="heading" aria-level={1}>
@@ -101,6 +101,7 @@ const styles = StyleSheet.create({
   container: {
     gap: 24,
     padding: 24,
+    paddingTop: 0,
   },
   titleRow: {
     flexDirection: "row",

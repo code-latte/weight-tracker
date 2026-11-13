@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
 import { singleMuscleBodyPartsOf } from "@/presentation/workouts/catalog";
 
@@ -8,24 +9,22 @@ import { singleMuscleBodyPartsOf } from "@/presentation/workouts/catalog";
  */
 export default function useSingleMuscleBodyParts(): ReadonlySet<string> {
   const container = useContainer();
+  const { runWithSession } = useSession();
   const [bodyParts, setBodyParts] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let active = true;
 
-    void container
-      .resolve("getExercisesUseCase")
-      .execute()
-      .then((result) => {
-        if (active && result.ok) {
-          setBodyParts(singleMuscleBodyPartsOf(result.value));
-        }
-      });
+    void runWithSession(() => container.resolve("getExercisesUseCase").execute()).then((result) => {
+      if (active && result.ok) {
+        setBodyParts(singleMuscleBodyPartsOf(result.value));
+      }
+    });
 
     return () => {
       active = false;
     };
-  }, [container]);
+  }, [container, runWithSession]);
 
   return bodyParts;
 }

@@ -162,6 +162,26 @@ describe("WorkoutsView", () => {
     expect(screen.queryByText("Empuje")).not.toBeOnTheScreen();
   });
 
+  it("renews the session and reads the workouts again when the read is unauthorized", async () => {
+    // Arrange
+    const results = [fail(new DomainError("UNAUTHORIZED", ""))];
+    const refresh = jest.fn(async () => ok({} as never));
+    const { dependencies, getWorkouts } = setup({
+      workoutsResult: async () => results.shift() ?? ok(workouts),
+    });
+
+    // Act
+    await renderWithProviders(<WorkoutsView />, {
+      ...dependencies,
+      refreshSessionUseCase: () => ({ execute: refresh }),
+    });
+
+    // Assert
+    expect(await screen.findByText("Empuje")).toBeOnTheScreen();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(getWorkouts).toHaveBeenCalledTimes(2);
+  });
+
   it("opens on the current week with its title, range and progress", async () => {
     // Arrange & Act
     const { dependencies } = setup();

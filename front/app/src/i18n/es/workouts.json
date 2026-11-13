@@ -70,6 +70,19 @@
     "restReset": "Reiniciar descanso",
     "errors": {
       "CONFLICT": "No se puede registrar esta serie."
+    },
+    "lastPerformance": {
+      "link": "Marcas anteriores",
+      "title": "Última sesión",
+      "effort": "Esfuerzo",
+      "reps": "{{count}} reps",
+      "seconds": "{{count}} s",
+      "weight": "{{weight}} kg",
+      "noWeight": "sin peso",
+      "close": "Cerrar",
+      "setsDone": "Series realizadas",
+      "setsRecorded": "Series registradas",
+      "highest": "Mayor carga"
     }
   },
   "muscles": {
@@ -99,5 +112,35 @@
     "SHOULDERS": "Hombros",
     "CORE": "Core",
     "NECK": "Cuello"
+  },
+  "efforts": {
+    "LOW": "Bajo",
+    "MIDLOW": "Medio-bajo",
+    "MID": "Medio",
+    "MIDHIGH": "Medio-alto",
+    "HIGH": "Alto"
+  },
+  "effortsByType": {
+    "STRENGTH": {
+      "LOW": "RIR 5+",
+      "MIDLOW": "RIR 4",
+      "MID": "RIR 3",
+      "MIDHIGH": "RIR 1-2",
+      "HIGH": "RIR 0"
+    },
+    "CARDIO": {
+      "LOW": "RPE 1-2",
+      "MIDLOW": "RPE 3-4",
+      "MID": "RPE 5-6",
+      "MIDHIGH": "RPE 7-8",
+      "HIGH": "RPE 9-10"
+    },
+    "STRETCHING": {
+      "LOW": "Muy suave",
+      "MIDLOW": "Suave",
+      "MID": "Moderado",
+      "MIDHIGH": "Intenso",
+      "HIGH": "Muy intenso"
+    }
   }
 }

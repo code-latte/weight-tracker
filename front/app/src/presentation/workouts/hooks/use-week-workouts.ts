@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ContainerInterface, Dependencies } from "@weight-tracker/core/application";
 import type { DomainErrorCode, WorkoutListItem } from "@weight-tracker/core/domain";
+import useSession from "@/presentation/auth/hooks/use-session";
+import type { SessionState } from "@/presentation/auth/context/session-context";
 import useContainer from "@/presentation/common/hooks/use-container";
 import { addWeeks, isInWeek, weekStartOf } from "@/presentation/common/format/week";
 
@@ -18,8 +20,11 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function readWorkouts(container: ContainerInterface<Dependencies>): Promise<WorkoutsState> {
-  const result = await container.resolve("getWorkoutsUseCase").execute({});
+async function readWorkouts(
+  container: ContainerInterface<Dependencies>,
+  runWithSession: SessionState["runWithSession"],
+): Promise<WorkoutsState> {
+  const result = await runWithSession(() => container.resolve("getWorkoutsUseCase").execute({}));
   if (!result.ok) {
     return { status: "error", errorCode: result.error.code };
   }
@@ -38,6 +43,7 @@ export function isDone(workout: WorkoutListItem): boolean {
  */
 export default function useWeekWorkouts() {
   const container = useContainer();
+  const { runWithSession } = useSession();
   const [state, setState] = useState<WorkoutsState>({ status: "loading" });
   const [weekStart, setWeekStart] = useState(() => weekStartOf(new Date()));
   const [refreshing, setRefreshing] = useState(false);
@@ -45,7 +51,7 @@ export default function useWeekWorkouts() {
   useEffect(() => {
     let active = true;
 
-    void readWorkouts(container).then((next) => {
+    void readWorkouts(container, runWithSession).then((next) => {
       if (active) {
         setState(next);
       }
@@ -54,30 +60,32 @@ export default function useWeekWorkouts() {
     return () => {
       active = false;
     };
-  }, [container]);
+  }, [container, runWithSession]);
 
   const retry = useCallback(() => {
     setState({ status: "loading" });
-    void readWorkouts(container).then(setState);
-  }, [container]);
+    void readWorkouts(container, runWithSession).then(setState);
+  }, [container, runWithSession]);
 
   /** Reads again without any sign of it, for when the screen regains focus. A failed read keeps what is shown. */
   const reload = useCallback(() => {
-    void readWorkouts(container).then((next) => {
+    void readWorkouts(container, runWithSession).then((next) => {
       if (next.status === "ready") {
         setState(next);
       }
     });
-  }, [container]);
+  }, [container, runWithSession]);
 
   /** Reads again while the list stays on screen; the viewed week is kept. */
   const refresh = useCallback(() => {
     setRefreshing(true);
-    void Promise.all([readWorkouts(container), wait(MIN_REFRESH_MS)]).then(([next]) => {
-      setState(next);
-      setRefreshing(false);
-    });
-  }, [container]);
+    void Promise.all([readWorkouts(container, runWithSession), wait(MIN_REFRESH_MS)]).then(
+      ([next]) => {
+        setState(next);
+        setRefreshing(false);
+      },
+    );
+  }, [container, runWithSession]);
 
   const previousWeek = useCallback(() => setWeekStart((current) => addWeeks(current, -1)), []);
   const nextWeek = useCallback(() => setWeekStart((current) => addWeeks(current, 1)), []);

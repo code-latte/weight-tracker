@@ -2,6 +2,7 @@ import type {
   CreatedUserResponse,
   CreateUserRequest,
   DomainError,
+  ExerciseLastPerformance,
   Result,
   UpdateProfileRequest,
   UserActivationSummary,
@@ -13,6 +14,10 @@ export default interface UserRepositoryInterface {
   getMe(): Promise<Result<UserProfile, DomainError>>;
   /** The user's current trainer, or `null` when they have none. */
   getTrainer(userId: string): Promise<Result<UserProfile | null, DomainError>>;
+  /** The signed-in user's last performance of a catalog exercise, or `null` when they never did it. */
+  getMyExerciseLastPerformance(
+    exerciseId: string,
+  ): Promise<Result<ExerciseLastPerformance | null, DomainError>>;
   updateMe(request: UpdateProfileRequest): Promise<Result<UserProfile, DomainError>>;
   getAll(): Promise<Result<UserSummary[], DomainError>>;
   create(request: CreateUserRequest): Promise<Result<CreatedUserResponse, DomainError>>;

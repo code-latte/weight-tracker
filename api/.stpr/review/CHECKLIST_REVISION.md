@@ -19,6 +19,7 @@ This checklist is a guide for human review. AI may help inspect the codebase, co
 
 - [ ] Module folders exist per layer: `WeightTracker.Domain/<Module>`, `WeightTracker.Application/UseCases/<Module>`, `WeightTracker.Infra/Repositories`, and `WeightTracker.Api/Endpoints/<Resource>`.
 - [ ] Repository contracts live in `WeightTracker.Application/Interfaces`; implementations live in `WeightTracker.Infra/Repositories`.
+- [ ] Read projection contracts (`I<Projection>Query`) live in `WeightTracker.Application/Interfaces`; implementations live in `WeightTracker.Infra/Queries`.
 - [ ] Tests live in `test/WeightTracker.Unit` (no infrastructure) and `test/WeightTracker.Integration` (real Postgres in a disposable Testcontainers container, never the compose database).
 
 ## Domain
@@ -46,7 +47,8 @@ This checklist is a guide for human review. AI may help inspect the codebase, co
 - [ ] Repositories do not call `SaveChanges`; the use case calls `IUnitOfWork.SaveChangesAsync` exactly once.
 - [ ] Repositories take and return domain types only; no EF entity leaks past the repository.
 - [ ] Every I/O method takes a `CancellationToken` as its last parameter and passes it through to EF.
-- [ ] `DbContext` is reached directly only from seed code and the integration test bootstrap.
+- [ ] `DbContext` is reached directly only from repositories, read projections in `Infra/Queries`, seed code and the integration test bootstrap.
+- [ ] Every read projection follows `STPR_INVARIANTS.md` ("Read projections"): own interface, no-tracking, returns an Application view, never used before a write, and named in the plan with its reason.
 
 ## API
 

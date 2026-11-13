@@ -1,10 +1,12 @@
 import { useCallback, useState } from "react";
 import type { DomainErrorCode, WorkoutStatus } from "@weight-tracker/core/domain";
+import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
 
 /** Moves a workout to another status (start, finish). Holds whether the change is in flight and its last error. It never throws. */
 export default function useChangeWorkoutStatus(workoutId: string) {
   const container = useContainer();
+  const { runWithSession } = useSession();
   const [changing, setChanging] = useState(false);
   const [errorCode, setErrorCode] = useState<DomainErrorCode | null>(null);
 
@@ -14,9 +16,9 @@ export default function useChangeWorkoutStatus(workoutId: string) {
       setChanging(true);
       setErrorCode(null);
 
-      const result = await container
-        .resolve("changeWorkoutStatusUseCase")
-        .execute({ workoutId, status });
+      const result = await runWithSession(() =>
+        container.resolve("changeWorkoutStatusUseCase").execute({ workoutId, status }),
+      );
 
       setChanging(false);
       if (result.ok) {
@@ -26,7 +28,7 @@ export default function useChangeWorkoutStatus(workoutId: string) {
 
       return false;
     },
-    [container, workoutId],
+    [container, runWithSession, workoutId],
   );
 
   return { change, changing, errorCode };

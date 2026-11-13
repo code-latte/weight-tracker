@@ -70,6 +70,19 @@
     "restReset": "Reset rest",
     "errors": {
       "CONFLICT": "This set cannot be recorded."
+    },
+    "lastPerformance": {
+      "link": "Previous sets",
+      "title": "Last session",
+      "effort": "Effort",
+      "reps": "{{count}} reps",
+      "seconds": "{{count}} s",
+      "weight": "{{weight}} kg",
+      "noWeight": "no weight",
+      "close": "Close",
+      "setsDone": "Sets done",
+      "setsRecorded": "Recorded sets",
+      "highest": "Highest weight"
     }
   },
   "muscles": {
@@ -99,5 +112,35 @@
     "SHOULDERS": "Shoulders",
     "CORE": "Core",
     "NECK": "Neck"
+  },
+  "efforts": {
+    "LOW": "Low",
+    "MIDLOW": "Medium-low",
+    "MID": "Medium",
+    "MIDHIGH": "Medium-high",
+    "HIGH": "High"
+  },
+  "effortsByType": {
+    "STRENGTH": {
+      "LOW": "RIR 5+",
+      "MIDLOW": "RIR 4",
+      "MID": "RIR 3",
+      "MIDHIGH": "RIR 1-2",
+      "HIGH": "RIR 0"
+    },
+    "CARDIO": {
+      "LOW": "RPE 1-2",
+      "MIDLOW": "RPE 3-4",
+      "MID": "RPE 5-6",
+      "MIDHIGH": "RPE 7-8",
+      "HIGH": "RPE 9-10"
+    },
+    "STRETCHING": {
+      "LOW": "Very light",
+      "MIDLOW": "Light",
+      "MID": "Moderate",
+      "MIDHIGH": "Intense",
+      "HIGH": "Very intense"
+    }
   }
 }

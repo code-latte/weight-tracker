@@ -3,6 +3,7 @@ import type { HttpClientInterface, HttpRequest } from "../../../src/application"
 import {
   type CreatedUserResponse,
   type CreateUserRequest,
+  type ExerciseLastPerformance,
   ok,
   type UpdateProfileRequest,
   type UserActivationSummary,
@@ -17,6 +18,15 @@ const profile: UserProfile = {
   name: "Ana",
   surname: "García",
   role: "TRAINER",
+};
+
+const lastPerformance: ExerciseLastPerformance = {
+  workoutDate: "2026-11-10",
+  effort: "HIGH",
+  sets: [
+    { reps: 10, durationSeconds: null, weight: 20 },
+    { reps: 10, durationSeconds: null, weight: null },
+  ],
 };
 
 const summary: UserActivationSummary = { ...profile, isActive: true, deactivatedAtUtc: null };
@@ -176,6 +186,78 @@ describe("UserRepository", () => {
 
       // Act
       const result = await repository.getTrainer(userId);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("getMyExerciseLastPerformance", () => {
+    const exerciseId = "9b8a7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
+
+    it("gets /users/me/exercises/{exerciseId}/last-performance without a body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => lastPerformance);
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      await repository.getMyExerciseLastPerformance(exerciseId);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "GET", path: `/users/me/exercises/${exerciseId}/last-performance` },
+      ]);
+    });
+
+    it("returns the last performance on success, keeping a null weight", async () => {
+      // Arrange
+      const repository = new UserRepository(new FakeHttpClient(async () => lastPerformance));
+
+      // Act
+      const result = await repository.getMyExerciseLastPerformance(exerciseId);
+
+      // Assert
+      expect(result).toEqual(ok(lastPerformance));
+    });
+
+    it("returns null when the API answers with no content", async () => {
+      // Arrange
+      const repository = new UserRepository(new FakeHttpClient(async () => undefined));
+
+      // Act
+      const result = await repository.getMyExerciseLastPerformance(exerciseId);
+
+      // Assert
+      expect(result).toEqual(ok(null));
+    });
+
+    it.each([
+      [401, "UNAUTHORIZED"],
+      [404, "NOT_FOUND"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => {
+        throw new HttpError(status, { status, detail: "Something failed" });
+      });
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      const result = await repository.getMyExerciseLastPerformance(exerciseId);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      const result = await repository.getMyExerciseLastPerformance(exerciseId);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

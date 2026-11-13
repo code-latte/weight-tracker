@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { DomainErrorCode } from "@weight-tracker/core/domain";
+import useSession from "@/presentation/auth/hooks/use-session";
 import useContainer from "@/presentation/common/hooks/use-container";
 import { type SetRow, type SetValues, setRecordBodyOf } from "@/presentation/workouts/set-rows";
 
@@ -9,6 +10,7 @@ import { type SetRow, type SetValues, setRecordBodyOf } from "@/presentation/wor
  */
 export default function useSaveSetRecord(workoutId: string, exerciseId: string) {
   const container = useContainer();
+  const { runWithSession } = useSession();
   const [savingNumber, setSavingNumber] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<number, DomainErrorCode>>({});
 
@@ -23,14 +25,14 @@ export default function useSaveSetRecord(workoutId: string, exerciseId: string) 
       });
 
       const body = setRecordBodyOf(row, values);
-      const result =
-        row.record === null
-          ? await container
-              .resolve("addSetRecordUseCase")
-              .execute({ workoutId, exerciseId, ...body })
-          : await container
+      const record = row.record;
+      const result = await runWithSession(() =>
+        record === null
+          ? container.resolve("addSetRecordUseCase").execute({ workoutId, exerciseId, ...body })
+          : container
               .resolve("updateSetRecordUseCase")
-              .execute({ workoutId, exerciseId, setRecordId: row.record.id, ...body });
+              .execute({ workoutId, exerciseId, setRecordId: record.id, ...body }),
+      );
 
       setSavingNumber(null);
       if (result.ok) {
@@ -40,7 +42,7 @@ export default function useSaveSetRecord(workoutId: string, exerciseId: string) 
 
       return false;
     },
-    [container, workoutId, exerciseId],
+    [container, runWithSession, workoutId, exerciseId],
   );
 
   return { save, savingNumber, errors };

@@ -1233,6 +1233,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workouts/{workoutId}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    workoutId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkoutSummaryResponse"];
+                        "application/json": components["schemas"]["WorkoutSummaryResponse"];
+                        "text/json": components["schemas"]["WorkoutSummaryResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workouts/{workoutId}": {
         parameters: {
             query?: never;
@@ -3128,6 +3200,92 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{userId}/exercises/{exerciseId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number | string;
+                };
+                header?: never;
+                path: {
+                    userId: string;
+                    exerciseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ExerciseHistorySessionResponse"][];
+                        "application/json": components["schemas"]["ExerciseHistorySessionResponse"][];
+                        "text/json": components["schemas"]["ExerciseHistorySessionResponse"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5439,6 +5597,18 @@ export interface components {
             /** Format: date-time */
             createdAtUtc: string;
         };
+        ExerciseHistorySessionResponse: {
+            /** Format: uuid */
+            workoutId: string;
+            /** Format: date */
+            workoutDate: string;
+            /** Format: double */
+            maxWeight: null | number | string;
+            /** Format: double */
+            volume: null | number | string;
+            /** Format: double */
+            estimatedOneRepMax: null | number | string;
+        };
         ExerciseLastPerformanceResponse: {
             /** Format: date */
             workoutDate: string;
@@ -5465,6 +5635,17 @@ export interface components {
             ownerId: null | string;
             /** Format: date-time */
             archivedAtUtc: null | string;
+        };
+        ExerciseSummaryResponse: {
+            /** Format: uuid */
+            workoutExerciseId: string;
+            /** Format: uuid */
+            exerciseId: string;
+            setsInTarget: components["schemas"]["SetsInTargetResponse"];
+            /** Format: double */
+            volume: null | number | string;
+            topSet: null | components["schemas"]["LastPerformanceSetResponse"];
+            previous: null | components["schemas"]["PreviousExecutionResponse"];
         };
         ExerciseTranslationResponse: {
             languageCode: string;
@@ -5535,6 +5716,13 @@ export interface components {
         };
         /** @enum {unknown} */
         Muscles: "ABDOMINALS" | "ABDUCTORS" | "ADDUCTORS" | "BICEPS" | "CALVES" | "CHEST" | "FOREARMS" | "GLUTES" | "HAMSTRINGS" | "LATS" | "LOWER_BACK" | "MIDDLE_BACK" | "NECK" | "QUADRICEPS" | "SHOULDERS" | "TRAPS" | "TRICEPS" | null;
+        PreviousExecutionResponse: {
+            /** Format: uuid */
+            workoutId: string;
+            /** Format: date */
+            workoutDate: string;
+            topSet: components["schemas"]["LastPerformanceSetResponse"];
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -5592,6 +5780,12 @@ export interface components {
             /** Format: int32 */
             count: number | string;
             target: components["schemas"]["SetTargetResponse"];
+        };
+        SetsInTargetResponse: {
+            /** Format: int32 */
+            inTarget: number | string;
+            /** Format: int32 */
+            evaluated: number | string;
         };
         SetTargetResponse: {
             type: string;
@@ -5899,6 +6093,14 @@ export interface components {
         };
         /** @enum {unknown} */
         WorkoutStatus: "DRAFT" | "PUBLISHED" | "STARTED" | "COMPLETED" | "REVIEWED" | null;
+        WorkoutSummaryResponse: {
+            /** Format: uuid */
+            workoutId: string;
+            setsInTarget: components["schemas"]["SetsInTargetResponse"];
+            /** Format: double */
+            volume: null | number | string;
+            exercises: components["schemas"]["ExerciseSummaryResponse"][];
+        };
         WorkoutTemplateResponse: {
             /** Format: uuid */
             id: string;

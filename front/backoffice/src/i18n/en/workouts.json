@@ -265,7 +265,70 @@
     },
     "volumeValue": "{{value}} kg",
     "expand": "Expand {{name}}",
-    "collapse": "Collapse {{name}}"
+    "collapse": "Collapse {{name}}",
+    "metrics": {
+      "results": {
+        "title": "Session results",
+        "subtitle": "Compliance, volume and intensity of the session",
+        "setsDone": "Sets completed",
+        "exercisesDone": "Exercises completed",
+        "setsInTarget": "Sets in target range",
+        "volume": "Strength volume",
+        "duration": "Duration"
+      },
+      "percentValue": "{{value}}%",
+      "evolution": {
+        "exercise": "Exercise"
+      },
+      "load": {
+        "title": "Load progression",
+        "subtitle": "Max weight per session",
+        "aria": "Chart of the max weight per session"
+      },
+      "volume": {
+        "title": "Volume progression",
+        "subtitle": "Total exercise volume (weight × reps)",
+        "aria": "Chart of the volume per session"
+      },
+      "history": {
+        "empty": "No data for this exercise"
+      },
+      "comparison": {
+        "title": "Exercise comparison",
+        "subtitle": "This session against the previous execution",
+        "exercise": "Exercise",
+        "previous": "Previous",
+        "current": "Current",
+        "change": "Change",
+        "volume": "Volume (current)",
+        "compliance": "Compliance",
+        "changeValue": "{{value}} %",
+        "equal": "=",
+        "empty": "No weighted exercise in this session"
+      },
+      "muscles": {
+        "title": "Sets per muscle group",
+        "subtitle": "Effective sets of the session",
+        "sets": "{{count}} sets"
+      },
+      "observations": {
+        "title": "Session observations",
+        "subtitle": "Key points and recommendations",
+        "preview": "Preview",
+        "LOAD_PROGRESSION": {
+          "title": "Notable progression",
+          "text": "Load increase in Romanian deadlift (+8.3%) and Hack squat (+12.5%)."
+        },
+        "GOOD_COMPLIANCE": {
+          "title": "Good compliance",
+          "text": "27 of 29 sets within the target rep range (93%)."
+        },
+        "SET_BELOW_TARGET": {
+          "title": "Review",
+          "text": "The third set of Romanian deadlift fell below target (7/8 reps). Consider keeping the load or adjusting the RIR next session."
+        }
+      }
+    }
   },
   "muscles": {
     "ABDOMINALS": "Abdominals",

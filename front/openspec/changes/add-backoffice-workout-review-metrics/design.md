@@ -78,11 +78,13 @@ _Alternative:_ a render-prop per tab. Rejected because one prop is enough for on
 
 ### D3. State hooks, held by the view
 
-- **`useWorkoutSummary(workoutId, enabled)`** (`presentation/workouts/hooks/use-workout-summary.ts`):
+- **`useWorkoutSummary(workoutId)`** (`presentation/workouts/hooks/use-workout-summary.ts`):
   - modelled on `useWorkout`: `status` (`idle` | `loading` | `loaded` | `failed`), `summary`, `errorCode`, `reload`,
     and the generation guard;
-  - it reads once, the first time `enabled` becomes true, and keeps the result while the view lives;
-  - the view passes `enabled = tab === "metrics"` and hands the hook's state to `WorkoutReviewMetrics`.
+  - it exposes `load`, which reads only the first time it is called and does nothing afterwards, so the read is
+    event-driven and not an effect;
+  - the view calls `load` when the user selects the metrics tab, and hands the hook's state to
+    `WorkoutReviewMetrics`.
 - **`useExerciseHistory(userId, exerciseId)`** (`hooks/use-exercise-history.ts`):
   - same shape;
   - it reads with `limit: 5` whenever `exerciseId` changes and is not `null`, and stays `idle` with `null`;
@@ -111,8 +113,9 @@ summary would be read again.
 - **`BarChart` atom** (`bar-chart.tsx`): the same props, wrapping `BarChart`. The last bar is in the full primary
   colour and the others in a softer primary.
 - The atoms hold no copy. Labels and formatted values come by props, as in every other atom.
-- `ExerciseEvolutionCard` (organism) takes `variant: "load" | "volume"`, the points, the selector props and the
-  history state. It renders, in order:
+- `ExerciseEvolutionCard` (organism) takes `variant: "load" | "volume"`, the selector props and the history state, and
+  derives its points with `historyPointsOf`. Each card has its own selector, as in the mockup, both bound to the one
+  selection held by the view. It renders, in order:
   - the title, the subtitle and the selector (`text-field` with `select` and `menu-item`);
   - then, by state:
     - `skeleton` while loading;
@@ -154,6 +157,8 @@ only atoms import `@mui/material` widgets or `@mui/x-charts`.
   - `SessionObservationsCard`.
 - **Molecules:**
   - `ReviewStatCard` (existing) gains an optional `caption` with a `captionColor`;
+  - `ReviewSectionHeader`: the icon, title, subtitle and optional action that head each card of the tab, so the five
+    organisms do not repeat it;
   - `WeightChangeChip`: the `chip` atom, success or warning, with "▲" / "▼" / "=" / "—";
   - `ComplianceChip`: the `chip` atom with a check icon at 100%;
   - `MuscleSetsRow`: label, `linear-progress` and count;

@@ -120,21 +120,22 @@ Both SHALL plot the athlete's last 5 sessions of the selected exercise, oldest t
 - **WHEN** one session of the history has `maxWeight: null`
 - **THEN** the load chart leaves that session out and the volume chart still shows it if its `volume` is not `null`
 
-### Requirement: One selector drives both charts
+### Requirement: One selection drives both charts
 
-Both evolution cards SHALL share one exercise selector, listing the weighted exercises in workout order and selecting
-the first one on opening. Changing it SHALL read that exercise's history again for the workout's athlete.
+Each evolution card SHALL show an exercise selector, and both selectors SHALL show the same selection. They SHALL list
+the weighted exercises in workout order and select the first one on opening. Changing either SHALL change both and read
+that exercise's history again for the workout's athlete.
 
 #### Scenario: Changing the exercise
 
-- **WHEN** the user selects "Sentadilla hack" in the selector
-- **THEN** the history of that exercise is requested for the workout's athlete with a limit of 5
-- **AND** both charts show its sessions
+- **WHEN** the user selects "Sentadilla hack" in the selector of either card
+- **THEN** the history of that exercise is requested once for the workout's athlete with a limit of 5
+- **AND** both selectors show it and both charts show its sessions
 
 #### Scenario: No weighted exercise
 
 - **WHEN** the summary has no weighted exercise
-- **THEN** no history is requested and both cards show "Sin datos de este ejercicio"
+- **THEN** no history is requested, no selector is shown and both cards show "Sin datos de este ejercicio"
 
 ### Requirement: Empty or failed history
 
@@ -174,6 +175,11 @@ anterior". It SHALL hold a table with one row per weighted exercise, in workout 
 - **WHEN** an exercise's `previous` is `null`
 - **THEN** "Anterior" and "Cambio" show "—"
 
+#### Scenario: No weighted exercise
+
+- **WHEN** the summary has no weighted exercise
+- **THEN** the card shows "Ningún ejercicio con peso en esta sesión" instead of the table
+
 ### Requirement: Weight change and compliance marks
 
 "Cambio" SHALL show the change from the previous top set's weight to the current one, as a percentage with one
@@ -184,7 +190,7 @@ below it, and "—" when nothing was evaluated.
 #### Scenario: Weight falls
 
 - **WHEN** the previous top set is 100 kg and the current one 95 kg
-- **THEN** "Cambio" shows "▼ −5,0 %" in a warning mark
+- **THEN** "Cambio" shows "▼ -5,0 %" in a warning mark
 
 #### Scenario: Same weight
 

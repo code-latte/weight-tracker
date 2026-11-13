@@ -15,7 +15,10 @@ interface WorkoutReviewTabsProps {
   value: ReviewTab;
   onChange: (value: ReviewTab) => void;
   /** The content of the "Ejercicios" tab; the other two are empty for now. */
+  /** The panel of the "Ejercicios" tab. */
   children: ReactNode;
+  /** The panel of the "Resumen y métricas" tab. */
+  metrics: ReactNode;
 }
 
 const TABS: { value: ReviewTab; icon: ReactElement }[] = [
@@ -25,7 +28,12 @@ const TABS: { value: ReviewTab; icon: ReactElement }[] = [
 ];
 
 /** The review's tab row and the panel of the selected tab. */
-export default function WorkoutReviewTabs({ value, onChange, children }: WorkoutReviewTabsProps) {
+export default function WorkoutReviewTabs({
+  value,
+  onChange,
+  children,
+  metrics,
+}: WorkoutReviewTabsProps) {
   const { t } = useTranslation("workouts");
 
   return (
@@ -50,6 +58,7 @@ export default function WorkoutReviewTabs({ value, onChange, children }: Workout
       </Tabs>
       <Box role="tabpanel" id={`review-panel-${value}`} aria-labelledby={`review-tab-${value}`}>
         {value === "exercises" ? children : null}
+        {value === "metrics" ? metrics : null}
       </Box>
     </Box>
   );

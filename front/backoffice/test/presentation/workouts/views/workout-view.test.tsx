@@ -9,6 +9,7 @@ import type {
   CreateSuperSeriesInput,
   Exercise,
   ExerciseFavorite,
+  ExerciseHistorySession,
   RemoveExerciseFromWorkoutInput,
   ReorderWorkoutExercisesInput,
   Result,
@@ -22,6 +23,7 @@ import type {
   WorkoutByIdExercise,
   WorkoutDetail,
   WorkoutExerciseDetail,
+  WorkoutSummary,
   WorkoutTemplate,
 } from "@weight-tracker/core/domain";
 import i18n from "@/infrastructure/i18n";
@@ -38,6 +40,18 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push }),
   usePathname: () => "/workout",
   useSearchParams: () => new URLSearchParams(navigation.search),
+}));
+
+/** jsdom has no layout, so the chart atoms are replaced by stubs that expose the points they were given. */
+vi.mock("@/presentation/common/components/atoms/line-chart", () => ({
+  default: ({ labels, values }: { labels: string[]; values: number[] }) => (
+    <div data-testid="line-chart" data-labels={labels.join("|")} data-values={values.join("|")} />
+  ),
+}));
+vi.mock("@/presentation/common/components/atoms/bar-chart", () => ({
+  default: ({ labels, values }: { labels: string[]; values: number[] }) => (
+    <div data-testid="bar-chart" data-labels={labels.join("|")} data-values={values.join("|")} />
+  ),
 }));
 
 function catalogExercise(
@@ -311,7 +325,15 @@ function renderWorkout({
   profile = completeProfile,
   saveAsTemplate = async () => ok(savedTemplate),
   changeStatus = async ({ status }) => ok({ ...workout, status: status ?? workout.status }),
+  getSummary = async () => fail(new DomainError("UNEXPECTED", "Not used")),
+  getHistory = async () => ok([]),
 }: {
+  getSummary?: (input: { workoutId: string }) => Promise<Result<WorkoutSummary, DomainError>>;
+  getHistory?: (input: {
+    userId: string;
+    exerciseId: string;
+    limit: number;
+  }) => Promise<Result<ExerciseHistorySession[], DomainError>>;
   changeStatus?: (input: ChangeWorkoutStatusInput) => Promise<Result<WorkoutDetail, DomainError>>;
   saveAsTemplate?: () => Promise<Result<WorkoutTemplate, DomainError>>;
   getWorkout?: () => Promise<Result<WorkoutById, DomainError>>;
@@ -338,6 +360,8 @@ function renderWorkout({
   breakSuperSeries?: (input: BreakSuperSeriesInput) => Promise<Result<void, DomainError>>;
 } = {}) {
   const readWorkout = vi.fn(getWorkout);
+  const readSummary = vi.fn(getSummary);
+  const readHistory = vi.fn(getHistory);
   const readCatalog = vi.fn(getExercises);
   // The workout carries its mesocycle: registered only to prove the screen never reads it.
   const readMesocycle = vi.fn(async () => fail(new DomainError("UNEXPECTED", "Not used")));
@@ -361,6 +385,8 @@ function renderWorkout({
 
   return {
     readWorkout,
+    readSummary,
+    readHistory,
     readCatalog,
     readMesocycle,
     favorites,
@@ -377,6 +403,8 @@ function renderWorkout({
         getSessionUseCase: () => ({ execute: session }),
         getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
         getWorkoutByIdUseCase: () => ({ execute: readWorkout }),
+        getWorkoutSummaryUseCase: () => ({ execute: readSummary }),
+        getUserExerciseHistoryUseCase: () => ({ execute: readHistory }),
         getMesocycleByIdUseCase: () => ({ execute: readMesocycle }),
         getExercisesUseCase: () => ({ execute: readCatalog }),
         getExerciseFavoritesUseCase: () => ({ execute: favorites.read }),
@@ -4882,17 +4910,20 @@ describe("WorkoutView", () => {
       expect(screen.queryByRole("button", { name: "Expandir todo" })).not.toBeInTheDocument();
     });
 
-    it.each(["Resumen y métricas", "Feedback"])("shows an empty panel in %s", async (name) => {
+    it("shows an empty panel in Feedback", async () => {
       // Arrange
       await renderWorkout({ getWorkout: withReview() }).rendered;
       await heading();
       const user = userEvent.setup();
 
       // Act
-      await user.click(screen.getByRole("tab", { name }));
+      await user.click(screen.getByRole("tab", { name: "Feedback" }));
 
       // Assert
-      expect(screen.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: "Feedback" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
       expect(
         screen.queryByRole("heading", { name: "Sentadilla", level: 3 }),
       ).not.toBeInTheDocument();
@@ -5109,6 +5140,418 @@ describe("WorkoutView", () => {
       // Assert
       expect(await screen.findByText("Revisa los datos introducidos.")).toBeInTheDocument();
       expect(screen.queryByText("Plantilla creada.")).not.toBeInTheDocument();
+    });
+
+    describe("metrics tab", () => {
+      const curlPending = exerciseWithRecords(
+        "we-5",
+        curl.id,
+        "MID",
+        [{ count: 3, target: { type: "Reps", value: 12, maxValue: null } }],
+        [],
+      );
+      const metricsWorkout: Partial<WorkoutById> = {
+        status: "COMPLETED",
+        startedAt: "2026-11-13T10:00:00Z",
+        completedAt: "2026-11-13T11:12:00Z",
+        exercises: [squatDone, benchStarted, pressPending, bikeStarted, curlPending],
+      };
+      const previousTopSet = { reps: 6, durationSeconds: null, weight: 120 };
+
+      /** The summary the API answers: the squat, bench and press are weighted; the bike and the curl are not. */
+      function summaryOf(exercises: WorkoutSummary["exercises"] = []): WorkoutSummary {
+        const entry = (
+          workoutExerciseId: string,
+          exerciseId: string,
+          volume: number | null,
+          setsInTarget: { inTarget: number; evaluated: number },
+          topSet: WorkoutSummary["exercises"][number]["topSet"],
+          previous: WorkoutSummary["exercises"][number]["previous"],
+        ) => ({ workoutExerciseId, exerciseId, volume, setsInTarget, topSet, previous });
+
+        return {
+          workoutId: "w-1",
+          setsInTarget: { inTarget: 27, evaluated: 29 },
+          volume: 16913.4,
+          exercises: exercises.length
+            ? exercises
+            : [
+                entry(
+                  "we-1",
+                  squat.id,
+                  3190,
+                  { inTarget: 3, evaluated: 3 },
+                  { reps: 7, durationSeconds: null, weight: 130 },
+                  { workoutId: "w-0", workoutDate: "2026-10-27", topSet: previousTopSet },
+                ),
+                entry(
+                  "we-2",
+                  bench.id,
+                  1200,
+                  { inTarget: 1, evaluated: 2 },
+                  { reps: 10, durationSeconds: null, weight: 40 },
+                  null,
+                ),
+                entry(
+                  "we-3",
+                  legPress.id,
+                  2400,
+                  { inTarget: 3, evaluated: 3 },
+                  { reps: 12, durationSeconds: null, weight: 100 },
+                  {
+                    workoutId: "w-0",
+                    workoutDate: "2026-10-27",
+                    topSet: { reps: 12, durationSeconds: null, weight: 100 },
+                  },
+                ),
+                entry("we-4", bike.id, null, { inTarget: 0, evaluated: 0 }, null, null),
+                entry("we-5", curl.id, null, { inTarget: 0, evaluated: 0 }, null, null),
+              ],
+        };
+      }
+      const withSummary = async () => ok(summaryOf());
+
+      const sessionOf = (
+        workoutDate: string,
+        maxWeight: number | null,
+        volume: number | null,
+      ): ExerciseHistorySession => ({
+        workoutId: `w-${workoutDate}`,
+        workoutDate,
+        maxWeight,
+        volume,
+        estimatedOneRepMax: null,
+      });
+      /** Newest first, as the API answers; the oldest has no max weight. */
+      const history = [
+        sessionOf("2026-11-12", 130, 3190),
+        sessionOf("2026-10-27", 120, 2880),
+        sessionOf("2026-10-13", null, 2500),
+      ];
+      const withHistory = async () => ok(history);
+
+      async function openMetrics(options: Parameters<typeof renderWorkout>[0] = {}) {
+        const rendered = renderWorkout({
+          getWorkout: withReview(metricsWorkout),
+          getSummary: withSummary,
+          getHistory: withHistory,
+          ...options,
+        });
+        await rendered.rendered;
+        await heading();
+        const user = userEvent.setup();
+        await user.click(screen.getByRole("tab", { name: "Resumen y métricas" }));
+        return { ...rendered, user };
+      }
+
+      const panel = () => screen.getByRole("tabpanel");
+      const resultsHeading = () =>
+        screen.findByRole("heading", { name: "Resultados de la sesión" });
+      const cardOfHeading = (name: string) =>
+        within(panel()).getByRole("heading", { name }).closest(".MuiPaper-root") as HTMLElement;
+      /** The value and the caption under a stat label of the results card. */
+      const stat = (label: string) => {
+        const value = within(cardOfHeading("Resultados de la sesión")).getByText(
+          label,
+        ).nextElementSibling!;
+        return { value: value.textContent, caption: value.nextElementSibling?.textContent ?? null };
+      };
+      const tableRows = (card: HTMLElement) =>
+        within(card)
+          .getAllByRole("row")
+          .slice(1)
+          .map((row) =>
+            within(row)
+              .getAllByRole("cell")
+              .map((cell) => cell.textContent),
+          );
+      const chart = (testId: string) => ({
+        labels: screen.getByTestId(testId).getAttribute("data-labels"),
+        values: screen.getByTestId(testId).getAttribute("data-values"),
+      });
+
+      it("does not read the summary while the tab is closed", async () => {
+        // Arrange
+        const { readSummary } = renderWorkout({
+          getWorkout: withReview(metricsWorkout),
+          getSummary: withSummary,
+        });
+
+        // Act
+        await heading();
+
+        // Assert
+        expect(readSummary).not.toHaveBeenCalled();
+      });
+
+      it("reads the summary once on first opening and not when coming back", async () => {
+        // Arrange
+        const { readSummary, user } = await openMetrics();
+        await resultsHeading();
+
+        // Act
+        await user.click(screen.getByRole("tab", { name: "Ejercicios" }));
+        await user.click(screen.getByRole("tab", { name: "Resumen y métricas" }));
+
+        // Assert
+        expect(await resultsHeading()).toBeInTheDocument();
+        expect(readSummary).toHaveBeenCalledTimes(1);
+        expect(readSummary).toHaveBeenCalledWith({ workoutId: "w-1" });
+      });
+
+      it("shows a load error with retry, and the content after a retry that succeeds", async () => {
+        // Arrange
+        let calls = 0;
+        const { user } = await openMetrics({
+          getSummary: async () =>
+            ++calls === 1 ? fail(new DomainError("NETWORK", "offline")) : ok(summaryOf()),
+        });
+        const retry = await screen.findByRole("button", { name: "Reintentar" });
+
+        // Act
+        await user.click(retry);
+
+        // Assert
+        expect(await resultsHeading()).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+      });
+
+      it("shows the five result cards with their percentages", async () => {
+        // Arrange & Act
+        await openMetrics();
+        await resultsHeading();
+
+        // Assert
+        expect(
+          screen.getByText("Cumplimiento, volumen e intensidad del entrenamiento"),
+        ).toBeInTheDocument();
+        expect(stat("Series completadas")).toEqual({ value: "5 / 15", caption: "33%" });
+        expect(stat("Ejercicios completados")).toEqual({ value: "1 / 5", caption: "20%" });
+        expect(stat("Series en rango objetivo")).toEqual({ value: "27 / 29", caption: "93%" });
+        expect(stat("Volumen de fuerza")).toEqual({ value: "16.913,4 kg", caption: null });
+        expect(stat("Duración")).toEqual({ value: "1 h 12 min", caption: null });
+      });
+
+      it("shows a dash for nothing evaluated, no volume and no start", async () => {
+        // Arrange & Act
+        await openMetrics({
+          getWorkout: withReview({ ...metricsWorkout, startedAt: null }),
+          getSummary: async () =>
+            ok({
+              ...summaryOf(),
+              setsInTarget: { inTarget: 0, evaluated: 0 },
+              volume: null,
+            }),
+        });
+        await resultsHeading();
+
+        // Assert
+        expect(stat("Series en rango objetivo")).toEqual({ value: "—", caption: null });
+        expect(stat("Volumen de fuerza")).toEqual({ value: "—", caption: null });
+        expect(stat("Duración")).toEqual({ value: "—", caption: null });
+      });
+
+      it("lists the weighted exercises only, in workout order, against their previous top set", async () => {
+        // Arrange & Act
+        await openMetrics();
+        await resultsHeading();
+
+        // Assert
+        expect(tableRows(cardOfHeading("Comparativa por ejercicio"))).toEqual([
+          ["1Sentadilla", "6 × 120 kg", "7 × 130 kg", "▲ +8,3 %", "3.190 kg", "100%"],
+          ["2Press de banca", "—", "10 × 40 kg", "—", "1.200 kg", "50%"],
+          ["3Prensa de piernas", "12 × 100 kg", "12 × 100 kg", "=", "2.400 kg", "100%"],
+        ]);
+      });
+
+      it("shows a fall in weight and no compliance when nothing was evaluated", async () => {
+        // Arrange
+        const [first] = summaryOf().exercises;
+        const lighter = {
+          ...first!,
+          topSet: { reps: 7, durationSeconds: null, weight: 95 },
+          previous: {
+            workoutId: "w-0",
+            workoutDate: "2026-10-27",
+            topSet: { reps: 7, durationSeconds: null, weight: 100 },
+          },
+          setsInTarget: { inTarget: 0, evaluated: 0 },
+        };
+
+        // Act
+        await openMetrics({ getSummary: async () => ok(summaryOf([lighter])) });
+        await resultsHeading();
+
+        // Assert
+        expect(tableRows(cardOfHeading("Comparativa por ejercicio"))).toEqual([
+          ["1Sentadilla", "7 × 100 kg", "7 × 95 kg", "▼ -5,0 %", "3.190 kg", "—"],
+        ]);
+      });
+
+      it("shows the trained muscles only, most sets first", async () => {
+        // Arrange & Act
+        await openMetrics();
+        await resultsHeading();
+
+        // Assert
+        const card = cardOfHeading("Distribución de series por grupo muscular");
+        expect(within(card).getByText("Series efectivas de la sesión")).toBeInTheDocument();
+        expect(
+          within(card)
+            .getAllByRole("progressbar")
+            .map((bar) => bar.getAttribute("aria-label")),
+        ).toEqual(["Cuádriceps: 4 series", "Pecho: 1 series"]);
+        expect(within(card).queryByText("Bíceps")).not.toBeInTheDocument();
+      });
+
+      it("shows the three sample observations marked as a preview", async () => {
+        // Arrange & Act
+        await openMetrics();
+        await resultsHeading();
+
+        // Assert
+        const card = cardOfHeading("Observaciones de la sesión");
+        expect(within(card).getByText("Vista previa")).toBeInTheDocument();
+        expect(
+          within(card)
+            .getAllByRole("heading", { level: 3 })
+            .map((item) => item.textContent),
+        ).toEqual(["Progresión destacada", "Buen cumplimiento", "Revisar"]);
+      });
+
+      it("charts the athlete's history of the first weighted exercise, oldest first", async () => {
+        // Arrange & Act
+        const { readHistory } = await openMetrics();
+        await resultsHeading();
+
+        // Assert
+        await waitFor(() =>
+          expect(chart("line-chart")).toEqual({ labels: "27 oct|12 nov", values: "120|130" }),
+        );
+        expect(chart("bar-chart")).toEqual({
+          labels: "13 oct|27 oct|12 nov",
+          values: "2500|2880|3190",
+        });
+        expect(readHistory).toHaveBeenCalledTimes(1);
+        expect(readHistory).toHaveBeenCalledWith({
+          userId: ana.id,
+          exerciseId: squat.id,
+          limit: 5,
+        });
+      });
+
+      it("reads the history again when another exercise is selected, in both cards", async () => {
+        // Arrange
+        const { readHistory, user } = await openMetrics();
+        await resultsHeading();
+        await waitFor(() => expect(screen.getByTestId("line-chart")).toBeInTheDocument());
+        const [loadSelector] = screen.getAllByRole("combobox", { name: "Ejercicio" });
+
+        // Act
+        await user.click(loadSelector!);
+        await user.click(screen.getByRole("option", { name: "Press de banca" }));
+
+        // Assert
+        await waitFor(() =>
+          expect(readHistory).toHaveBeenLastCalledWith({
+            userId: ana.id,
+            exerciseId: bench.id,
+            limit: 5,
+          }),
+        );
+        const selectors = screen.getAllByRole("combobox", { name: "Ejercicio" });
+        expect(selectors.map((item) => item.textContent)).toEqual([
+          "Press de banca",
+          "Press de banca",
+        ]);
+      });
+
+      it("shows that there is no data when the history is empty", async () => {
+        // Arrange & Act
+        await openMetrics({ getHistory: async () => ok([]) });
+        await resultsHeading();
+
+        // Assert
+        await waitFor(() =>
+          expect(screen.getAllByText("Sin datos de este ejercicio")).toHaveLength(2),
+        );
+        expect(screen.queryByTestId("line-chart")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("bar-chart")).not.toBeInTheDocument();
+      });
+
+      it("shows a load error with retry in both evolution cards while the rest stays", async () => {
+        // Arrange
+        let calls = 0;
+        const { user } = await openMetrics({
+          getHistory: async () =>
+            ++calls === 1 ? fail(new DomainError("FORBIDDEN", "")) : ok(history),
+        });
+        await resultsHeading();
+        const retries = await screen.findAllByRole("button", { name: "Reintentar" });
+
+        // Act
+        await user.click(retries[0]!);
+
+        // Assert
+        expect(retries).toHaveLength(2);
+        expect(tableRows(cardOfHeading("Comparativa por ejercicio"))).toHaveLength(3);
+        await waitFor(() => expect(screen.getByTestId("line-chart")).toBeInTheDocument());
+        expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+      });
+
+      it("reads no history when no exercise is weighted", async () => {
+        // Arrange & Act
+        const { readHistory } = await openMetrics({
+          getSummary: async () =>
+            ok({
+              ...summaryOf(),
+              exercises: summaryOf().exercises.map((entry) => ({ ...entry, volume: null })),
+            }),
+        });
+        await resultsHeading();
+
+        // Assert
+        expect(screen.getAllByText("Sin datos de este ejercicio")).toHaveLength(2);
+        expect(screen.getByText("Ningún ejercicio con peso en esta sesión")).toBeInTheDocument();
+        expect(screen.queryByRole("combobox", { name: "Ejercicio" })).not.toBeInTheDocument();
+        expect(readHistory).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ["ADMIN", admin],
+        ["TRAINER", trainerProfile],
+      ])("shows the same tab to a %s", async (_role, profile) => {
+        // Arrange & Act
+        await openMetrics({ profile });
+        await resultsHeading();
+
+        // Assert
+        expect(stat("Volumen de fuerza").value).toBe("16.913,4 kg");
+        expect(tableRows(cardOfHeading("Comparativa por ejercicio"))).toHaveLength(3);
+        expect(within(panel()).getByText("Vista previa")).toBeInTheDocument();
+      });
+
+      it("reads in English", async () => {
+        // Arrange
+        await openMetrics();
+        await resultsHeading();
+
+        // Act
+        await act(() => i18n.changeLanguage("en"));
+
+        // Assert
+        expect(screen.getByRole("heading", { name: "Session results" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Exercise comparison" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Sets per muscle group" })).toBeInTheDocument();
+        expect(
+          within(cardOfHeading("Session results")).getByText("Strength volume").nextElementSibling,
+        ).toHaveTextContent("16,913.4 kg");
+        expect(
+          within(cardOfHeading("Sets per muscle group"))
+            .getAllByRole("progressbar")
+            .map((bar) => bar.getAttribute("aria-label")),
+        ).toEqual(["Quadriceps: 4 sets", "Chest: 1 sets"]);
+      });
     });
 
     it("reads in English", async () => {

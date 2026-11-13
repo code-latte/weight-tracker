@@ -49,15 +49,15 @@
 
 ## 5. Backoffice: dependency and atoms
 
-- [ ] 5.1 Run `pnpm --filter backoffice add @mui/x-charts` (the workspace uses pnpm). Verify it lands in
+- [x] 5.1 Run `pnpm --filter backoffice add @mui/x-charts` (the workspace uses pnpm). Verify it lands in
       `backoffice/package.json` and `pnpm-lock.yaml`, and that `pnpm --filter backoffice typecheck` passes.
-- [ ] 5.2 Add the `LineChart` and `BarChart` atoms in `backoffice/src/presentation/common/components/atoms/`, per
+- [x] 5.2 Add the `LineChart` and `BarChart` atoms in `backoffice/src/presentation/common/components/atoms/`, per
       design D4. They take labels, values, a value formatter, a height and an aria label by props, hold no copy, and
       highlight the last value. Verify they typecheck and are the only files importing `@mui/x-charts`.
 
 ## 6. Backoffice: helpers and copy
 
-- [ ] 6.1 Add the design D5 helpers to `presentation/workouts/workout-review.ts`: `isWeighted`, `weightedExercisesOf`,
+- [x] 6.1 Add the design D5 helpers to `presentation/workouts/workout-review.ts`: `isWeighted`, `weightedExercisesOf`,
       `weightChangeOf`, `percentOf`, `muscleDistributionOf` and `historyPointsOf`.
   - Extend `test/presentation/workouts/workout-review.test.ts` to cover:
     - weight change up, down, equal, no previous and a previous of 0;
@@ -66,43 +66,43 @@
     - history reversed with `null` points dropped;
     - the weighted pairing order.
   - Verify the tests pass.
-- [ ] 6.2 Add the `review.metrics.*` keys from the brief and design D8 to `backoffice/src/i18n/{es,en}/workouts.json`.
+- [x] 6.2 Add the `review.metrics.*` keys from the brief and design D8 to `backoffice/src/i18n/{es,en}/workouts.json`.
       Verify the backoffice translation parity test passes.
-- [ ] 6.3 Add `presentation/workouts/session-observations.mock.ts` with the three preview observations (`code`,
+- [x] 6.3 Add `presentation/workouts/session-observations.mock.ts` with the three preview observations (`code`,
       `severity`). Verify it typechecks.
 
 ## 7. Backoffice: state hooks
 
-- [ ] 7.1 Add `useWorkoutSummary(workoutId, enabled)` in `presentation/workouts/hooks/use-workout-summary.ts`,
-      modelled on `use-workout.ts`. It reads once when `enabled` first becomes true, has a `reload` and the generation
+- [x] 7.1 Add `useWorkoutSummary(workoutId)` in `presentation/workouts/hooks/use-workout-summary.ts`, modelled on
+      `use-workout.ts`. Its `load` reads only the first time it is called, and it has a `reload` and the generation
       guard, and never throws. Verify it typechecks.
-- [ ] 7.2 Add `useExerciseHistory(userId, exerciseId)` in `hooks/use-exercise-history.ts` with the same shape. It reads
+- [x] 7.2 Add `useExerciseHistory(userId, exerciseId)` in `hooks/use-exercise-history.ts` with the same shape. It reads
       with `limit: 5` on each non-null `exerciseId` and ignores stale answers. Verify it typechecks.
 
 ## 8. Backoffice: components
 
-- [ ] 8.1 Extend the `ReviewStatCard` molecule with an optional `caption` and `captionColor`. Add the
+- [x] 8.1 Extend the `ReviewStatCard` molecule with an optional `caption` and `captionColor`. Add the
       `WeightChangeChip`, `ComplianceChip`, `MuscleSetsRow` and `ObservationItem` molecules in `components/molecules/`
       (text by props, only atoms imported). Verify they typecheck and that the existing review tests still pass.
-- [ ] 8.2 Add the organisms in `components/organisms/`, per design D4 and D6: `SessionResultsCard`,
+- [x] 8.2 Add the organisms in `components/organisms/`, per design D4 and D6: `SessionResultsCard`,
       `ExerciseEvolutionCard` (load and volume variants, the selector on `text-field` with `select`, and loading, error,
       empty and chart states), `ExerciseComparisonCard`, `MuscleDistributionCard` and `SessionObservationsCard`. Verify
       they typecheck and import only downward.
-- [ ] 8.3 Add the `WorkoutReviewMetrics` organism. It lays out the five blocks per `brand/review.png` (results; the two
+- [x] 8.3 Add the `WorkoutReviewMetrics` organism. It lays out the five blocks per `brand/review.png` (results; the two
       evolution cards side by side, stacking when narrow; comparison; muscles and observations side by side) and shows
       `LoadError` with retry while the summary has failed. Verify it typechecks.
 
 ## 9. Backoffice: view and tests
 
-- [ ] 9.1 Give `WorkoutReviewTabs` a `metrics` prop rendered on the "metrics" tab, per design D2.
+- [x] 9.1 Give `WorkoutReviewTabs` a `metrics` prop rendered on the "metrics" tab, per design D2.
   - In `WorkoutReviewView`:
     - hold the selected chart exercise;
-    - call `useWorkoutSummary(workout.id, tab === "metrics")` and
+    - call `useWorkoutSummary(workout.id)`, calling its `load` when the metrics tab is selected, and
       `useExerciseHistory(workout.athlete.id, selected)`;
     - default the selection to the first weighted exercise once the summary loads;
     - pass `elapsed` and the hooks' state to `WorkoutReviewMetrics`.
   - Verify the existing `workout-view.test.tsx` still passes.
-- [ ] 9.2 Extend `backoffice/test/presentation/workouts/views/workout-view.test.tsx`, following its structure and
+- [x] 9.2 Extend `backoffice/test/presentation/workouts/views/workout-view.test.tsx`, following its structure and
       faking `getWorkoutSummaryUseCase` and `getUserExerciseHistoryUseCase` through the container. Mock the chart atoms
       (design, Tests). Cover the scenarios of `specs/backoffice-workout-review-metrics` and the modified tab scenarios:
   - the summary is read once on first opening and not again on return, and is not read when the tab is never opened;
@@ -122,16 +122,16 @@
 
   Verify they pass.
 
-- [ ] 9.3 Review the backoffice against its mapped references (`review-stat-card.tsx`, `review-exercise-card.tsx`,
+- [x] 9.3 Review the backoffice against its mapped references (`review-stat-card.tsx`, `review-exercise-card.tsx`,
       `review-sets-table.tsx`, `use-workout.ts`, `load-error.tsx` and the existing view test). Check:
   - atomic levels and downward imports;
   - that only atoms import `@mui/material` widgets and `@mui/x-charts`;
   - that there are no hard-coded strings and no business rule;
   - that the app is untouched beyond `container.ts`.
-- [ ] 9.4 Check the tab against `brand/review.png` in `pnpm dev:backoffice`, in light and dark mode and at a narrow
+- [x] 9.4 Check the tab against `brand/review.png` in `pnpm dev:backoffice`, in light and dark mode and at a narrow
       width, with the API running. Note any visual difference that is not covered by a spec decision.
 
 ## 10. Integration
 
-- [ ] 10.1 Run the `.stpr/template/` drift check from `AGENTS.md` and verify it prints no `DRIFT`.
+- [x] 10.1 Run the `.stpr/template/` drift check from `AGENTS.md` and verify it prints no `DRIFT`.
 - [ ] 10.2 Run `pnpm typecheck && pnpm lint && pnpm test` from `front/` and verify it passes. No E2E is planned.

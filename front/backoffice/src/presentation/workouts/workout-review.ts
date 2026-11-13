@@ -1,4 +1,11 @@
-import type { SetRecord, WorkoutById, WorkoutByIdExercise } from "@weight-tracker/core/domain";
+import type {
+  ExerciseHistorySession,
+  ExerciseSummary,
+  SetRecord,
+  WorkoutById,
+  WorkoutByIdExercise,
+  WorkoutSummary,
+} from "@weight-tracker/core/domain";
 
 /** The workout statuses the backoffice shows as a review, once the athlete has started the workout. */
 const REVIEW_STATUSES = new Set(["STARTED", "COMPLETED", "REVIEWED"]);
@@ -143,4 +150,100 @@ export function elapsedPartsOf(ms: number): { hours: number; minutes: number } {
   const totalMinutes = Math.floor(ms / 60_000);
 
   return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 };
+}
+
+/** An exercise of the summary is weighted when the API answered a volume for it. */
+export function isWeighted(exercise: ExerciseSummary): boolean {
+  return exercise.volume != null;
+}
+
+/** A weighted exercise of the summary, with its entry in the workout and its 1-based position there. */
+export interface WeightedExercise {
+  summary: ExerciseSummary;
+  exercise: WorkoutByIdExercise;
+  position: number;
+}
+
+/** The weighted exercises of the summary, in workout order, each paired with its workout entry. */
+export function weightedExercisesOf(
+  summary: WorkoutSummary,
+  workout: Pick<WorkoutById, "exercises">,
+): WeightedExercise[] {
+  const weighted: WeightedExercise[] = [];
+
+  workout.exercises.forEach((exercise, index) => {
+    const entry = summary.exercises.find(
+      ({ workoutExerciseId }) => workoutExerciseId === exercise.id,
+    );
+
+    if (entry && isWeighted(entry)) {
+      weighted.push({ summary: entry, exercise, position: index + 1 });
+    }
+  });
+  return weighted;
+}
+
+export interface WeightChange {
+  direction: "up" | "down" | "equal";
+  /** The signed change from the previous weight to the current one, in percent and not rounded. */
+  percent: number;
+}
+
+/** How the weight moved between two top sets, or `null` when either is missing or the previous one is 0. */
+export function weightChangeOf(
+  previous: number | string | null | undefined,
+  current: number | string | null | undefined,
+): WeightChange | null {
+  if (previous == null || current == null || Number(previous) === 0) {
+    return null;
+  }
+  const before = Number(previous);
+  const after = Number(current);
+
+  if (after === before) {
+    return { direction: "equal", percent: 0 };
+  }
+  return { direction: after > before ? "up" : "down", percent: ((after - before) / before) * 100 };
+}
+
+/** A part over a total, rounded, or `null` when there is no total. */
+export function percentOf(part: number | string, total: number | string): number | null {
+  return Number(total) === 0 ? null : Math.round((Number(part) / Number(total)) * 100);
+}
+
+export interface MuscleSets {
+  muscle: string;
+  sets: number;
+}
+
+/** The counted records per muscle, for the muscles that were trained only, most sets first. */
+export function muscleDistributionOf(workout: Pick<WorkoutById, "exercises">): MuscleSets[] {
+  const setsByMuscle = new Map<string, number>();
+
+  for (const exercise of workout.exercises) {
+    const sets = countedRecordsOf(exercise).length;
+
+    if (sets > 0) {
+      setsByMuscle.set(exercise.muscle, (setsByMuscle.get(exercise.muscle) ?? 0) + sets);
+    }
+  }
+  return [...setsByMuscle]
+    .map(([muscle, sets]) => ({ muscle, sets }))
+    .sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle));
+}
+
+export interface HistoryPoint {
+  workoutDate: string;
+  value: number;
+}
+
+/** The sessions oldest first, as the chart reads them, without the ones that have no value for the field. */
+export function historyPointsOf(
+  sessions: readonly ExerciseHistorySession[],
+  field: "maxWeight" | "volume",
+): HistoryPoint[] {
+  return [...sessions]
+    .reverse()
+    .filter((session) => session[field] != null)
+    .map((session) => ({ workoutDate: session.workoutDate, value: Number(session[field]) }));
 }

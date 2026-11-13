@@ -135,13 +135,18 @@ Rules that follow from the classification:
   outside these two factories.
 - Constructors stay private so an aggregate cannot be built in an invalid state.
 
-### Domain events: dormant
+### Domain events: dispatcher without producers
 
-`AggregateRoot` exposes `AddDomainEvent`, `DomainEvents` and `ClearDomainEvents`, and `IDomainEvent` is defined,
-but **no dispatcher exists**. Events raised today would never be delivered.
+`AggregateRoot` exposes `AddDomainEvent`, `DomainEvents` and `ClearDomainEvents`, and `IDomainEvent` is defined.
+A dispatcher exists in `WeightTracker.Application/Common/Dispatcher`: `IEventDispatcher` delivers events, and a handler
+is declared by implementing `IEventHandler<TEvent>`. `AddEventHandlers` (`WeightTracker.Api/Common`) scans the Application
+and Infra assemblies, so handlers live in one of those two and are **never registered by hand**.
 
-- Do not call `AddDomainEvent` until a change introduces a dispatcher and the plan approves it.
-- A change that wants domain events must add the dispatch mechanism as part of its own scope.
+No aggregate raises events and no use case dispatches them yet.
+
+- Do not call `AddDomainEvent` until a change wires dispatch into use cases and the plan approves it.
+- A change that wires dispatch must also decide when the aggregate's events are cleared; the dispatcher does not clear them.
+- Handlers of the same event must not depend on each other: only the order of events is guaranteed.
 
 - Domain in DDD
   - Should define Rehydrate, that requires Id

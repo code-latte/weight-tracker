@@ -83,6 +83,7 @@ builder.Services.AddDbContext<WeightTrackerDbContext>(options =>
 );
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddEventHandlers(typeof(IUnitOfWork).Assembly, typeof(UnitOfWork).Assembly);
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IExerciseRepository, ExerciseRepository>();
 builder.Services.AddScoped<IExerciseFavoriteRepository, ExerciseFavoriteRepository>();

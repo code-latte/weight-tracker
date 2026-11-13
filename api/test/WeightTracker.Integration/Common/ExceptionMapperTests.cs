@@ -41,6 +41,32 @@ public class ExceptionMapperTests
     }
 
     [Fact]
+    public void Map_ShouldReturnInternalServerErrorForABrokenObservationRule()
+    {
+        // Arrange
+        var exception = new InvalidWorkoutObservationException("at most 3 observations can be highlighted, got 4");
+
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(StatusCodes.Status500InternalServerError);
+    }
+
+    [Fact]
+    public void Map_ShouldReturnInternalServerErrorForInvalidObservationThresholds()
+    {
+        // Arrange
+        var exception = new InvalidObservationThresholdsException("TrendCount must be at least 2, got 0");
+
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(StatusCodes.Status500InternalServerError);
+    }
+
+    [Fact]
     public void Map_ShouldReturnBadRequestForAnInvalidExerciseName()
     {
         // Arrange

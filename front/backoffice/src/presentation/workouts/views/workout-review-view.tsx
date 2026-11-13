@@ -23,6 +23,7 @@ import WorkoutReviewTabs, {
 } from "@/presentation/workouts/components/organisms/workout-review-tabs";
 import useExerciseHistory from "@/presentation/workouts/hooks/use-exercise-history";
 import useSaveWorkoutAsTemplate from "@/presentation/workouts/hooks/use-save-workout-as-template";
+import useWorkoutObservations from "@/presentation/workouts/hooks/use-workout-observations";
 import useWorkoutSummary from "@/presentation/workouts/hooks/use-workout-summary";
 import { backHrefOf, personCardOf } from "@/presentation/workouts/workout-context";
 import useNow from "@/presentation/workouts/hooks/use-now";
@@ -47,9 +48,10 @@ export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
     return new Set(first === null ? [] : [first]);
   });
   const summary = reviewSummaryOf(workout);
-  // The metrics tab reads its summary the first time it opens, and the charts follow the exercise chosen there, the
+  // The metrics tab reads its summary and observations the first time it opens, and the charts follow the exercise chosen there, the
   // first weighted one until the trainer picks another. Both live here so they survive a change of tab.
   const metrics = useWorkoutSummary(workout.id);
+  const observations = useWorkoutObservations(workout.id);
   const [chosenExerciseId, setChosenExerciseId] = useState<string | null>(null);
   const firstWeightedId = metrics.summary
     ? (weightedExercisesOf(metrics.summary, workout)[0]?.exercise.exerciseId ?? null)
@@ -172,6 +174,7 @@ export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
           setTab(next);
           if (next === "metrics") {
             metrics.load();
+            observations.load();
           }
         }}
         metrics={
@@ -179,6 +182,7 @@ export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
             workout={workout}
             elapsed={elapsed}
             summary={metrics}
+            observations={observations}
             history={history}
             selectedExerciseId={chartExerciseId}
             onSelectExercise={setChosenExerciseId}

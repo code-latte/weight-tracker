@@ -113,6 +113,7 @@ public class MigrationsTests : IAsyncLifetime
         "FavoriteExercises",
         "Mesocycles",
         "MesocycleWeeks",
+        "WorkoutObservations",
     ];
 
     private readonly string _maintenanceConnectionString;

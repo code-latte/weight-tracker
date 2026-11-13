@@ -42,12 +42,22 @@ export type ExerciseSummary = components["schemas"]["ExerciseSummaryResponse"];
 export type SetsInTarget = components["schemas"]["SetsInTargetResponse"];
 /** The previous execution of an exercise: its workout, its date and its top set. */
 export type PreviousExecution = components["schemas"]["PreviousExecutionResponse"];
+/**
+ * What the API generated when a prescribed workout was completed: every observation, and which of them are highlighted.
+ * Both lists are empty when none were generated.
+ */
+export type WorkoutObservations = components["schemas"]["WorkoutObservationsResponse"];
+/** One measurable fact about a workout or one of its exercises; `data` holds the numbers it was calculated from. */
+export type WorkoutObservation = components["schemas"]["WorkoutObservationResponse"];
+/** An observation the API selected for the trainer's attention, with its position among the highlights. */
+export type WorkoutHighlight = components["schemas"]["WorkoutHighlightResponse"];
 
 /** The workout id travels in the path, the rest of the input in the body. */
 export type UpdateWorkoutInput = UpdateWorkoutRequest & { id: string };
 export type AddExerciseToWorkoutInput = AddExerciseRequest & { workoutId: string };
 export type GetWorkoutByIdInput = { id: string };
 export type GetWorkoutSummaryInput = { workoutId: string };
+export type GetWorkoutObservationsInput = { workoutId: string };
 export type DeleteWorkoutInput = { id: string };
 /** The list's query: `standalone` keeps only the workouts not placed in a mesocycle. */
 export type GetWorkoutsInput = { standalone?: boolean };

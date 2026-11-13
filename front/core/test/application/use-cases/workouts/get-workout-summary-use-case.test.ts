@@ -12,6 +12,7 @@ import {
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
+  type WorkoutObservations,
   type WorkoutSummary,
 } from "../../../../src/domain";
 
@@ -64,6 +65,11 @@ class FakeWorkoutRepository implements WorkoutRepositoryInterface {
   async getSummary(workoutId: string): Promise<Result<WorkoutSummary, DomainError>> {
     this.reads.push(workoutId);
     return this.result;
+  }
+
+  async getObservations(): Promise<Result<WorkoutObservations, DomainError>> {
+    this.otherCalls += 1;
+    return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 
   async create(): Promise<Result<Workout, DomainError>> {

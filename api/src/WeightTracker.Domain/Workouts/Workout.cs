@@ -334,7 +334,10 @@ public sealed class Workout : AggregateRoot
             StartedAt = ToStoredPrecision(changedAtUtc);
 
         if (target == WorkoutStatus.COMPLETED)
+        {
             CompletedAt = ToStoredPrecision(changedAtUtc);
+            AddDomainEvent(new WorkoutCompletedEvent(Id, changedAtUtc));
+        }
     }
 
     /// <summary>

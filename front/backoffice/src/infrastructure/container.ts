@@ -51,6 +51,7 @@ import {
   GetUsersUseCase,
   GetUserExerciseHistoryUseCase,
   GetWorkoutByIdUseCase,
+  GetWorkoutObservationsUseCase,
   GetWorkoutSummaryUseCase,
   GetWorkoutsUseCase,
   InviteAthleteUseCase,
@@ -137,6 +138,8 @@ const container = new Container<Dependencies>({
   getWorkoutsUseCase: (c) => new GetWorkoutsUseCase(c.resolve("workoutRepository")),
   getWorkoutByIdUseCase: (c) => new GetWorkoutByIdUseCase(c.resolve("workoutRepository")),
   getWorkoutSummaryUseCase: (c) => new GetWorkoutSummaryUseCase(c.resolve("workoutRepository")),
+  getWorkoutObservationsUseCase: (c) =>
+    new GetWorkoutObservationsUseCase(c.resolve("workoutRepository")),
   createWorkoutUseCase: (c) => new CreateWorkoutUseCase(c.resolve("workoutRepository")),
   updateWorkoutUseCase: (c) => new UpdateWorkoutUseCase(c.resolve("workoutRepository")),
   deleteWorkoutUseCase: (c) => new DeleteWorkoutUseCase(c.resolve("workoutRepository")),

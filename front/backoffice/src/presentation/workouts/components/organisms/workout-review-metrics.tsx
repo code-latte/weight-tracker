@@ -1,7 +1,12 @@
 "use client";
 
 import Box from "@mui/material/Box";
-import type { DomainErrorCode, WorkoutById, WorkoutSummary } from "@weight-tracker/core/domain";
+import type {
+  DomainErrorCode,
+  WorkoutById,
+  WorkoutObservations,
+  WorkoutSummary,
+} from "@weight-tracker/core/domain";
 import Skeleton from "@/presentation/common/components/atoms/skeleton";
 import LoadError from "@/presentation/common/components/molecules/load-error";
 import ExerciseComparisonCard from "@/presentation/workouts/components/organisms/exercise-comparison-card";
@@ -24,6 +29,13 @@ interface WorkoutReviewMetricsProps {
     errorCode: DomainErrorCode | null;
     reload: () => void;
   };
+  /** Read with the summary, but failing or loading apart from it: only the observations card shows that. */
+  observations: {
+    status: "idle" | "loading" | "loaded" | "failed";
+    observations: WorkoutObservations | null;
+    errorCode: DomainErrorCode | null;
+    reload: () => void;
+  };
   history: EvolutionHistory;
   /** The catalog id of the exercise the evolution charts show. */
   selectedExerciseId: string | null;
@@ -35,6 +47,7 @@ export default function WorkoutReviewMetrics({
   workout,
   elapsed,
   summary,
+  observations,
   history,
   selectedExerciseId,
   onSelectExercise,
@@ -82,7 +95,7 @@ export default function WorkoutReviewMetrics({
       <ExerciseComparisonCard weighted={weighted} />
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
         <MuscleDistributionCard distribution={muscleDistributionOf(workout)} />
-        <SessionObservationsCard />
+        <SessionObservationsCard workout={workout} observations={observations} />
       </Box>
     </Box>
   );

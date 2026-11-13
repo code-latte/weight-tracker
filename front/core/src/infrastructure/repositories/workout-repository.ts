@@ -21,6 +21,7 @@ import {
   type WorkoutExerciseDetail,
   type GetWorkoutsInput,
   type WorkoutListItem,
+  type WorkoutObservations,
   type WorkoutSummary,
 } from "../../domain";
 import { mapHttpError } from "../http";
@@ -46,6 +47,19 @@ export default class WorkoutRepository implements WorkoutRepositoryInterface {
       const response = await this.httpClient.request<WorkoutById>({
         method: "GET",
         path: `/workouts/${id}`,
+      });
+
+      return ok(response);
+    } catch (error) {
+      return fail(mapHttpError(error));
+    }
+  }
+
+  async getObservations(workoutId: string): Promise<Result<WorkoutObservations, DomainError>> {
+    try {
+      const response = await this.httpClient.request<WorkoutObservations>({
+        method: "GET",
+        path: `/workouts/${workoutId}/observations`,
       });
 
       return ok(response);

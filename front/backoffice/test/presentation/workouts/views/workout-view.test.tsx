@@ -23,6 +23,8 @@ import type {
   WorkoutByIdExercise,
   WorkoutDetail,
   WorkoutExerciseDetail,
+  WorkoutObservation,
+  WorkoutObservations,
   WorkoutSummary,
   WorkoutTemplate,
 } from "@weight-tracker/core/domain";
@@ -326,9 +328,13 @@ function renderWorkout({
   saveAsTemplate = async () => ok(savedTemplate),
   changeStatus = async ({ status }) => ok({ ...workout, status: status ?? workout.status }),
   getSummary = async () => fail(new DomainError("UNEXPECTED", "Not used")),
+  getObservations = async () => ok({ observations: [], highlights: [] }),
   getHistory = async () => ok([]),
 }: {
   getSummary?: (input: { workoutId: string }) => Promise<Result<WorkoutSummary, DomainError>>;
+  getObservations?: (input: {
+    workoutId: string;
+  }) => Promise<Result<WorkoutObservations, DomainError>>;
   getHistory?: (input: {
     userId: string;
     exerciseId: string;
@@ -361,6 +367,7 @@ function renderWorkout({
 } = {}) {
   const readWorkout = vi.fn(getWorkout);
   const readSummary = vi.fn(getSummary);
+  const readObservations = vi.fn(getObservations);
   const readHistory = vi.fn(getHistory);
   const readCatalog = vi.fn(getExercises);
   // The workout carries its mesocycle: registered only to prove the screen never reads it.
@@ -386,6 +393,7 @@ function renderWorkout({
   return {
     readWorkout,
     readSummary,
+    readObservations,
     readHistory,
     readCatalog,
     readMesocycle,
@@ -404,6 +412,7 @@ function renderWorkout({
         getMyProfileUseCase: () => ({ execute: async () => ok(profile) }),
         getWorkoutByIdUseCase: () => ({ execute: readWorkout }),
         getWorkoutSummaryUseCase: () => ({ execute: readSummary }),
+        getWorkoutObservationsUseCase: () => ({ execute: readObservations }),
         getUserExerciseHistoryUseCase: () => ({ execute: readHistory }),
         getMesocycleByIdUseCase: () => ({ execute: readMesocycle }),
         getExercisesUseCase: () => ({ execute: readCatalog }),
@@ -5211,6 +5220,61 @@ describe("WorkoutView", () => {
       }
       const withSummary = async () => ok(summaryOf());
 
+      /** The contract types `data` as `Record<string, never>`, so the numbers a fixture holds need this cast. */
+      const dataOf = (values: Record<string, number | number[]>) =>
+        values as WorkoutObservation["data"];
+      const observationOf = (
+        id: string,
+        code: string,
+        severity: string,
+        exerciseId: string | null,
+        data: Record<string, number | number[]>,
+      ): WorkoutObservation => ({
+        id,
+        code,
+        severity,
+        exerciseId,
+        priority: null,
+        data: dataOf(data),
+      });
+      const incomplete = observationOf("o-1", "WORKOUT_INCOMPLETE", "WARNING", null, {
+        recordedSets: 9,
+        prescribedSets: 15,
+        completionPercent: 60,
+      });
+      const weightRecord = observationOf("o-2", "WEIGHT_PERSONAL_RECORD", "SUCCESS", squat.id, {
+        previousMaxKg: 120,
+        currentMaxKg: 130,
+        changePercent: 8.33,
+      });
+      const belowTarget = observationOf("o-3", "REPS_BELOW_TARGET", "WARNING", bench.id, {
+        setPositions: [3, 4],
+        reps: [6, 5],
+        targetMins: [8, 8],
+      });
+      const weightDecrease = observationOf("o-4", "WEIGHT_DECREASE", "INFO", legPress.id, {
+        previousMaxKg: 84,
+        currentMaxKg: 82,
+        changePercent: -2.4,
+        baselineMaxKg: 100,
+      });
+      const highlight = (observationId: string, rank: number) => ({
+        observationId,
+        rank,
+        priority: "HIGH",
+      });
+      /** Four observations, two of them highlighted out of order, plus a highlight that points at nothing. */
+      const observationsAnswer: WorkoutObservations = {
+        observations: [incomplete, weightRecord, belowTarget, weightDecrease],
+        highlights: [highlight("o-2", 2), highlight("ghost", 3), highlight("o-1", 1)],
+      };
+      const withObservations = async () => ok(observationsAnswer);
+      const observationsCard = () => cardOfHeading("Observaciones de la sesión");
+      const itemTitles = (container: HTMLElement) =>
+        within(container)
+          .getAllByRole("heading", { level: 3 })
+          .map((item) => item.textContent);
+
       const sessionOf = (
         workoutDate: string,
         maxWeight: number | null,
@@ -5404,19 +5468,219 @@ describe("WorkoutView", () => {
         expect(within(card).queryByText("Bíceps")).not.toBeInTheDocument();
       });
 
-      it("shows the three sample observations marked as a preview", async () => {
+      it("does not read the observations while the tab is closed", async () => {
+        // Arrange
+        const { readObservations } = renderWorkout({
+          getWorkout: withReview(metricsWorkout),
+          getSummary: withSummary,
+          getObservations: withObservations,
+        });
+
+        // Act
+        await heading();
+
+        // Assert
+        expect(readObservations).not.toHaveBeenCalled();
+      });
+
+      it("reads the observations once on first opening and not when coming back", async () => {
+        // Arrange
+        const { readObservations, user } = await openMetrics({
+          getObservations: withObservations,
+        });
+        await resultsHeading();
+
+        // Act
+        await user.click(screen.getByRole("tab", { name: "Ejercicios" }));
+        await user.click(screen.getByRole("tab", { name: "Resumen y métricas" }));
+
+        // Assert
+        expect(await resultsHeading()).toBeInTheDocument();
+        expect(readObservations).toHaveBeenCalledTimes(1);
+        expect(readObservations).toHaveBeenCalledWith({ workoutId: "w-1" });
+      });
+
+      it("shows the highlights in rank order, without the preview mark", async () => {
+        // Arrange & Act
+        await openMetrics({ getObservations: withObservations });
+        await resultsHeading();
+
+        // Assert
+        const card = observationsCard();
+        await within(card).findByText("Entrenamiento incompleto");
+        expect(itemTitles(card)).toEqual(["Entrenamiento incompleto", "Récord de peso"]);
+        expect(within(card).queryByText("Vista previa")).not.toBeInTheDocument();
+        expect(within(card).queryByText("Por debajo del objetivo")).not.toBeInTheDocument();
+      });
+
+      it("writes each highlight's text from its data, naming the exercise", async () => {
+        // Arrange & Act
+        await openMetrics({ getObservations: withObservations });
+        await resultsHeading();
+
+        // Assert
+        const card = observationsCard();
+        expect(
+          await within(card).findByText("9 de 15 series registradas (60 %)."),
+        ).toBeInTheDocument();
+        expect(
+          within(card).getByText("Sentadilla: 130 kg, antes 120 kg (+8,3 %)."),
+        ).toBeInTheDocument();
+      });
+
+      it("shows the count on the button and opens every observation in a dialog", async () => {
+        // Arrange
+        const { user } = await openMetrics({ getObservations: withObservations });
+        await resultsHeading();
+        const button = await within(observationsCard()).findByRole("button", {
+          name: "Ver todas las observaciones (4)",
+        });
+
+        // Act
+        await user.click(button);
+
+        // Assert
+        const dialog = await screen.findByRole("dialog", { name: "Observaciones de la sesión" });
+        expect(
+          within(dialog)
+            .getAllByRole("heading", { level: 3 })
+            .map((item) => item.textContent),
+        ).toEqual([
+          "Entrenamiento",
+          "Entrenamiento incompleto",
+          "Sentadilla",
+          "Récord de peso",
+          "Press de banca",
+          "Por debajo del objetivo",
+          "Prensa de piernas",
+          "Bajada de carga",
+        ]);
+        expect(within(dialog).getAllByText("Destacada")).toHaveLength(2);
+      });
+
+      it("lists the sets of a rep observation and the earlier reference of a decrease", async () => {
+        // Arrange
+        const { user } = await openMetrics({ getObservations: withObservations });
+        await resultsHeading();
+        await user.click(
+          await within(observationsCard()).findByRole("button", {
+            name: "Ver todas las observaciones (4)",
+          }),
+        );
+
+        // Act
+        const dialog = await screen.findByRole("dialog");
+
+        // Assert
+        expect(
+          within(dialog).getByText("Press de banca: serie 3: 6/8 · serie 4: 5/8."),
+        ).toBeInTheDocument();
+        expect(
+          within(dialog).getByText(
+            "Prensa de piernas: de 84 kg a 82 kg (-2,4 %). Referencia previa: 100 kg.",
+          ),
+        ).toBeInTheDocument();
+      });
+
+      it("closes the dialog without reading anything again", async () => {
+        // Arrange
+        const { readObservations, user } = await openMetrics({
+          getObservations: withObservations,
+        });
+        await resultsHeading();
+        await user.click(
+          await within(observationsCard()).findByRole("button", {
+            name: "Ver todas las observaciones (4)",
+          }),
+        );
+        const dialog = await screen.findByRole("dialog");
+
+        // Act
+        await user.click(within(dialog).getByRole("button", { name: "Cerrar" }));
+
+        // Assert
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        expect(readObservations).toHaveBeenCalledTimes(1);
+      });
+
+      it("shows the severity title alone for a code it does not know, and a generic exercise", async () => {
+        // Arrange
+        const strange = observationOf("o-9", "SOMETHING_NEW", "SUCCESS", null, { value: 1 });
+        const stranger = observationOf("o-8", "EXERCISE_SKIPPED", "WARNING", "ex-gone", {
+          prescribedSets: 3,
+        });
+
+        // Act
+        await openMetrics({
+          getObservations: async () =>
+            ok({
+              observations: [strange, stranger],
+              highlights: [highlight("o-9", 1), highlight("o-8", 2)],
+            }),
+        });
+        await resultsHeading();
+
+        // Assert
+        const card = observationsCard();
+        expect(await within(card).findByText("Observación")).toBeInTheDocument();
+        expect(
+          within(card).getByText("Ejercicio: ninguna de las 3 series registrada."),
+        ).toBeInTheDocument();
+      });
+
+      it("says nothing stands out when there are observations but no highlights", async () => {
+        // Arrange & Act
+        await openMetrics({
+          getObservations: async () =>
+            ok({
+              observations: [incomplete, weightRecord, belowTarget, weightDecrease],
+              highlights: [],
+            }),
+        });
+        await resultsHeading();
+
+        // Assert
+        const card = observationsCard();
+        expect(await within(card).findByText("Nada destacable en esta sesión")).toBeInTheDocument();
+        expect(
+          within(card).getByRole("button", { name: "Ver todas las observaciones (4)" }),
+        ).toBeInTheDocument();
+      });
+
+      it("says there are no observations, with no button, when none were generated", async () => {
         // Arrange & Act
         await openMetrics();
         await resultsHeading();
 
         // Assert
-        const card = cardOfHeading("Observaciones de la sesión");
-        expect(within(card).getByText("Vista previa")).toBeInTheDocument();
+        const card = observationsCard();
         expect(
-          within(card)
-            .getAllByRole("heading", { level: 3 })
-            .map((item) => item.textContent),
-        ).toEqual(["Progresión destacada", "Buen cumplimiento", "Revisar"]);
+          await within(card).findByText("No hay observaciones para esta sesión"),
+        ).toBeInTheDocument();
+        expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+      });
+
+      it("shows a load error with retry in the card while the other blocks stay", async () => {
+        // Arrange
+        let calls = 0;
+        const { user } = await openMetrics({
+          getObservations: async () =>
+            ++calls === 1 ? fail(new DomainError("NETWORK", "offline")) : ok(observationsAnswer),
+        });
+        await resultsHeading();
+        const retry = await within(observationsCard()).findByRole("button", {
+          name: "Reintentar",
+        });
+
+        // Act
+        await user.click(retry);
+
+        // Assert
+        expect(await within(observationsCard()).findByText("Récord de peso")).toBeInTheDocument();
+        expect(
+          screen.getByRole("heading", { name: "Comparativa por ejercicio" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
       });
 
       it("charts the athlete's history of the first weighted exercise, oldest first", async () => {
@@ -5522,13 +5786,13 @@ describe("WorkoutView", () => {
         ["TRAINER", trainerProfile],
       ])("shows the same tab to a %s", async (_role, profile) => {
         // Arrange & Act
-        await openMetrics({ profile });
+        await openMetrics({ profile, getObservations: withObservations });
         await resultsHeading();
 
         // Assert
         expect(stat("Volumen de fuerza").value).toBe("16.913,4 kg");
         expect(tableRows(cardOfHeading("Comparativa por ejercicio"))).toHaveLength(3);
-        expect(within(panel()).getByText("Vista previa")).toBeInTheDocument();
+        expect(await within(observationsCard()).findByText("Récord de peso")).toBeInTheDocument();
       });
 
       it("reads in English", async () => {

@@ -35,6 +35,29 @@ public class OpenApiDocumentTests : IntegrationTest
         => document.GetProperty("paths").GetProperty(path).GetProperty(method);
 
     [Fact]
+    public async Task ObservationsOperation_ShouldDeclareItsResponsesAndRequireAuthentication()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        var operation = Operation(document, "/workouts/{workoutId}/observations", "get");
+        var responses = operation.GetProperty("responses").EnumerateObject().Select(response => response.Name).ToList();
+        responses.Should().BeEquivalentTo("200", "401", "403", "404");
+        operation.GetProperty("security").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task StatusOperation_ShouldDeclareTheFailureOfGeneratingObservations()
+    {
+        // Arrange & Act
+        var document = await Document();
+
+        // Assert
+        Operation(document, "/workouts/{workoutId}/status", "put").GetProperty("responses").TryGetProperty("500", out _).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Document_ShouldBeServed()
     {
         // Arrange & Act

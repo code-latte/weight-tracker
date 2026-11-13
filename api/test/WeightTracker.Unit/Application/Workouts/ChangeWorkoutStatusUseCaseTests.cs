@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Moq;
 using WeightTracker.Application.Common;
+using WeightTracker.Application.Common.Dispatcher;
 using WeightTracker.Application.Exceptions;
 using WeightTracker.Application.Interfaces;
 using WeightTracker.Application.Services;
@@ -24,6 +25,7 @@ public class ChangeWorkoutStatusUseCaseTests
 
     private readonly Mock<IWorkoutRepository> _workouts = new(MockBehavior.Strict);
     private readonly Mock<IUnitOfWork> _unitOfWork = new(MockBehavior.Strict);
+    private readonly Mock<IEventDispatcher> _dispatcher = new();
 
     private static readonly DateTime Now = new(2026, 11, 10, 7, 45, 0, DateTimeKind.Utc);
     private readonly Mock<IClock> _clock = new();
@@ -47,9 +49,10 @@ public class ChangeWorkoutStatusUseCaseTests
     {
         _workouts.Verify(repository => repository.Save(It.IsAny<Workout>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWork.VerifyNoOtherCalls();
+        _dispatcher.Verify(dispatcher => dispatcher.DispatchAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    private ChangeWorkoutStatusUseCase AUseCase() => new(_workouts.Object, new WorkoutStatusAuthorizer(), _unitOfWork.Object, _clock.Object);
+    private ChangeWorkoutStatusUseCase AUseCase() => new(_workouts.Object, new WorkoutStatusAuthorizer(), _unitOfWork.Object, _clock.Object, _dispatcher.Object);
 
     [Fact]
     public async Task Execute_ShouldChangeTheStatusSaveAndCommitOnce()
@@ -241,5 +244,87 @@ public class ChangeWorkoutStatusUseCaseTests
         await act.Should().ThrowAsync<InvalidWorkoutStatusTransitionException>();
         workout.Status.Should().Be(WorkoutStatus.COMPLETED);
         VerifyNothingSavedOrCommitted();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldDispatchTheCompletionEventOnlyAfterCommittingAndClearIt()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.STARTED);
+        GivenStored(workout);
+        var calls = new List<string>();
+        IReadOnlyCollection<IDomainEvent>? dispatched = null;
+        _workouts.Setup(repository => repository.Save(workout, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("save")).Returns(Task.CompletedTask);
+        _unitOfWork.Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("commit")).Returns(Task.CompletedTask);
+        _dispatcher.Setup(dispatcher => dispatcher.DispatchAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .Callback((IEnumerable<IDomainEvent> events, CancellationToken _) => { calls.Add("dispatch"); dispatched = events.ToList(); })
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await AUseCase().Execute(AthleteId, Role.USER, workout.Id, WorkoutStatus.COMPLETED, CancellationToken.None);
+
+        // Assert
+        calls.Should().Equal("save", "commit", "dispatch");
+        dispatched.Should().ContainSingle().Which.Should().Be(new WorkoutCompletedEvent(workout.Id, Now));
+        workout.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldDispatchNoEventForAMoveThatIsNotACompletion()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.DRAFT);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+        IReadOnlyCollection<IDomainEvent>? dispatched = null;
+        _dispatcher.Setup(dispatcher => dispatcher.DispatchAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .Callback((IEnumerable<IDomainEvent> events, CancellationToken _) => dispatched = events.ToList())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await AUseCase().Execute(TrainerId, Role.TRAINER, workout.Id, WorkoutStatus.PUBLISHED, CancellationToken.None);
+
+        // Assert
+        dispatched.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldNotDispatchWhenCommittingFails()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.STARTED);
+        GivenStored(workout);
+        _workouts.Setup(repository => repository.Save(workout, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _unitOfWork.Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new WorkoutConcurrencyConflictException(new InvalidOperationException()));
+
+        // Act
+        var act = () => AUseCase().Execute(AthleteId, Role.USER, workout.Id, WorkoutStatus.COMPLETED, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<WorkoutConcurrencyConflictException>();
+        _dispatcher.Verify(dispatcher => dispatcher.DispatchAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldPropagateAHandlerFailureAfterTheChangeWasCommitted()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.STARTED);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+        var failure = new InvalidOperationException("generation failed");
+        _dispatcher.Setup(dispatcher => dispatcher.DispatchAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(failure);
+
+        // Act
+        var act = () => AUseCase().Execute(AthleteId, Role.USER, workout.Id, WorkoutStatus.COMPLETED, CancellationToken.None);
+
+        // Assert
+        (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Should().BeSameAs(failure);
+        _unitOfWork.Verify(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        workout.Status.Should().Be(WorkoutStatus.COMPLETED);
     }
 }

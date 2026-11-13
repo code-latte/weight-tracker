@@ -22,7 +22,13 @@ import WorkoutReviewTabs, {
 } from "@/presentation/workouts/components/organisms/workout-review-tabs";
 import useSaveWorkoutAsTemplate from "@/presentation/workouts/hooks/use-save-workout-as-template";
 import { backHrefOf, personCardOf } from "@/presentation/workouts/workout-context";
-import { initiallyExpandedOf, reviewSummaryOf } from "@/presentation/workouts/workout-review";
+import useNow from "@/presentation/workouts/hooks/use-now";
+import {
+  elapsedMsOf,
+  elapsedPartsOf,
+  initiallyExpandedOf,
+  reviewSummaryOf,
+} from "@/presentation/workouts/workout-review";
 
 /** The read-only review of a started, completed or reviewed workout: the session's figures and its exercises. */
 export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
@@ -38,6 +44,10 @@ export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
   });
   const summary = reviewSummaryOf(workout);
   const notAvailable = t("review.notAvailable");
+  // A started workout keeps counting; a finished one is fixed.
+  const now = useNow(workout.status === "STARTED");
+  const elapsedMs = elapsedMsOf(workout, now);
+  const elapsed = elapsedMs === null ? notAvailable : elapsedTextOf(elapsedMs);
   const subtitle = [
     workout.name,
     workout.mesocycle?.name,
@@ -51,6 +61,15 @@ export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
     useGrouping: "always",
     maximumFractionDigits: 1,
   }).format(summary.volumeKg);
+
+  function elapsedTextOf(ms: number): string {
+    const { hours, minutes } = elapsedPartsOf(ms);
+
+    if (hours > 0) {
+      return t("review.elapsed.hours", { hours, minutes: String(minutes).padStart(2, "0") });
+    }
+    return minutes > 0 ? t("review.elapsed.minutes", { minutes }) : t("review.elapsed.lessThanOne");
+  }
 
   function toggle(id: string) {
     setExpanded((current) => {
@@ -102,13 +121,14 @@ export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
             ? personCardOf(workout.trainer, tc("person.role.trainer"))
             : null
         }
+        startedAt={workout.startedAt}
         resultsUpdatedAt={workout.resultsUpdatedAt}
       />
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 3 }}>
         <ReviewStatCard
           icon={<TimerOutlined />}
           label={t("review.stats.elapsed")}
-          value={notAvailable}
+          value={elapsed}
         />
         <ReviewStatCard
           icon={<CheckCircleOutlineOutlined />}

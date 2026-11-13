@@ -121,6 +121,7 @@ public class WeightTrackerDbContext : DbContext
             entity.Property(workout => workout.ReviewedAtUtc).HasColumnName("ReviewedAtUtc");
             entity.Property(workout => workout.ReviewedBy).HasColumnName("ReviewedBy");
             entity.Property(workout => workout.ResultsUpdatedAtUtc).HasColumnName("ResultsUpdatedAtUtc");
+            entity.Property(workout => workout.StartedAtUtc).HasColumnName("StartedAtUtc");
             entity.Property(workout => workout.CompletedAtUtc).HasColumnName("CompletedAtUtc");
 
             // xmin is maintained by Postgres; a save whose original version no longer matches fails instead of overwriting

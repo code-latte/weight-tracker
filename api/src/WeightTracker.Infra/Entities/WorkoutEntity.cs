@@ -39,6 +39,9 @@ public class WorkoutEntity
     /// <summary>Last time the set records of the workout changed, in UTC.</summary>
     public DateTime? ResultsUpdatedAtUtc { get; set; }
 
+    /// <summary>Last time the workout reached started, in UTC. Kept when it leaves started. Estimated for older workouts.</summary>
+    public DateTime? StartedAtUtc { get; set; }
+
     /// <summary>Last time the workout reached completed, in UTC. Kept when it leaves completed.</summary>
     public DateTime? CompletedAtUtc { get; set; }
 

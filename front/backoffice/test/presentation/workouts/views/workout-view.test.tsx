@@ -199,6 +199,7 @@ const workout: WorkoutById = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  startedAt: null,
   completedAt: null,
   reviewedAt: null,
   reviewedBy: null,
@@ -4647,7 +4648,7 @@ describe("WorkoutView", () => {
 
     it("shows the athlete and the start placeholder", async () => {
       // Arrange & Act
-      await renderWorkout({ getWorkout: withReview() }).rendered;
+      await renderWorkout({ getWorkout: withReview({ startedAt: null }) }).rendered;
 
       // Assert
       await heading();
@@ -4656,6 +4657,24 @@ describe("WorkoutView", () => {
       expect(within(strip).getByText("Ana García")).toBeInTheDocument();
       expect(within(strip).getByText("Atleta")).toBeInTheDocument();
       expect(within(strip).getByText("Inicio: —")).toBeInTheDocument();
+    });
+
+    it("shows the athlete and the start time", async () => {
+      // Arrange
+      const startedAt = "2026-11-13T10:42:00Z";
+      const expected = new Intl.DateTimeFormat("es", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(startedAt));
+
+      // Act
+      await renderWorkout({ getWorkout: withReview({ startedAt }) }).rendered;
+
+      // Assert
+      await heading();
+      const strip = screen.getByRole("region", { name: "Datos del entrenamiento" });
+      expect(within(strip).getByText("Ana García")).toBeInTheDocument();
+      expect(within(strip).getByText(`Inicio: ${expected}`)).toBeInTheDocument();
     });
 
     it("shows when the results last changed", async () => {
@@ -4703,10 +4722,126 @@ describe("WorkoutView", () => {
 
       // Assert
       await heading();
-      expect(statValue("Tiempo transcurrido")).toBe("—");
       expect(statValue("Series completadas")).toBe("5 / 12");
       expect(statValue("Ejercicios terminados")).toBe("1 / 4");
       expect(statValue("Volumen registrado")).toBe("1.915 kg");
+    });
+
+    describe("elapsed time", () => {
+      const now = new Date("2026-11-13T10:30:00Z");
+
+      beforeEach(() => {
+        vi.setSystemTime(now);
+      });
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it("counts from the start to now for a started workout", async () => {
+        // Arrange
+        const startedAt = "2026-11-13T10:05:00Z";
+
+        // Act
+        await renderWorkout({ getWorkout: withReview({ status: "STARTED", startedAt }) }).rendered;
+
+        // Assert
+        await heading();
+        expect(statValue("Tiempo transcurrido")).toBe("25 min");
+      });
+
+      it.each([
+        ["COMPLETED", "2026-11-13T10:00:00Z", "2026-11-13T11:05:00Z", "1 h 05 min"],
+        ["REVIEWED", "2026-11-13T10:00:00Z", "2026-11-13T10:40:00Z", "40 min"],
+        ["COMPLETED", "2026-11-13T10:00:00Z", "2026-11-13T10:00:30Z", "< 1 min"],
+      ])(
+        "counts from the start to the completion for a %s workout (%s to %s)",
+        async (status, startedAt, completedAt, expected) => {
+          // Arrange & Act
+          await renderWorkout({
+            getWorkout: withReview({ status, startedAt, completedAt }),
+          }).rendered;
+
+          // Assert
+          await heading();
+          expect(statValue("Tiempo transcurrido")).toBe(expected);
+        },
+      );
+
+      it.each([
+        ["without a start", { status: "STARTED", startedAt: null }],
+        [
+          "without a completion",
+          { status: "COMPLETED", startedAt: "2026-11-13T10:00:00Z", completedAt: null },
+        ],
+        [
+          "with a completion before the start",
+          {
+            status: "COMPLETED",
+            startedAt: "2026-11-13T10:00:00Z",
+            completedAt: "2026-11-13T09:00:00Z",
+          },
+        ],
+      ])("shows a dash %s", async (_name, overrides) => {
+        // Arrange & Act
+        await renderWorkout({ getWorkout: withReview(overrides) }).rendered;
+
+        // Assert
+        await heading();
+        expect(statValue("Tiempo transcurrido")).toBe("—");
+      });
+
+      it("counts one more minute when a minute passes on a started workout", async () => {
+        // Arrange
+        const ticks: (() => void)[] = [];
+        const realSetInterval = globalThis.setInterval;
+        vi.spyOn(globalThis, "setInterval").mockImplementation(((
+          handler: () => void,
+          timeout?: number,
+        ) => {
+          if (timeout === 60_000) {
+            ticks.push(handler);
+          }
+          return realSetInterval(handler, timeout);
+        }) as typeof setInterval);
+        const getWorkout = vi.fn(
+          withReview({ status: "STARTED", startedAt: "2026-11-13T10:05:00Z" }),
+        );
+        await renderWorkout({ getWorkout }).rendered;
+        await heading();
+
+        // Act
+        act(() => {
+          vi.setSystemTime(new Date(now.getTime() + 60_000));
+          ticks.forEach((tick) => tick());
+        });
+
+        // Assert
+        expect(statValue("Tiempo transcurrido")).toBe("26 min");
+        expect(getWorkout).toHaveBeenCalledTimes(1);
+      });
+
+      it("keeps a completed workout's time when a minute passes", async () => {
+        // Arrange
+        const intervals = vi.spyOn(globalThis, "setInterval");
+        await renderWorkout({
+          getWorkout: withReview({
+            status: "COMPLETED",
+            startedAt: "2026-11-13T10:00:00Z",
+            completedAt: "2026-11-13T10:40:00Z",
+          }),
+        }).rendered;
+        await heading();
+
+        // Act
+        act(() => {
+          vi.setSystemTime(new Date(now.getTime() + 60_000));
+        });
+
+        // Assert
+        expect(intervals).not.toHaveBeenCalledWith(expect.any(Function), 60_000);
+        expect(statValue("Tiempo transcurrido")).toBe("40 min");
+      });
     });
 
     it("shows the progress of the session", async () => {

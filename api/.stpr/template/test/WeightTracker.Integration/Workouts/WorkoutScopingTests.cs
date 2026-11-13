@@ -58,6 +58,22 @@ public class WorkoutScopingTests : WorkoutEndpointTest
     }
 
     [Fact]
+    public async Task GetAll_ShouldCarryTheStartDateOfAStartedWorkout()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "STARTED");
+        var startedAt = await StartedAtOf(SeedData.TrainedWorkoutId);
+
+        // Act
+        var workout = await WorkoutVisibleTo(SeedCredentials.User, SeedData.TrainedWorkoutId);
+
+        // Assert
+        workout.GetProperty("status").GetString().Should().Be("STARTED");
+        startedAt.Should().NotBeNull();
+        workout.GetProperty("startedAt").GetDateTime().Should().Be(startedAt!.Value);
+    }
+
+    [Fact]
     public async Task GetAll_ShouldCarryTheCompletionDateOfACompletedWorkout()
     {
         // Arrange
@@ -83,6 +99,7 @@ public class WorkoutScopingTests : WorkoutEndpointTest
         workout.GetProperty("reviewedAt").ValueKind.Should().Be(JsonValueKind.Null);
         workout.GetProperty("reviewedBy").ValueKind.Should().Be(JsonValueKind.Null);
         workout.GetProperty("resultsUpdatedAt").ValueKind.Should().Be(JsonValueKind.Null);
+        workout.GetProperty("startedAt").ValueKind.Should().Be(JsonValueKind.Null);
         workout.GetProperty("completedAt").ValueKind.Should().Be(JsonValueKind.Null);
     }
 

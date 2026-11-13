@@ -374,6 +374,109 @@ public class WorkoutStatusChangeEndpointTests : WorkoutEndpointTest
     }
 
     [Fact]
+    public async Task AthleteOfAPrescribedWorkout_ShouldRecordWhenTheyStartIt()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "PUBLISHED");
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await PutStatus(user, SeedData.TrainedWorkoutId, "STARTED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var startedAt = body.GetProperty("startedAt").GetDateTime();
+        startedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        (await StartedAtOf(SeedData.TrainedWorkoutId)).Should().Be(startedAt);
+    }
+
+    [Fact]
+    public async Task Admin_ShouldRecordWhenTheyStartAWorkoutSkippingTheLifecycle()
+    {
+        // Arrange
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await PutStatus(admin, SeedData.PrescribedDraftWorkoutId, "STARTED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await StartedAtOf(SeedData.PrescribedDraftWorkoutId)).Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task AthleteOfAPrescribedWorkout_ShouldKeepTheStartDateWhenTheyCompleteIt()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "STARTED");
+        var startedAt = await StartedAtOf(SeedData.TrainedWorkoutId);
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await PutStatus(user, SeedData.TrainedWorkoutId, "COMPLETED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        startedAt.Should().NotBeNull();
+        body.GetProperty("startedAt").GetDateTime().Should().Be(startedAt!.Value);
+    }
+
+    [Fact]
+    public async Task Admin_ShouldKeepTheStartDateWhenMovingAStartedWorkoutBack()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "STARTED");
+        var startedAt = await StartedAtOf(SeedData.TrainedWorkoutId);
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await PutStatus(admin, SeedData.TrainedWorkoutId, "PUBLISHED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("status").GetString().Should().Be("PUBLISHED");
+        startedAt.Should().NotBeNull();
+        body.GetProperty("startedAt").GetDateTime().Should().Be(startedAt!.Value);
+    }
+
+    [Fact]
+    public async Task Admin_ShouldOverwriteTheStartDateWhenTheWorkoutIsStartedAgain()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "STARTED");
+        var firstStartedAt = await StartedAtOf(SeedData.TrainedWorkoutId);
+        await GivenWorkoutStatus(SeedData.TrainedWorkoutId, "PUBLISHED");
+        var admin = await AuthenticatedClientFor(SeedCredentials.Admin);
+
+        // Act
+        var response = await PutStatus(admin, SeedData.TrainedWorkoutId, "STARTED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await StartedAtOf(SeedData.TrainedWorkoutId)).Should().BeAfter(firstStartedAt!.Value);
+    }
+
+    [Fact]
+    public async Task AthleteOfAWorkoutWithoutTrainer_ShouldKeepTheStartDateWhenAMoveIsRefused()
+    {
+        // Arrange
+        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "STARTED");
+        await GivenWorkoutStatus(SeedData.OwnedWorkoutId, "COMPLETED");
+        var startedAt = await StartedAtOf(SeedData.OwnedWorkoutId);
+        var user = await AuthenticatedClientFor(SeedCredentials.User);
+
+        // Act
+        var response = await PutStatus(user, SeedData.OwnedWorkoutId, "STARTED");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await StartedAtOf(SeedData.OwnedWorkoutId)).Should().Be(startedAt);
+    }
+
+    [Fact]
     public async Task AthleteOfAPrescribedWorkout_ShouldRecordWhenTheyCompleteIt()
     {
         // Arrange

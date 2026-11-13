@@ -30,6 +30,7 @@ const workout: Workout = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  startedAt: null,
   completedAt: null,
   reviewedAt: null,
   reviewedBy: null,
@@ -296,6 +297,25 @@ describe("WorkoutRepository", () => {
 
       // Assert
       expect(result).toEqual(ok(workoutById));
+    });
+
+    it("returns the session dates unchanged", async () => {
+      // Arrange
+      const completed = {
+        ...workoutById,
+        status: "COMPLETED",
+        startedAt: "2026-11-13T10:00:00Z",
+        completedAt: "2026-11-13T11:05:00Z",
+      };
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => completed));
+
+      // Act
+      const result = await repository.getById(workout.id);
+
+      // Assert
+      expect(result).toEqual(ok(completed));
+      expect(result.ok && result.value.startedAt).toBe("2026-11-13T10:00:00Z");
+      expect(result.ok && result.value.completedAt).toBe("2026-11-13T11:05:00Z");
     });
 
     it.each([

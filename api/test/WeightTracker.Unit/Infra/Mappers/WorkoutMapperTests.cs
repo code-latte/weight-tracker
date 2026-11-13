@@ -793,6 +793,34 @@ public class WorkoutMapperTests
         restored.CompletedAt.Should().BeNull();
     }
 
+    [Fact]
+    public void RoundTrip_ShouldPreserveTheStartTime()
+    {
+        // Arrange
+        var original = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED, [],
+            startedAt: RecordedAt);
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.StartedAt.Should().Be(RecordedAt);
+    }
+
+    [Fact]
+    public void RoundTrip_ShouldPreserveAStartedWorkoutWithoutStartTime()
+    {
+        // Arrange
+        var original = Workout.Rehydrate(Id.New(), Id.New(), null, Name, null, WorkoutDate, WorkoutStatus.STARTED, []);
+
+        // Act
+        var restored = RoundTrip(original);
+
+        // Assert
+        restored.Status.Should().Be(WorkoutStatus.STARTED);
+        restored.StartedAt.Should().BeNull();
+    }
+
     private static SetResult Seconds(int value) => new SetResult.Duration(DurationInSeconds.From(value));
 
     /// <summary>Reps without weight on one exercise; a weighted and an unweighted duration on a time-based one.</summary>

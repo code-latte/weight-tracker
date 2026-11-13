@@ -5756,6 +5756,8 @@ export interface components {
             /** Format: int32 */
             mesocycleWeekNumber: null | number | string;
             /** Format: date-time */
+            startedAt: null | string;
+            /** Format: date-time */
             completedAt: null | string;
             /** Format: date-time */
             reviewedAt: null | string;
@@ -5784,6 +5786,8 @@ export interface components {
             mesocycleId: null | string;
             /** Format: int32 */
             mesocycleWeekNumber: null | number | string;
+            /** Format: date-time */
+            startedAt: null | string;
             /** Format: date-time */
             completedAt: null | string;
             /** Format: date-time */
@@ -5844,6 +5848,8 @@ export interface components {
             /** Format: int32 */
             mesocycleWeekNumber: null | number | string;
             /** Format: date-time */
+            startedAt: null | string;
+            /** Format: date-time */
             completedAt: null | string;
             /** Format: date-time */
             reviewedAt: null | string;
@@ -5880,6 +5886,8 @@ export interface components {
             mesocycleId: null | string;
             /** Format: int32 */
             mesocycleWeekNumber: null | number | string;
+            /** Format: date-time */
+            startedAt: null | string;
             /** Format: date-time */
             completedAt: null | string;
             /** Format: date-time */

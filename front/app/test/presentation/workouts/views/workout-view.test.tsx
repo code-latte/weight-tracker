@@ -143,6 +143,7 @@ function workout(overrides: Partial<WorkoutById> = {}): WorkoutById {
     exercises,
     mesocycleId: "m1",
     mesocycleWeekNumber: 3,
+    startedAt: null,
     completedAt: null,
     reviewedAt: null,
     reviewedBy: null,

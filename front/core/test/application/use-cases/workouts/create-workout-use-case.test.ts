@@ -25,6 +25,7 @@ const workout: Workout = {
   status: "DRAFT",
   mesocycleId: null,
   mesocycleWeekNumber: null,
+  startedAt: null,
   completedAt: null,
   reviewedAt: null,
   reviewedBy: null,

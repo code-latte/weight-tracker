@@ -117,6 +117,38 @@ public class ChangeWorkoutStatusUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_ShouldStartAtTheClockTime()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.PUBLISHED);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await AUseCase().Execute(AthleteId, Role.USER, workout.Id, WorkoutStatus.STARTED, CancellationToken.None);
+
+        // Assert
+        updated.Status.Should().Be(WorkoutStatus.STARTED);
+        updated.StartedAt.Should().Be(Now);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldLetAnAdminStartAtTheClockTime()
+    {
+        // Arrange
+        var workout = AStoredWorkoutIn(WorkoutStatus.DRAFT);
+        GivenStored(workout);
+        GivenSaveAndCommitSucceed(workout);
+
+        // Act
+        var updated = await AUseCase().Execute(Id.New(), Role.ADMIN, workout.Id, WorkoutStatus.STARTED, CancellationToken.None);
+
+        // Assert
+        updated.Status.Should().Be(WorkoutStatus.STARTED);
+        updated.StartedAt.Should().Be(Now);
+    }
+
+    [Fact]
     public async Task Execute_ShouldRejectAnUnknownWorkoutWithoutSavingOrCommitting()
     {
         // Arrange

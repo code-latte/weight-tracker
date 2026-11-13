@@ -45,6 +45,21 @@ public sealed class WorkoutExercise : Entity
     public int TotalSets => _sets.Sum(set => set.count);
 
     /// <summary>
+    /// How many recorded sets met their target. The prescriptions are expanded by count into one target per set and
+    /// each set record is matched to the target at its own position. Records beyond the prescribed sets and prescribed
+    /// sets without a record are not evaluated.
+    /// </summary>
+    /// <returns>The sets that met their target and the sets that were evaluated.</returns>
+    public (int InTarget, int Evaluated) SetsInTarget()
+    {
+        var targets = _sets.SelectMany(set => Enumerable.Repeat(set.target, set.count)).ToList();
+
+        var evaluated = _setRecords.Zip(targets, (record, target) => target.IsMetBy(record.Result)).ToList();
+
+        return (evaluated.Count(isMet => isMet), evaluated.Count);
+    }
+
+    /// <summary>
     /// Superseries this entry belongs to, null when it is performed on its own.
     /// Only its root changes it, because the grouping rules span several entries.
     /// </summary>

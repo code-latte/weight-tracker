@@ -265,7 +265,71 @@
     },
     "volumeValue": "{{value}} kg",
     "expand": "Expandir {{name}}",
-    "collapse": "Contraer {{name}}"
+    "collapse": "Contraer {{name}}",
+    "metrics": {
+      "results": {
+        "title": "Resultados de la sesión",
+        "subtitle": "Cumplimiento, volumen e intensidad del entrenamiento",
+        "setsDone": "Series completadas",
+        "exercisesDone": "Ejercicios completados",
+        "setsInTarget": "Series en rango objetivo",
+        "volume": "Volumen de fuerza",
+        "duration": "Duración"
+      },
+      "percentValue": "{{value}}%",
+      "evolution": {
+        "exercise": "Ejercicio"
+      },
+      "load": {
+        "title": "Evolución de la carga",
+        "subtitle": "Peso máximo por sesión",
+        "aria": "Gráfico del peso máximo por sesión"
+      },
+      "volume": {
+        "title": "Evolución del volumen",
+        "subtitle": "Volumen total del ejercicio (peso × repeticiones)",
+        "aria": "Gráfico del volumen por sesión"
+      },
+      "history": {
+        "empty": "Sin datos de este ejercicio"
+      },
+      "comparison": {
+        "title": "Comparativa por ejercicio",
+        "subtitle": "Resultados de esta sesión frente a la ejecución anterior",
+        "exercise": "Ejercicio",
+        "bestSet": "Mejor serie",
+        "previous": "Anterior",
+        "current": "Actual",
+        "change": "Cambio",
+        "volume": "Volumen (actual)",
+        "compliance": "Cumplimiento",
+        "changeValue": "{{value}} %",
+        "equal": "=",
+        "empty": "Ningún ejercicio con peso en esta sesión"
+      },
+      "muscles": {
+        "title": "Distribución de series por grupo muscular",
+        "subtitle": "Series efectivas de la sesión",
+        "sets": "{{count}} series"
+      },
+      "observations": {
+        "title": "Observaciones de la sesión",
+        "subtitle": "Puntos clave y recomendaciones",
+        "preview": "Vista previa",
+        "LOAD_PROGRESSION": {
+          "title": "Progresión destacada",
+          "text": "Aumento de carga en Peso muerto rumano (+8,3 %) y Sentadilla hack (+12,5 %)."
+        },
+        "GOOD_COMPLIANCE": {
+          "title": "Buen cumplimiento",
+          "text": "27 de 29 series dentro del rango de repeticiones objetivo (93 %)."
+        },
+        "SET_BELOW_TARGET": {
+          "title": "Revisar",
+          "text": "La tercera serie de Peso muerto rumano quedó por debajo del objetivo (7/8 reps). Valorar mantener la carga o ajustar el RIR en la próxima sesión."
+        }
+      }
+    }
   },
   "muscles": {
     "ABDOMINALS": "Abdominales",

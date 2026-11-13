@@ -3,6 +3,7 @@ export { default as CreateUserUseCase } from "./create-user-use-case";
 export { default as DeactivateUserUseCase } from "./deactivate-user-use-case";
 export { default as GetMyExerciseLastPerformanceUseCase } from "./get-my-exercise-last-performance-use-case";
 export { default as GetMyProfileUseCase } from "./get-my-profile-use-case";
+export { default as GetUserExerciseHistoryUseCase } from "./get-user-exercise-history-use-case";
 export { default as GetUserTrainerUseCase } from "./get-user-trainer-use-case";
 export { default as GetUsersUseCase } from "./get-users-use-case";
 export { default as UpdateMyProfileUseCase } from "./update-my-profile-use-case";

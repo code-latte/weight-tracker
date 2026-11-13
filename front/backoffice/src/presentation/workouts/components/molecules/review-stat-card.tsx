@@ -10,10 +10,20 @@ interface ReviewStatCardProps {
   label: string;
   /** The figure, already formatted; "—" while the API cannot provide it. */
   value: string;
+  /** A smaller line under the value, such as the figure as a percentage. */
+  caption?: string;
+  /** The caption's colour, as a theme path; secondary text by default. */
+  captionColor?: string;
 }
 
 /** One figure of the review: its icon, its label and the value in large type. */
-export default function ReviewStatCard({ icon, label, value }: ReviewStatCardProps) {
+export default function ReviewStatCard({
+  icon,
+  label,
+  value,
+  caption,
+  captionColor = "text.secondary",
+}: ReviewStatCardProps) {
   return (
     <Card
       variant="outlined"
@@ -27,6 +37,11 @@ export default function ReviewStatCard({ icon, label, value }: ReviewStatCardPro
         <Typography variant="h5" component="p" sx={{ fontWeight: 700 }}>
           {value}
         </Typography>
+        {caption && (
+          <Typography variant="body2" color={captionColor} component="p" sx={{ fontWeight: 600 }}>
+            {caption}
+          </Typography>
+        )}
       </Box>
     </Card>
   );

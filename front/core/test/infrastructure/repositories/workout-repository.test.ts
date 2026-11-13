@@ -17,6 +17,7 @@ import {
   type WorkoutDetail,
   type WorkoutExerciseDetail,
   type WorkoutListItem,
+  type WorkoutSummary,
 } from "../../../src/domain";
 import { HttpError, WorkoutRepository } from "../../../src/infrastructure";
 
@@ -73,6 +74,34 @@ const workoutExercise: WorkoutExerciseDetail = {
 const workoutDetail: WorkoutDetail = {
   ...workout,
   exercises: [workoutExercise],
+};
+
+const workoutSummary: WorkoutSummary = {
+  workoutId: workout.id,
+  setsInTarget: { inTarget: 27, evaluated: 29 },
+  volume: 16913.4,
+  exercises: [
+    {
+      workoutExerciseId: "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      exerciseId: "1f2e3d4c-5b6a-4978-8695-a4b3c2d1e0f9",
+      setsInTarget: { inTarget: 3, evaluated: 3 },
+      volume: 3190,
+      topSet: { reps: 7, durationSeconds: null, weight: 130 },
+      previous: {
+        workoutId: "2b3c4d5e-6f70-4819-9a0b-1c2d3e4f5a6b",
+        workoutDate: "2026-10-27",
+        topSet: { reps: 6, durationSeconds: null, weight: 120 },
+      },
+    },
+    {
+      workoutExerciseId: "3c4d5e6f-7081-492a-8b1c-2d3e4f5a6b7c",
+      exerciseId: "4d5e6f70-8192-4a3b-9c2d-3e4f5a6b7c8d",
+      setsInTarget: { inTarget: 0, evaluated: 0 },
+      volume: null,
+      topSet: null,
+      previous: null,
+    },
+  ],
 };
 
 const workoutById: WorkoutById = {
@@ -340,6 +369,60 @@ describe("WorkoutRepository", () => {
 
       // Act
       const result = await repository.getById(workout.id);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("getSummary", () => {
+    it("gets /workouts/{workoutId}/summary without a body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => workoutSummary);
+      const repository = new WorkoutRepository(httpClient);
+
+      // Act
+      await repository.getSummary(workout.id);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "GET", path: `/workouts/${workout.id}/summary` },
+      ]);
+    });
+
+    it("returns the summary on success, keeping every null", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(new FakeHttpClient(async () => workoutSummary));
+
+      // Act
+      const result = await repository.getSummary(workout.id);
+
+      // Assert
+      expect(result).toEqual(ok(workoutSummary));
+    });
+
+    it.each([
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const repository = new WorkoutRepository(failingWith(status));
+
+      // Act
+      const result = await repository.getSummary(workout.id);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const repository = new WorkoutRepository(unreachable());
+
+      // Act
+      const result = await repository.getSummary(workout.id);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

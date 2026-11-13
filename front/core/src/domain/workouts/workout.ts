@@ -31,11 +31,23 @@ export type ReorderSetRecordsRequest = components["schemas"]["ReorderSetRecordsR
 export type ReviewWorkoutRequest = components["schemas"]["ReviewWorkoutRequest"];
 export type ChangeWorkoutStatusRequest = components["schemas"]["ChangeWorkoutStatusRequest"];
 export type WorkoutStatus = components["schemas"]["WorkoutStatus"];
+/**
+ * The stats the API computes for one workout: its sets in target and volume, and per exercise the top set and the top
+ * set of its previous execution.
+ */
+export type WorkoutSummary = components["schemas"]["WorkoutSummaryResponse"];
+/** The stats of one exercise of a {@link WorkoutSummary}; `volume`, `topSet` and `previous` are `null` when not applicable. */
+export type ExerciseSummary = components["schemas"]["ExerciseSummaryResponse"];
+/** How many of the evaluated sets met their target. */
+export type SetsInTarget = components["schemas"]["SetsInTargetResponse"];
+/** The previous execution of an exercise: its workout, its date and its top set. */
+export type PreviousExecution = components["schemas"]["PreviousExecutionResponse"];
 
 /** The workout id travels in the path, the rest of the input in the body. */
 export type UpdateWorkoutInput = UpdateWorkoutRequest & { id: string };
 export type AddExerciseToWorkoutInput = AddExerciseRequest & { workoutId: string };
 export type GetWorkoutByIdInput = { id: string };
+export type GetWorkoutSummaryInput = { workoutId: string };
 export type DeleteWorkoutInput = { id: string };
 /** The list's query: `standalone` keeps only the workouts not placed in a mesocycle. */
 export type GetWorkoutsInput = { standalone?: boolean };

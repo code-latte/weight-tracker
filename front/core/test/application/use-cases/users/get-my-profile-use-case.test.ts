@@ -4,6 +4,7 @@ import { GetMyProfileUseCase } from "../../../../src/application";
 import {
   type CreatedUserResponse,
   DomainError,
+  type ExerciseHistorySession,
   type ExerciseLastPerformance,
   fail,
   ok,
@@ -39,6 +40,10 @@ class FakeUserRepository implements UserRepositoryInterface {
   async getMyExerciseLastPerformance(): Promise<
     Result<ExerciseLastPerformance | null, DomainError>
   > {
+    return fail(new DomainError("UNEXPECTED", "Not used"));
+  }
+
+  async getExerciseHistory(): Promise<Result<ExerciseHistorySession[], DomainError>> {
     return fail(new DomainError("UNEXPECTED", "Not used"));
   }
 

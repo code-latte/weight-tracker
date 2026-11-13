@@ -15,11 +15,14 @@ import type {
   DeleteWorkoutInput,
   Exercise,
   ExerciseFavorite,
+  ExerciseHistorySession,
   ExerciseLastPerformance,
   GetAthleteMesocyclesInput,
   GetMesocycleByIdInput,
   GetMesocycleWorkoutsInput,
+  GetUserExerciseHistoryInput,
   GetWorkoutByIdInput,
+  GetWorkoutSummaryInput,
   GetWorkoutsInput,
   InvitationResponseInput,
   InviteAthleteRequest,
@@ -52,6 +55,7 @@ import type {
   WorkoutDetail,
   WorkoutExerciseDetail,
   WorkoutListItem,
+  WorkoutSummary,
   AddExerciseToWorkoutTemplateInput,
   BreakWorkoutTemplateSuperSeriesInput,
   CreateWorkoutFromTemplateInput,
@@ -111,6 +115,10 @@ export default interface Dependencies {
   getMyProfileUseCase: UseCaseInterface<void, UserProfile>;
   getUserTrainerUseCase: UseCaseInterface<string, UserProfile | null>;
   getMyExerciseLastPerformanceUseCase: UseCaseInterface<string, ExerciseLastPerformance | null>;
+  getUserExerciseHistoryUseCase: UseCaseInterface<
+    GetUserExerciseHistoryInput,
+    ExerciseHistorySession[]
+  >;
   updateMyProfileUseCase: UseCaseInterface<UpdateProfileRequest, UserProfile>;
   getUsersUseCase: UseCaseInterface<void, UserSummary[]>;
   createUserUseCase: UseCaseInterface<CreateUserRequest, CreatedUserResponse>;
@@ -118,6 +126,7 @@ export default interface Dependencies {
   deactivateUserUseCase: UseCaseInterface<string, UserActivationSummary>;
   getWorkoutsUseCase: UseCaseInterface<GetWorkoutsInput, WorkoutListItem[]>;
   getWorkoutByIdUseCase: UseCaseInterface<GetWorkoutByIdInput, WorkoutById>;
+  getWorkoutSummaryUseCase: UseCaseInterface<GetWorkoutSummaryInput, WorkoutSummary>;
   createWorkoutUseCase: UseCaseInterface<CreateWorkoutRequest, Workout>;
   updateWorkoutUseCase: UseCaseInterface<UpdateWorkoutInput, Workout>;
   deleteWorkoutUseCase: UseCaseInterface<DeleteWorkoutInput, void>;

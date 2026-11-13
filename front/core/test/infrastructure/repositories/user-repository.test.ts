@@ -3,6 +3,7 @@ import type { HttpClientInterface, HttpRequest } from "../../../src/application"
 import {
   type CreatedUserResponse,
   type CreateUserRequest,
+  type ExerciseHistorySession,
   type ExerciseLastPerformance,
   ok,
   type UpdateProfileRequest,
@@ -28,6 +29,23 @@ const lastPerformance: ExerciseLastPerformance = {
     { reps: 10, durationSeconds: null, weight: null },
   ],
 };
+
+const history: ExerciseHistorySession[] = [
+  {
+    workoutId: "7b0c1f7e-3a54-4d4e-9d0e-1a2b3c4d5e6f",
+    workoutDate: "2026-11-12",
+    maxWeight: 130,
+    volume: 3190,
+    estimatedOneRepMax: 160.3,
+  },
+  {
+    workoutId: "2b3c4d5e-6f70-4819-9a0b-1c2d3e4f5a6b",
+    workoutDate: "2026-10-27",
+    maxWeight: null,
+    volume: null,
+    estimatedOneRepMax: null,
+  },
+];
 
 const summary: UserActivationSummary = { ...profile, isActive: true, deactivatedAtUtc: null };
 
@@ -258,6 +276,81 @@ describe("UserRepository", () => {
 
       // Act
       const result = await repository.getMyExerciseLastPerformance(exerciseId);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });
+    });
+  });
+
+  describe("getExerciseHistory", () => {
+    const userId = "5f1c2f0e-9d5b-4a53-8c7e-0d6f7c1a2b3c";
+    const exerciseId = "9b8a7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
+
+    it("gets /users/{userId}/exercises/{exerciseId}/history with the limit and no body", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => history);
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      await repository.getExerciseHistory(userId, exerciseId, 5);
+
+      // Assert
+      expect(httpClient.requests).toEqual([
+        { method: "GET", path: `/users/${userId}/exercises/${exerciseId}/history?limit=5` },
+      ]);
+    });
+
+    it("returns the sessions in the API's order, keeping every null", async () => {
+      // Arrange
+      const repository = new UserRepository(new FakeHttpClient(async () => history));
+
+      // Act
+      const result = await repository.getExerciseHistory(userId, exerciseId, 5);
+
+      // Assert
+      expect(result).toEqual(ok(history));
+    });
+
+    it("returns an empty list when the user never did the exercise", async () => {
+      // Arrange
+      const repository = new UserRepository(new FakeHttpClient(async () => []));
+
+      // Act
+      const result = await repository.getExerciseHistory(userId, exerciseId, 5);
+
+      // Assert
+      expect(result).toEqual(ok([]));
+    });
+
+    it.each([
+      [400, "VALIDATION"],
+      [401, "UNAUTHORIZED"],
+      [403, "FORBIDDEN"],
+      [404, "NOT_FOUND"],
+      [500, "UNEXPECTED"],
+    ])("maps status %i to %s", async (status, code) => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => {
+        throw new HttpError(status, { status, detail: "Something failed" });
+      });
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      const result = await repository.getExerciseHistory(userId, exerciseId, 5);
+
+      // Assert
+      expect(result).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+    });
+
+    it("returns the network code when there is no response", async () => {
+      // Arrange
+      const httpClient = new FakeHttpClient(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+      const repository = new UserRepository(httpClient);
+
+      // Act
+      const result = await repository.getExerciseHistory(userId, exerciseId, 5);
 
       // Assert
       expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "NETWORK" }) });

@@ -21,6 +21,7 @@
     "@mui/icons-material": "~9.5.0",
     "@mui/material": "^9.5.0",
     "@mui/material-nextjs": "^9.5.0",
+    "@mui/x-charts": "^9.17.0",
     "@weight-tracker/core": "workspace:*",
     "i18next": "^26.5.3",
     "next": "16.4.2",

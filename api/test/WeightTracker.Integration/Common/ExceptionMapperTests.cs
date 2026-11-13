@@ -584,4 +584,17 @@ public class ExceptionMapperTests
         // Assert
         status.Should().Be(expected);
     }
+
+    [Fact]
+    public void Map_ShouldReturnBadRequestForAnInvalidHistoryLimit()
+    {
+        // Arrange
+        var exception = new InvalidHistoryLimitException(0, 1, 50);
+
+        // Act
+        var status = StatusOf(exception);
+
+        // Assert
+        status.Should().Be(StatusCodes.Status400BadRequest);
+    }
 }

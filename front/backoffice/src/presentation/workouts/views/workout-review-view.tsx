@@ -16,11 +16,14 @@ import ReviewStatCard from "@/presentation/workouts/components/molecules/review-
 import SessionProgressCard from "@/presentation/workouts/components/molecules/session-progress-card";
 import ReviewExerciseCard from "@/presentation/workouts/components/organisms/review-exercise-card";
 import WorkoutReviewHeader from "@/presentation/workouts/components/organisms/workout-review-header";
+import WorkoutReviewMetrics from "@/presentation/workouts/components/organisms/workout-review-metrics";
 import WorkoutReviewPersonStrip from "@/presentation/workouts/components/organisms/workout-review-person-strip";
 import WorkoutReviewTabs, {
   type ReviewTab,
 } from "@/presentation/workouts/components/organisms/workout-review-tabs";
+import useExerciseHistory from "@/presentation/workouts/hooks/use-exercise-history";
 import useSaveWorkoutAsTemplate from "@/presentation/workouts/hooks/use-save-workout-as-template";
+import useWorkoutSummary from "@/presentation/workouts/hooks/use-workout-summary";
 import { backHrefOf, personCardOf } from "@/presentation/workouts/workout-context";
 import useNow from "@/presentation/workouts/hooks/use-now";
 import {
@@ -28,6 +31,7 @@ import {
   elapsedPartsOf,
   initiallyExpandedOf,
   reviewSummaryOf,
+  weightedExercisesOf,
 } from "@/presentation/workouts/workout-review";
 
 /** The read-only review of a started, completed or reviewed workout: the session's figures and its exercises. */
@@ -43,6 +47,15 @@ export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
     return new Set(first === null ? [] : [first]);
   });
   const summary = reviewSummaryOf(workout);
+  // The metrics tab reads its summary the first time it opens, and the charts follow the exercise chosen there, the
+  // first weighted one until the trainer picks another. Both live here so they survive a change of tab.
+  const metrics = useWorkoutSummary(workout.id);
+  const [chosenExerciseId, setChosenExerciseId] = useState<string | null>(null);
+  const firstWeightedId = metrics.summary
+    ? (weightedExercisesOf(metrics.summary, workout)[0]?.exercise.exerciseId ?? null)
+    : null;
+  const chartExerciseId = chosenExerciseId ?? firstWeightedId;
+  const history = useExerciseHistory(workout.athlete.id, chartExerciseId);
   const notAvailable = t("review.notAvailable");
   // A started workout keeps counting; a finished one is fixed.
   const now = useNow(workout.status === "STARTED");
@@ -153,7 +166,25 @@ export default function WorkoutReview({ workout }: { workout: WorkoutById }) {
           pending={summary.pending}
         />
       </Box>
-      <WorkoutReviewTabs value={tab} onChange={setTab}>
+      <WorkoutReviewTabs
+        value={tab}
+        onChange={(next) => {
+          setTab(next);
+          if (next === "metrics") {
+            metrics.load();
+          }
+        }}
+        metrics={
+          <WorkoutReviewMetrics
+            workout={workout}
+            elapsed={elapsed}
+            summary={metrics}
+            history={history}
+            selectedExerciseId={chartExerciseId}
+            onSelectExercise={setChosenExerciseId}
+          />
+        }
+      >
         <Box component="ul" sx={{ display: "grid", gap: 1.5, listStyle: "none", m: 0, p: 0 }}>
           {workout.exercises.map((exercise, index) => (
             <li key={exercise.id}>

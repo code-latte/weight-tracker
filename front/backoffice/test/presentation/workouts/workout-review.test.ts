@@ -1,16 +1,29 @@
 import { describe, expect, it } from "vitest";
-import type { SetRecord, WorkoutById, WorkoutByIdExercise } from "@weight-tracker/core/domain";
+import type {
+  ExerciseHistorySession,
+  ExerciseSummary,
+  SetRecord,
+  WorkoutById,
+  WorkoutByIdExercise,
+  WorkoutSummary,
+} from "@weight-tracker/core/domain";
 import {
   countedRecordsOf,
   elapsedMsOf,
   elapsedPartsOf,
   exerciseStateOf,
+  historyPointsOf,
   initiallyExpandedOf,
   isReviewStatus,
+  isWeighted,
+  muscleDistributionOf,
+  percentOf,
   plannedRowsOf,
   plannedSetsOf,
   restOf,
   reviewSummaryOf,
+  weightChangeOf,
+  weightedExercisesOf,
 } from "@/presentation/workouts/workout-review";
 
 function record(
@@ -471,5 +484,288 @@ describe("elapsedPartsOf", () => {
 
     // Assert
     expect(result).toEqual({ hours, minutes });
+  });
+});
+
+function summaryEntry(workoutExerciseId: string, volume: number | null): ExerciseSummary {
+  return {
+    workoutExerciseId,
+    exerciseId: `catalog-${workoutExerciseId}`,
+    setsInTarget: { inTarget: 0, evaluated: 0 },
+    volume,
+    topSet: null,
+    previous: null,
+  };
+}
+
+function session(
+  workoutDate: string,
+  values: Partial<Pick<ExerciseHistorySession, "maxWeight" | "volume">> = {},
+): ExerciseHistorySession {
+  return {
+    workoutId: `workout-${workoutDate}`,
+    workoutDate,
+    maxWeight: null,
+    volume: null,
+    estimatedOneRepMax: null,
+    ...values,
+  };
+}
+
+describe("isWeighted", () => {
+  it.each([
+    [3190, true],
+    [0, true],
+    [null, false],
+  ])("answers for a volume of %s", (volume, expected) => {
+    // Arrange
+    const entry = summaryEntry("a", volume);
+
+    // Act
+    const weighted = isWeighted(entry);
+
+    // Assert
+    expect(weighted).toBe(expected);
+  });
+});
+
+describe("weightedExercisesOf", () => {
+  it("keeps the weighted exercises in workout order with their position, whatever the summary order", () => {
+    // Arrange
+    const stretch = exercise("stretch", [1]);
+    const squat = exercise("squat", [3]);
+    const press = exercise("press", [3]);
+    const summary = {
+      exercises: [
+        summaryEntry("press", 1200),
+        summaryEntry("stretch", null),
+        summaryEntry("squat", 3190),
+      ],
+    } as WorkoutSummary;
+
+    // Act
+    const weighted = weightedExercisesOf(summary, workout([stretch, squat, press]));
+
+    // Assert
+    expect(weighted.map(({ exercise: { id }, position }) => [id, position])).toEqual([
+      ["squat", 2],
+      ["press", 3],
+    ]);
+    expect(weighted[0].summary.volume).toBe(3190);
+  });
+
+  it("leaves out a workout exercise that the summary does not list", () => {
+    // Arrange
+    const summary = { exercises: [summaryEntry("squat", 3190)] } as WorkoutSummary;
+
+    // Act
+    const weighted = weightedExercisesOf(
+      summary,
+      workout([exercise("squat", [3]), exercise("press", [3])]),
+    );
+
+    // Assert
+    expect(weighted.map(({ exercise: { id } }) => id)).toEqual(["squat"]);
+  });
+});
+
+describe("weightChangeOf", () => {
+  it("reports a rise with its percentage", () => {
+    // Arrange
+    const previous = 120;
+    const current = 130;
+
+    // Act
+    const change = weightChangeOf(previous, current);
+
+    // Assert
+    expect(change?.direction).toBe("up");
+    expect(change?.percent).toBeCloseTo(8.33, 2);
+  });
+
+  it("reports a fall with a negative percentage", () => {
+    // Arrange
+    const previous = 100;
+    const current = 95;
+
+    // Act
+    const change = weightChangeOf(previous, current);
+
+    // Assert
+    expect(change).toEqual({ direction: "down", percent: -5 });
+  });
+
+  it("reports equal weights as equal", () => {
+    // Arrange
+    const previous = "100";
+    const current = 100;
+
+    // Act
+    const change = weightChangeOf(previous, current);
+
+    // Assert
+    expect(change).toEqual({ direction: "equal", percent: 0 });
+  });
+
+  it.each([
+    [null, 100],
+    [100, null],
+    [undefined, 100],
+    [0, 100],
+  ])("has no change from %s to %s", (previous, current) => {
+    // Arrange
+    // (the inputs are the case)
+
+    // Act
+    const change = weightChangeOf(previous, current);
+
+    // Assert
+    expect(change).toBeNull();
+  });
+});
+
+describe("percentOf", () => {
+  it.each([
+    [27, 29, 93],
+    [29, 29, 100],
+    [0, 29, 0],
+    ["2", "3", 67],
+  ])("answers %s of %s as %s", (part, total, expected) => {
+    // Arrange
+    // (the inputs are the case)
+
+    // Act
+    const percent = percentOf(part, total);
+
+    // Assert
+    expect(percent).toBe(expected);
+  });
+
+  it("has no percentage when there is no total", () => {
+    // Arrange
+    // (the inputs are the case)
+
+    // Act
+    const percent = percentOf(0, 0);
+
+    // Assert
+    expect(percent).toBeNull();
+  });
+});
+
+describe("muscleDistributionOf", () => {
+  it("sums the counted records per muscle, most sets first", () => {
+    // Arrange
+    const squat = exercise("squat", [3], [record("1"), record("2"), record("3")], {
+      muscle: "QUADRICEPS",
+    });
+    const extension = exercise("extension", [2], [record("4"), record("5")], {
+      muscle: "QUADRICEPS",
+    });
+    const thrust = exercise("thrust", [2], [record("6"), record("7")], { muscle: "GLUTES" });
+
+    // Act
+    const distribution = muscleDistributionOf(workout([thrust, squat, extension]));
+
+    // Assert
+    expect(distribution).toEqual([
+      { muscle: "QUADRICEPS", sets: 5 },
+      { muscle: "GLUTES", sets: 2 },
+    ]);
+  });
+
+  it("leaves out a muscle whose exercises have no counted record", () => {
+    // Arrange
+    const squat = exercise("squat", [3], [record("1")], { muscle: "QUADRICEPS" });
+    const calves = exercise("calves", [3], [], { muscle: "CALVES" });
+
+    // Act
+    const distribution = muscleDistributionOf(workout([squat, calves]));
+
+    // Assert
+    expect(distribution).toEqual([{ muscle: "QUADRICEPS", sets: 1 }]);
+  });
+
+  it("discards the records beyond the plan", () => {
+    // Arrange
+    const squat = exercise("squat", [2], [record("1"), record("2"), record("3")], {
+      muscle: "QUADRICEPS",
+    });
+
+    // Act
+    const distribution = muscleDistributionOf(workout([squat]));
+
+    // Assert
+    expect(distribution).toEqual([{ muscle: "QUADRICEPS", sets: 2 }]);
+  });
+
+  it("orders muscles with the same sets by their code", () => {
+    // Arrange
+    const glutes = exercise("thrust", [1], [record("1")], { muscle: "GLUTES" });
+    const biceps = exercise("curl", [1], [record("2")], { muscle: "BICEPS" });
+
+    // Act
+    const distribution = muscleDistributionOf(workout([glutes, biceps]));
+
+    // Assert
+    expect(distribution.map(({ muscle }) => muscle)).toEqual(["BICEPS", "GLUTES"]);
+  });
+});
+
+describe("historyPointsOf", () => {
+  it("puts the oldest session first", () => {
+    // Arrange
+    const sessions = [
+      session("2026-11-12", { maxWeight: 130 }),
+      session("2026-10-27", { maxWeight: 120 }),
+    ];
+
+    // Act
+    const points = historyPointsOf(sessions, "maxWeight");
+
+    // Assert
+    expect(points).toEqual([
+      { workoutDate: "2026-10-27", value: 120 },
+      { workoutDate: "2026-11-12", value: 130 },
+    ]);
+  });
+
+  it("drops the sessions that have no value for the field and reads strings as numbers", () => {
+    // Arrange
+    const sessions = [
+      session("2026-11-12", { maxWeight: null, volume: "3190" as unknown as number }),
+      session("2026-10-27", { maxWeight: 120, volume: null }),
+    ];
+
+    // Act
+    const points = historyPointsOf(sessions, "volume");
+
+    // Assert
+    expect(points).toEqual([{ workoutDate: "2026-11-12", value: 3190 }]);
+  });
+
+  it("keeps each field's own sessions", () => {
+    // Arrange
+    const sessions = [
+      session("2026-11-12", { maxWeight: null, volume: 3190 }),
+      session("2026-10-27", { maxWeight: 120, volume: null }),
+    ];
+
+    // Act
+    const points = historyPointsOf(sessions, "maxWeight");
+
+    // Assert
+    expect(points).toEqual([{ workoutDate: "2026-10-27", value: 120 }]);
+  });
+
+  it("answers an empty list for no sessions", () => {
+    // Arrange
+    const sessions: ExerciseHistorySession[] = [];
+
+    // Act
+    const points = historyPointsOf(sessions, "volume");
+
+    // Assert
+    expect(points).toEqual([]);
   });
 });

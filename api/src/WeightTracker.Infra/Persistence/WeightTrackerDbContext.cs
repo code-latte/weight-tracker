@@ -178,6 +178,10 @@ public class WeightTrackerDbContext : DbContext
 
             entity.HasIndex(workoutExercise => new { workoutExercise.WorkoutId, workoutExercise.ExerciseId }).IsUnique();
 
+            // Serves the reads that start from an exercise, so a rare or never-done one does not scan the table
+            entity.HasIndex(workoutExercise => new { workoutExercise.ExerciseId, workoutExercise.WorkoutId })
+                .HasDatabaseName("IX_WorkoutExercises_ExerciseId_WorkoutId");
+
             // Exercise is its own aggregate root: foreign key only, no navigation
             entity.HasOne<ExerciseEntity>()
                 .WithMany()

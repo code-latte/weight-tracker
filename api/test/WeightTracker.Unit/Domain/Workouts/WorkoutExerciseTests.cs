@@ -327,4 +327,77 @@ public class WorkoutExerciseTests
         snapshot.Should().NotBeSameAs(entry.SetRecords);
         snapshot.Should().BeAssignableTo<IReadOnlyList<SetRecord>>();
     }
+
+    private static SetRecord Record(SetResult result, int minute)
+        => SetRecord.Rehydrate(Id.New(), result, Weight.From(20), TenOClock.AddMinutes(minute));
+
+    [Fact]
+    public void SetsInTarget_ShouldBeZeroOfZeroWithoutSetRecords()
+    {
+        // Arrange
+        var entry = WorkoutExercise.Create(Id.New(), Effort.MID, [TwoByTen]);
+
+        // Act
+        var sets = entry.SetsInTarget();
+
+        // Assert
+        sets.Should().Be((0, 0));
+    }
+
+    [Fact]
+    public void SetsInTarget_ShouldCountTheSetsThatMeetTheirTarget()
+    {
+        // Arrange
+        var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))],
+            setRecords: [Record(Reps(10), 0), Record(Reps(9), 1), Record(Reps(12), 2)]);
+
+        // Act
+        var sets = entry.SetsInTarget();
+
+        // Assert
+        sets.Should().Be((2, 3));
+    }
+
+    [Fact]
+    public void SetsInTarget_ShouldNotEvaluateRecordsBeyondThePrescribedSets()
+    {
+        // Arrange
+        var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [new SetPrescription(3, new SetTarget.Reps(10))],
+            setRecords: [Record(Reps(10), 0), Record(Reps(10), 1), Record(Reps(10), 2), Record(Reps(10), 3)]);
+
+        // Act
+        var sets = entry.SetsInTarget();
+
+        // Assert
+        sets.Should().Be((3, 3));
+    }
+
+    [Fact]
+    public void SetsInTarget_ShouldNotEvaluatePrescribedSetsWithoutARecord()
+    {
+        // Arrange
+        var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID, [new SetPrescription(4, new SetTarget.Reps(10))],
+            setRecords: [Record(Reps(10), 0), Record(Reps(5), 1)]);
+
+        // Act
+        var sets = entry.SetsInTarget();
+
+        // Assert
+        sets.Should().Be((1, 2));
+    }
+
+    [Fact]
+    public void SetsInTarget_ShouldMatchEachRecordToThePrescriptionAtItsPosition()
+    {
+        // Arrange
+        var entry = WorkoutExercise.Rehydrate(Id.New(), Id.New(), Effort.MID,
+            [new SetPrescription(1, new SetTarget.Reps(10)), new SetPrescription(2, new SetTarget.RepsRange(6, 8)), new SetPrescription(1, new SetTarget.MaxReps())],
+            setRecords: [Record(Reps(10), 0), Record(Reps(6), 1), Record(Reps(5), 2), Record(Reps(2), 3)]);
+
+        // Act
+        var sets = entry.SetsInTarget();
+
+        // Assert
+        sets.Should().Be((3, 4));
+    }
 }
